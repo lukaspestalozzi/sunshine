@@ -5,7 +5,6 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class GeoPointTest {
-
     @Test
     fun `creates GeoPoint with valid coordinates`() {
         val point = GeoPoint(latitude = 46.8182, longitude = 8.2275)
