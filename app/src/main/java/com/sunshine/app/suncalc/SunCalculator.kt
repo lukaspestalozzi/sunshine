@@ -9,7 +9,6 @@ import java.time.LocalDateTime
  * Designed as a pluggable component to allow different implementations.
  */
 interface SunCalculator {
-
     /**
      * Calculate the sun's position (azimuth and elevation) for a given location and time.
      *

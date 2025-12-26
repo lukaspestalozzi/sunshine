@@ -28,14 +28,15 @@ fun OsmMapView(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val mapView = remember {
-        MapView(context).apply {
-            setTileSource(TileSourceFactory.MAPNIK)
-            setMultiTouchControls(true)
-            controller.setZoom(zoomLevel)
-            controller.setCenter(OsmGeoPoint(center.latitude, center.longitude))
+    val mapView =
+        remember {
+            MapView(context).apply {
+                setTileSource(TileSourceFactory.MAPNIK)
+                setMultiTouchControls(true)
+                controller.setZoom(zoomLevel)
+                controller.setCenter(OsmGeoPoint(center.latitude, center.longitude))
+            }
         }
-    }
 
     // Keep callback references updated without recreating the listener
     val currentOnMapMoved = rememberUpdatedState(onMapMoved)
@@ -43,23 +44,24 @@ fun OsmMapView(
 
     // Set up map listener once when mapView is created
     DisposableEffect(mapView) {
-        val listener = object : MapListener {
-            override fun onScroll(event: ScrollEvent?): Boolean {
-                val newCenter = mapView.mapCenter
-                currentOnMapMoved.value(
-                    GeoPoint(
-                        latitude = newCenter.latitude,
-                        longitude = newCenter.longitude,
-                    ),
-                )
-                return true
-            }
+        val listener =
+            object : MapListener {
+                override fun onScroll(event: ScrollEvent?): Boolean {
+                    val newCenter = mapView.mapCenter
+                    currentOnMapMoved.value(
+                        GeoPoint(
+                            latitude = newCenter.latitude,
+                            longitude = newCenter.longitude,
+                        ),
+                    )
+                    return true
+                }
 
-            override fun onZoom(event: ZoomEvent?): Boolean {
-                currentOnZoomChanged.value(mapView.zoomLevelDouble)
-                return true
+                override fun onZoom(event: ZoomEvent?): Boolean {
+                    currentOnZoomChanged.value(mapView.zoomLevelDouble)
+                    return true
+                }
             }
-        }
         mapView.addMapListener(listener)
 
         onDispose {

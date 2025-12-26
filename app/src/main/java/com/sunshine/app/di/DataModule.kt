@@ -8,6 +8,7 @@ import org.koin.dsl.module
 /**
  * Koin module for data layer dependencies (repositories, data sources).
  */
-val dataModule = module {
-    single<SettingsRepository> { SettingsRepositoryImpl(context = androidContext()) }
-}
+val dataModule =
+    module {
+        single<SettingsRepository> { SettingsRepositoryImpl(context = androidContext()) }
+    }

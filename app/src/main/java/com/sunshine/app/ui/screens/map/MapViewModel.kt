@@ -4,19 +4,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sunshine.app.domain.model.GeoPoint
 import com.sunshine.app.suncalc.SunCalculator
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.LocalTime
 
 class MapViewModel(
     private val sunCalculator: SunCalculator,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(MapUiState())
     val uiState: StateFlow<MapUiState> = _uiState.asStateFlow()
 
@@ -64,10 +63,11 @@ class MapViewModel(
             val dateTime = LocalDateTime.of(state.selectedDate, state.selectedTime)
 
             try {
-                val sunPosition = sunCalculator.calculateSunPosition(
-                    location = state.mapCenter,
-                    dateTime = dateTime,
-                )
+                val sunPosition =
+                    sunCalculator.calculateSunPosition(
+                        location = state.mapCenter,
+                        dateTime = dateTime,
+                    )
                 _uiState.update { it.copy(sunPosition = sunPosition, error = null) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message ?: "Failed to calculate sun position") }

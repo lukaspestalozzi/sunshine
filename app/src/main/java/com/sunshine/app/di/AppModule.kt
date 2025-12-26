@@ -8,7 +8,8 @@ import org.koin.dsl.module
 /**
  * Koin module for app-level dependencies (ViewModels).
  */
-val appModule = module {
-    viewModel { MapViewModel(sunCalculator = get()) }
-    viewModel { SettingsViewModel(settingsRepository = get()) }
-}
+val appModule =
+    module {
+        viewModel { MapViewModel(sunCalculator = get()) }
+        viewModel { SettingsViewModel(settingsRepository = get()) }
+    }

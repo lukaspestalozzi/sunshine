@@ -10,8 +10,9 @@ import org.koin.dsl.module
  * This module is designed to be easily swappable to allow different
  * sun calculation implementations (local library, PeakFinder API, etc.)
  */
-val sunCalcModule = module {
-    // Default implementation - simple local calculator
-    // To switch implementations, just change this binding
-    single<SunCalculator> { SimpleSunCalculator() }
-}
+val sunCalcModule =
+    module {
+        // Default implementation - simple local calculator
+        // To switch implementations, just change this binding
+        single<SunCalculator> { SimpleSunCalculator() }
+    }
