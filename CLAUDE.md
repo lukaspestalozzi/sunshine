@@ -367,21 +367,36 @@ Use descriptive test names with backticks:
 
 ### Local Testing (before push)
 
-All CI checks must be runnable locally. Use the following commands:
+Use the provided scripts to run CI checks locally. These handle proxy authentication issues automatically.
 
 ```bash
-# Run all checks (same as CI)
-./gradlew check
+# Quick verification (ktlint + detekt, no Gradle needed)
+./scripts/verify-local.sh --standalone
 
-# Individual checks
-./gradlew ktlintCheck      # Code formatting
-./gradlew detekt           # Static analysis
-./gradlew testDebugUnitTest # Unit tests
-./gradlew lintDebug        # Android lint
+# Full CI simulation via Gradle (exact CI match, requires ANDROID_HOME)
+./scripts/verify-local.sh --gradle
 
-# Quick feedback loop during development
-./gradlew testDebugUnitTest --continuous
+# Or run individual Gradle tasks via proxy wrapper
+./scripts/run-with-proxy.sh ktlintCheck
+./scripts/run-with-proxy.sh detekt
+./scripts/run-with-proxy.sh lintDebug
+./scripts/run-with-proxy.sh testDebugUnitTest
+./scripts/run-with-proxy.sh assembleDebug
+
+# Run all CI checks at once
+./scripts/run-with-proxy.sh check
 ```
+
+### Important: ktlint Version Difference
+
+There is a version difference between standalone ktlint and the Gradle plugin:
+
+| Tool | ktlint Version | Notes |
+|------|---------------|-------|
+| Standalone (verify-local.sh --standalone) | 1.5.0 | May miss some rules |
+| Gradle plugin 12.1.2 | ~1.0-1.3 | Matches CI exactly |
+
+**Known difference:** The `value-argument-comment` rule flags inline comments in argument lists in older versions but not in 1.5.0. Always use Gradle for final verification.
 
 ### CI Workflow
 
@@ -397,11 +412,20 @@ All CI checks must be runnable locally. Use the following commands:
 ### Pre-commit Checklist
 
 Before committing, ensure:
-- [ ] `./gradlew check` passes locally
+- [ ] `./scripts/verify-local.sh` passes (quick check)
+- [ ] `./scripts/run-with-proxy.sh ktlintCheck` passes (exact CI match)
 - [ ] New code has tests
 - [ ] No `// TODO` without issue reference
 - [ ] No hardcoded strings (use resources)
 - [ ] No suppressed warnings without justification
+
+### Project Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/verify-local.sh` | Auto-detect best verification method |
+| `scripts/run-with-proxy.sh` | Run Gradle commands through local auth proxy |
+| `scripts/auth-proxy.py` | Local proxy that handles Java HTTPS auth issues |
 
 ---
 
