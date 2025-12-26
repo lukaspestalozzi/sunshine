@@ -12,7 +12,6 @@ import org.koin.core.logger.Level
 import org.osmdroid.config.Configuration
 
 class SunshineApp : Application() {
-
     override fun onCreate() {
         super.onCreate()
 

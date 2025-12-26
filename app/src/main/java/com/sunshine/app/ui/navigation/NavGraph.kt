@@ -10,9 +10,13 @@ import com.sunshine.app.ui.screens.download.DownloadScreen
 import com.sunshine.app.ui.screens.map.MapScreen
 import com.sunshine.app.ui.screens.settings.SettingsScreen
 
-sealed class Screen(val route: String) {
+sealed class Screen(
+    val route: String,
+) {
     data object Map : Screen("map")
+
     data object Settings : Screen("settings")
+
     data object Download : Screen("download")
 }
 

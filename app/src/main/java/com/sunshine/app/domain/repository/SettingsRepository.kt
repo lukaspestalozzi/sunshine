@@ -6,7 +6,6 @@ import kotlinx.coroutines.flow.Flow
  * Repository for app settings.
  */
 interface SettingsRepository {
-
     /** Whether offline mode is enabled */
     val offlineModeEnabled: Flow<Boolean>
 

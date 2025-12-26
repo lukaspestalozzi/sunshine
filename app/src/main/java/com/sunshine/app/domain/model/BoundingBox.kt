@@ -15,22 +15,22 @@ data class BoundingBox(
     }
 
     val center: GeoPoint
-        get() = GeoPoint(
-            latitude = (north + south) / 2,
-            longitude = (east + west) / 2,
-        )
+        get() =
+            GeoPoint(
+                latitude = (north + south) / 2,
+                longitude = (east + west) / 2,
+            )
 
-    fun contains(point: GeoPoint): Boolean {
-        return point.latitude in south..north && point.longitude in west..east
-    }
+    fun contains(point: GeoPoint): Boolean = point.latitude in south..north && point.longitude in west..east
 
     companion object {
         /** Swiss Alps bounding box */
-        val SWISS_ALPS = BoundingBox(
-            north = 47.8,
-            south = 45.8,
-            east = 10.5,
-            west = 5.9,
-        )
+        val SWISS_ALPS =
+            BoundingBox(
+                north = 47.8,
+                south = 45.8,
+                east = 10.5,
+                west = 5.9,
+            )
     }
 }

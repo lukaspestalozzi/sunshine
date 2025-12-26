@@ -19,11 +19,6 @@ complexity:
     thresholdInObjects: 15
     thresholdInEnums: 5
 
-formatting:
-  active: true
-  android: true
-  autoCorrect: true
-
 naming:
   FunctionNaming:
     ignoreAnnotated:

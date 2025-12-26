@@ -12,7 +12,6 @@ import com.sunshine.app.ui.navigation.SunshineNavHost
 import com.sunshine.app.ui.theme.SunshineTheme
 
 class MainActivity : ComponentActivity() {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

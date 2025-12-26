@@ -7,7 +7,6 @@ import com.sunshine.app.domain.model.GeoPoint
  * Repository for elevation data.
  */
 interface ElevationRepository {
-
     /**
      * Get elevation at a specific point.
      *

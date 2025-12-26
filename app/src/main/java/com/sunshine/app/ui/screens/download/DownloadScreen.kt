@@ -23,17 +23,16 @@ import com.sunshine.app.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DownloadScreen(
-    onNavigateBack: () -> Unit,
-) {
+fun DownloadScreen(onNavigateBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.download_title)) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
+                colors =
+                    TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
@@ -47,10 +46,11 @@ fun DownloadScreen(
         },
     ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(16.dp),
         ) {
             Text(
                 text = stringResource(R.string.download_select_region),
@@ -59,9 +59,10 @@ fun DownloadScreen(
 
             // Placeholder for region selection
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(

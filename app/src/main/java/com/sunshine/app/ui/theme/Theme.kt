@@ -11,33 +11,35 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-private val LightColorScheme = lightColorScheme(
-    primary = SunshinePrimary,
-    onPrimary = SunshineLightOnPrimary,
-    primaryContainer = SunshinePrimaryVariant,
-    secondary = SunshineSecondary,
-    onSecondary = SunshineLightOnSecondary,
-    background = SunshineLightBackground,
-    onBackground = SunshineLightOnBackground,
-    surface = SunshineLightSurface,
-    onSurface = SunshineLightOnSurface,
-    error = SunshineError,
-    onError = SunshineOnError,
-)
+private val LightColorScheme =
+    lightColorScheme(
+        primary = SunshinePrimary,
+        onPrimary = SunshineLightOnPrimary,
+        primaryContainer = SunshinePrimaryVariant,
+        secondary = SunshineSecondary,
+        onSecondary = SunshineLightOnSecondary,
+        background = SunshineLightBackground,
+        onBackground = SunshineLightOnBackground,
+        surface = SunshineLightSurface,
+        onSurface = SunshineLightOnSurface,
+        error = SunshineError,
+        onError = SunshineOnError,
+    )
 
-private val DarkColorScheme = darkColorScheme(
-    primary = SunshinePrimary,
-    onPrimary = SunshineDarkOnPrimary,
-    primaryContainer = SunshinePrimaryVariant,
-    secondary = SunshineSecondary,
-    onSecondary = SunshineDarkOnSecondary,
-    background = SunshineDarkBackground,
-    onBackground = SunshineDarkOnBackground,
-    surface = SunshineDarkSurface,
-    onSurface = SunshineDarkOnSurface,
-    error = SunshineError,
-    onError = SunshineOnError,
-)
+private val DarkColorScheme =
+    darkColorScheme(
+        primary = SunshinePrimary,
+        onPrimary = SunshineDarkOnPrimary,
+        primaryContainer = SunshinePrimaryVariant,
+        secondary = SunshineSecondary,
+        onSecondary = SunshineDarkOnSecondary,
+        background = SunshineDarkBackground,
+        onBackground = SunshineDarkOnBackground,
+        surface = SunshineDarkSurface,
+        onSurface = SunshineDarkOnSurface,
+        error = SunshineError,
+        onError = SunshineOnError,
+    )
 
 @Composable
 fun SunshineTheme(

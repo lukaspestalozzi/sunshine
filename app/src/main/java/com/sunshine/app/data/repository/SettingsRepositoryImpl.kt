@@ -15,15 +15,15 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 class SettingsRepositoryImpl(
     private val context: Context,
 ) : SettingsRepository {
-
     private object PreferencesKeys {
         val OFFLINE_MODE = booleanPreferencesKey("offline_mode")
     }
 
-    override val offlineModeEnabled: Flow<Boolean> = context.dataStore.data
-        .map { preferences ->
-            preferences[PreferencesKeys.OFFLINE_MODE] ?: false
-        }
+    override val offlineModeEnabled: Flow<Boolean> =
+        context.dataStore.data
+            .map { preferences ->
+                preferences[PreferencesKeys.OFFLINE_MODE] ?: false
+            }
 
     override suspend fun setOfflineModeEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
