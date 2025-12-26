@@ -1,12 +1,12 @@
 package com.sunshine.app.suncalc
 
 import com.sunshine.app.domain.model.GeoPoint
+import java.time.LocalDateTime
+import java.time.Month
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.time.LocalDateTime
-import java.time.Month
 
 class SimpleSunCalculatorTest {
 
