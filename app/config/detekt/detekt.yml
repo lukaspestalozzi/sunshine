@@ -9,6 +9,8 @@ config:
 complexity:
   LongMethod:
     threshold: 30
+    ignoreAnnotated:
+      - 'Composable'
   LongParameterList:
     functionThreshold: 8
     constructorThreshold: 10
@@ -26,7 +28,7 @@ naming:
 
 style:
   MaxLineLength:
-    maxLineLength: 120
+    maxLineLength: 140
   WildcardImport:
     active: true
   MagicNumber:

@@ -21,7 +21,9 @@ import kotlin.math.tan
  *
  * Reference: https://gml.noaa.gov/grad/solcalc/solareqns.PDF
  */
+@Suppress("MagicNumber") // Astronomical constants from NOAA solar calculation algorithm
 class SimpleSunCalculator : SunCalculator {
+    @Suppress("LongMethod") // Complex astronomical calculation is inherently long but cohesive
     override suspend fun calculateSunPosition(
         location: GeoPoint,
         dateTime: LocalDateTime,
