@@ -188,7 +188,8 @@ private fun TimeControlPanel(
                     val time = java.time.LocalTime.ofSecondOfDay(seconds.toLong())
                     onTimeSelected(time)
                 },
-                valueRange = 0f..86399f, // 0 to 23:59:59
+                // 0 to 23:59:59
+                valueRange = 0f..86399f,
                 steps = 0,
             )
 
