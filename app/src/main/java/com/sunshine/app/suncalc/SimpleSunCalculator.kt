@@ -67,7 +67,7 @@ class SimpleSunCalculator : SunCalculator {
         val elevation = 90 - zenith
 
         val azimuthDenom = cos(location.latitude.toRadians()) * sin(zenith.toRadians())
-        var azimuth = if (azimuthDenom.absoluteValue() > 0.001) {
+        val azimuth = if (azimuthDenom.absoluteValue() > 0.001) {
             val azimuthRad = acos(
                 ((sin(location.latitude.toRadians()) * cos(zenith.toRadians())) - sin(sunDeclination.toRadians())) / azimuthDenom,
             )
