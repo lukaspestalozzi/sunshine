@@ -49,7 +49,8 @@ class SimpleSunCalculatorTest {
             val winterPosition = calculator.calculateSunPosition(location, winterNoon)
 
             assertTrue(
-                "Sun should be higher in summer (${summerPosition.elevation}) than winter (${winterPosition.elevation})",
+                "Sun should be higher in summer (${summerPosition.elevation}) " +
+                    "than winter (${winterPosition.elevation})",
                 summerPosition.elevation > winterPosition.elevation,
             )
         }

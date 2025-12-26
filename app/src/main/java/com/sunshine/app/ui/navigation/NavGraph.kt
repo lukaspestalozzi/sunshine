@@ -1,3 +1,5 @@
+@file:Suppress("MatchingDeclarationName") // File contains both Screen sealed class and NavHost
+
 package com.sunshine.app.ui.navigation
 
 import androidx.compose.runtime.Composable

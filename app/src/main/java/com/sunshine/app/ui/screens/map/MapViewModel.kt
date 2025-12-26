@@ -57,6 +57,7 @@ class MapViewModel(
         _uiState.update { it.copy(error = null) }
     }
 
+    @Suppress("TooGenericExceptionCaught") // Calculator may throw various exceptions
     private fun updateSunPosition() {
         viewModelScope.launch {
             val state = _uiState.value

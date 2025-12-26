@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.sunshine.app.R
 import com.sunshine.app.ui.components.OsmMapView
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -127,17 +128,18 @@ private fun SunPositionOverlay(
                 style = MaterialTheme.typography.labelMedium,
             )
             Text(
-                text = "Elevation: ${String.format("%.1f", sunPosition.elevation)}°",
+                text = "Elevation: ${String.format(Locale.US, "%.1f", sunPosition.elevation)}°",
                 style = MaterialTheme.typography.labelSmall,
             )
             Text(
-                text = "Azimuth: ${String.format("%.1f", sunPosition.azimuth)}°",
+                text = "Azimuth: ${String.format(Locale.US, "%.1f", sunPosition.azimuth)}°",
                 style = MaterialTheme.typography.labelSmall,
             )
         }
     }
 }
 
+@Suppress("UnusedParameter") // onDateSelected will be used when date picker is implemented
 @Composable
 private fun TimeControlPanel(
     uiState: MapUiState,
