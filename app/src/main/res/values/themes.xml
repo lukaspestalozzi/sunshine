@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.Sunshine" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">@color/sunshine_primary</item>
+        <item name="android:colorPrimaryDark">@color/sunshine_primary_variant</item>
+        <item name="android:colorAccent">@color/sunshine_secondary</item>
+        <item name="android:statusBarColor">@color/sunshine_primary_variant</item>
+        <item name="android:windowBackground">@color/sunshine_background</item>
+    </style>
+
+</resources>

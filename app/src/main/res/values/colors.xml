@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary colors - warm sunshine theme -->
+    <color name="sunshine_primary">#FF9800</color>
+    <color name="sunshine_primary_variant">#F57C00</color>
+    <color name="sunshine_secondary">#FFC107</color>
+
+    <!-- Surface colors -->
+    <color name="sunshine_background">#FFFBFE</color>
+    <color name="sunshine_surface">#FFFBFE</color>
+    <color name="sunshine_error">#B3261E</color>
+
+    <!-- On colors -->
+    <color name="sunshine_on_primary">#FFFFFF</color>
+    <color name="sunshine_on_secondary">#000000</color>
+    <color name="sunshine_on_background">#1C1B1F</color>
+    <color name="sunshine_on_surface">#1C1B1F</color>
+    <color name="sunshine_on_error">#FFFFFF</color>
+
+    <!-- Overlay colors for map -->
+    <color name="overlay_sunlit">#40FFEB3B</color>
+    <color name="overlay_shaded">#406B7A8F</color>
+</resources>
