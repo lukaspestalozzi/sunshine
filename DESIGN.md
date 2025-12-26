@@ -283,17 +283,114 @@ Calculating "where the sun shines" requires:
 
 **Recommended for MVP:** Start with **Approach B (Sample Grid)** - calculate visibility for a grid of points and render as overlay. This balances accuracy with performance.
 
-### 5.3 Candidate Libraries/APIs
+### 5.3 PeakFinder API Investigation (December 2025)
 
+#### What PeakFinder Offers
+- **Embed API** (not a data API): Allows embedding panoramic mountain views via iFrame or JavaScript Canvas
+- **Sun/Moon display**: Can show sun ecliptic and return sun times (sunrise/sunset)
+- **Horizon visualization**: Renders 360° panoramas with peak labels
+- **WebAssembly-based**: Runs in browser, not native
+
+#### API Capabilities
+| Feature | Available | Notes |
+|---------|-----------|-------|
+| Embed panorama view | ✅ Yes | iFrame or Canvas/JS |
+| Sun position display | ✅ Yes | Visual overlay on panorama |
+| Sun times (rise/set) | ✅ Yes | Returns JSON: `{"sun":{"rise":"...","set":"..."}}` |
+| Date/time control | ✅ Yes | `panel.astro.currentDateTime(year, month, day, hour, min)` |
+| Raw horizon profile data | ❌ No | No endpoint to extract elevation angles |
+| Raw elevation data | ❌ No | Cannot get DEM data |
+| Offline capability | ❌ No | Requires internet for API |
+| Bulk/batch queries | ❌ No | Interactive embed only |
+| Commercial licensing | ❓ Unclear | No public pricing; contact required |
+
+#### Why PeakFinder is NOT Suitable for Sunshine
+
+1. **Embed-only, not data API**: PeakFinder provides visualization embeds, not raw horizon/elevation data we can process
+2. **No offline support**: The API requires internet; our core requirement is offline functionality
+3. **WebAssembly limitation**: Cannot run natively on Android; would require WebView wrapper
+4. **No bulk processing**: Cannot efficiently calculate visibility for a grid of points
+5. **Unclear licensing**: No public commercial API terms; would need custom agreement
+6. **Wrong data format**: Returns rendered panoramas, not the terrain profile data we need for shadow calculations
+
+#### Verdict: ❌ Not recommended for this project
+
+### 5.4 Recommended Alternatives
+
+#### For Sun Position Calculation
+| Option | Type | Recommendation |
+|--------|------|----------------|
+| [commons-suncalc](https://github.com/shred/commons-suncalc) | Java Library | ✅ **Recommended** - Comprehensive, well-tested, Android-compatible |
+| [ca.rmen:lib-sunrise-sunset](https://github.com/caarmen/lib-sunrise-sunset) | Java Library | ✅ Good alternative |
+| Custom NOAA implementation | Code | Fallback if libraries don't fit |
+
+#### For Terrain/Horizon Calculation
 | Option | Type | Notes |
 |--------|------|-------|
-| [SunCalc (JS port needed)](https://github.com/mourner/suncalc) | Library | Popular, accurate, would need Kotlin port |
-| [ca.rmen:lib-sunrise-sunset](https://github.com/caarmen/lib-sunrise-sunset) | Library | Java library, works on Android |
-| [commons-suncalc](https://github.com/shred/commons-suncalc) | Library | Comprehensive Java library |
-| [PeakFinder API](https://www.peakfinder.com/) | API | Need to investigate API availability |
-| Custom implementation | Code | Full control, based on NOAA algorithms |
+| **Local DEM processing** | Offline | ✅ **Recommended** - Use SRTM/NASADEM data locally |
+| [HORAYZON](https://github.com/ChristianSteger/HORAYZON) | Python/Cython | Excellent reference implementation for horizon/shadow algorithms |
+| [PVGIS Horizon API](https://re.jrc.ec.europa.eu/pvg_tools) | Online API | 90m resolution, good for supplementary data |
+| [Open-Elevation API](https://open-elevation.com/) | Online API | For on-demand elevation queries |
 
-**Decision:** To be determined after prototyping. The pluggable architecture allows us to experiment.
+### 5.5 Recommended Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Sun Visibility Calculation                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────────┐     ┌──────────────────────────────────┐  │
+│  │  Sun Position    │     │  Terrain/Horizon Module          │  │
+│  │  Calculator      │     │                                  │  │
+│  │                  │     │  ┌─────────────┐ ┌────────────┐  │  │
+│  │  commons-suncalc │     │  │ DEM Data    │ │ Horizon    │  │  │
+│  │  or equivalent   │     │  │ (SRTM/      │ │ Calculator │  │  │
+│  │                  │     │  │  NASADEM)   │ │            │  │  │
+│  │  Input:          │     │  └──────┬──────┘ └─────┬──────┘  │  │
+│  │  - lat/lon       │     │         │              │         │  │
+│  │  - datetime      │     │         ▼              ▼         │  │
+│  │                  │     │  ┌─────────────────────────────┐ │  │
+│  │  Output:         │     │  │ Ray-casting / Line-of-sight │ │  │
+│  │  - azimuth       │     │  │ (inspired by HORAYZON)      │ │  │
+│  │  - elevation     │     │  └─────────────────────────────┘ │  │
+│  └────────┬─────────┘     └──────────────────┬───────────────┘  │
+│           │                                   │                  │
+│           └───────────────┬───────────────────┘                  │
+│                           ▼                                      │
+│              ┌─────────────────────────┐                         │
+│              │  Visibility Result      │                         │
+│              │  - isSunVisible: Bool   │                         │
+│              │  - shadowSource: Peak?  │                         │
+│              │  - nextSunTime: Time?   │                         │
+│              └─────────────────────────┘                         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 5.6 Implementation Strategy
+
+**Phase 1: Basic sun position** (MVP)
+- Use `commons-suncalc` for astronomical calculations
+- Ignore terrain initially (flat horizon assumption)
+
+**Phase 2: Terrain-aware visibility**
+- Download/bundle SRTM elevation data for Alps region
+- Implement horizon profile calculation (port HORAYZON concepts to Kotlin)
+- Ray-cast from observer toward sun to check for terrain occlusion
+
+**Phase 3: Optimization**
+- Pre-compute horizon profiles for downloaded regions
+- Cache results in Room database
+- Use spatial indexing for efficient lookups
+
+### 5.7 Data Requirements
+
+| Data | Source | Resolution | Storage (Alps) |
+|------|--------|------------|----------------|
+| Elevation (DEM) | SRTM v3 / NASADEM | 30m (~1 arc-second) | ~500MB raw, ~100MB compressed |
+| Horizon profiles | Pre-computed | Per 100m grid point | ~50MB |
+| Sun positions | Calculated on-demand | N/A | N/A |
+
+**Decision:** Use local DEM data with `commons-suncalc` for sun positions. Implement custom horizon calculation inspired by HORAYZON algorithms.
 
 ---
 
@@ -529,21 +626,36 @@ class ConnectivityObserver(context: Context) {
 
 | # | Question | Status |
 |---|----------|--------|
-| 1 | Which sun calculation library to use? | To prototype |
-| 2 | PeakFinder API availability and terms? | To investigate |
-| 3 | Optimal elevation grid resolution for Alps? | To determine |
+| 1 | Which sun calculation library to use? | ✅ Resolved: `commons-suncalc` recommended |
+| 2 | PeakFinder API availability and terms? | ✅ Resolved: Not suitable (see section 5.3) |
+| 3 | Optimal elevation grid resolution for Alps? | 30m (SRTM) sufficient for hiking use case |
 | 4 | Tile server usage policy for bulk downloads? | To check |
 | 5 | Target overlay update rate (performance)? | To benchmark |
+| 6 | SRTM data licensing for bundled distribution? | To verify (public domain expected) |
+| 7 | Horizon calculation performance on mobile? | To prototype and benchmark |
 
 ---
 
 ## 12. References
 
+### Core Libraries
 - [osmdroid Wiki](https://github.com/osmdroid/osmdroid/wiki)
-- [NOAA Solar Calculator](https://gml.noaa.gov/grad/solcalc/)
-- [Open-Elevation API](https://open-elevation.com/)
+- [commons-suncalc](https://github.com/shred/commons-suncalc) - Recommended sun position library
 - [Android Compose Documentation](https://developer.android.com/jetpack/compose)
 - [Room Persistence Library](https://developer.android.com/training/data-storage/room)
+
+### Sun & Terrain Calculation
+- [NOAA Solar Calculator](https://gml.noaa.gov/grad/solcalc/) - Reference algorithms
+- [HORAYZON](https://github.com/ChristianSteger/HORAYZON) - Horizon/shadow calculation reference (Python)
+- [PVGIS Horizon Tool](https://re.jrc.ec.europa.eu/pvg_tools) - EU horizon profile service
+
+### Elevation Data Sources
+- [Open-Elevation API](https://open-elevation.com/)
+- [SRTM Data (NASA)](https://www2.jpl.nasa.gov/srtm/) - 30m global elevation
+- [OpenTopography](https://opentopography.org/) - High-resolution DEM data
+
+### Investigated but Not Used
+- [PeakFinder API](https://www.peakfinder.com/about/resources/api/) - Embed-only, not suitable (see section 5.3)
 
 ---
 
