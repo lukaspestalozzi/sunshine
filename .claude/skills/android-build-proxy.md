@@ -4,14 +4,52 @@
 
 | Task | Command |
 |------|---------|
-| **Quick verify (standalone)** | `./scripts/verify-local.sh --standalone` |
-| **Full verify (Gradle, CI match)** | `./scripts/verify-local.sh --gradle` |
-| **ktlintCheck** | `./scripts/run-with-proxy.sh ktlintCheck` |
-| **detekt** | `./scripts/run-with-proxy.sh detekt` |
-| **lintDebug** | `./scripts/run-with-proxy.sh lintDebug` |
-| **Unit tests** | `./scripts/run-with-proxy.sh testDebugUnitTest` |
-| **Build APK** | `./scripts/run-with-proxy.sh assembleDebug` |
-| **All CI checks** | `./scripts/run-with-proxy.sh check` |
+| **Full CI simulation** | `./scripts/verify-local.sh` |
+| **Quick check (ktlint + detekt)** | `./scripts/verify-local.sh --quick` |
+| **Standalone (no Android SDK)** | `./scripts/verify-local.sh --standalone` |
+| **Individual Gradle task** | `./scripts/run-with-proxy.sh <task>` |
+
+## CI Pipeline Steps
+
+The CI runs these 5 steps in order. Local verification matches this exactly:
+
+| Step | Gradle Task | Description |
+|------|-------------|-------------|
+| 1 | `ktlintCheck` | Code style |
+| 2 | `detekt` | Static analysis |
+| 3 | `lintDebug` | Android lint |
+| 4 | `testDebugUnitTest` | Unit tests |
+| 5 | `assembleDebug` | Build APK |
+
+## Verification Workflow
+
+```
+During development    → ./scripts/verify-local.sh --quick     (fast: ktlint + detekt)
+Before committing     → ./scripts/verify-local.sh --quick     (catch style issues early)
+Before pushing        → ./scripts/verify-local.sh             (full CI: all 5 steps)
+```
+
+**Always run full verification before pushing!** This ensures CI will pass.
+
+## Script Usage
+
+### `./scripts/verify-local.sh`
+
+```bash
+./scripts/verify-local.sh              # Full CI simulation (all 5 steps)
+./scripts/verify-local.sh --quick      # Quick check (ktlint + detekt only)
+./scripts/verify-local.sh --standalone # Standalone tools (no Android SDK needed)
+```
+
+### `./scripts/run-with-proxy.sh`
+
+Run individual Gradle tasks:
+
+```bash
+./scripts/run-with-proxy.sh ktlintCheck
+./scripts/run-with-proxy.sh testDebugUnitTest --tests "*.SimpleSunCalculatorTest"
+./scripts/run-with-proxy.sh check
+```
 
 ## Important: ktlint Version Difference
 
@@ -20,7 +58,7 @@
 | Tool | ktlint Version | Accuracy |
 |------|---------------|----------|
 | `verify-local.sh --standalone` | 1.5.0 | Fast but may miss rules |
-| `run-with-proxy.sh ktlintCheck` | ~1.0-1.3 (Gradle plugin) | Matches CI exactly |
+| `verify-local.sh` or `--quick` | ~1.0-1.3 (Gradle plugin) | Matches CI exactly |
 
 **Known difference:** Inline comments in argument lists:
 ```kotlin
@@ -30,43 +68,6 @@ valueRange = 0f..86399f, // comment here
 // GOOD - Comment on separate line
 // comment here
 valueRange = 0f..86399f,
-```
-
-**Always run `./scripts/run-with-proxy.sh ktlintCheck` before pushing!**
-
-## Verification Workflow
-
-1. **During development**: `./scripts/verify-local.sh --standalone` (fast)
-2. **Before committing**: `./scripts/run-with-proxy.sh ktlintCheck detekt` (CI match)
-3. **Before pushing**: `./scripts/run-with-proxy.sh check` (full CI simulation)
-
-## CI Pipeline Steps
-
-The CI runs these steps in order:
-1. `ktlintCheck` - Code style
-2. `detekt` - Static analysis
-3. `lintDebug` - Android lint
-4. `testDebugUnitTest` - Unit tests
-5. `assembleDebug` - Build APK
-
-Run locally with: `./scripts/run-with-proxy.sh ktlintCheck detekt lintDebug testDebugUnitTest assembleDebug`
-
-## Script Usage
-
-### `./scripts/verify-local.sh`
-
-```bash
-./scripts/verify-local.sh              # Auto-detect method
-./scripts/verify-local.sh --standalone # Fast, standalone tools
-./scripts/verify-local.sh --gradle     # Slower, matches CI exactly
-```
-
-### `./scripts/run-with-proxy.sh`
-
-```bash
-./scripts/run-with-proxy.sh ktlintCheck
-./scripts/run-with-proxy.sh testDebugUnitTest --tests "*.SimpleSunCalculatorTest"
-./scripts/run-with-proxy.sh check
 ```
 
 ## Auto-fixing Code Style
@@ -96,8 +97,10 @@ When suppressing rules, always add justification:
 
 ## Requirements
 
-- **Standalone**: Python 3, Java 17+, curl
-- **Gradle**: Python 3, Java 17+, Android SDK (ANDROID_HOME)
+| Mode | Requirements |
+|------|--------------|
+| Full/Quick | `ANDROID_HOME` set, Java 17+ |
+| Standalone | Java 17+, curl |
 
 ## How Proxy Works
 
@@ -106,4 +109,4 @@ Java's `HttpURLConnection` doesn't send proxy auth for HTTPS CONNECT. The `auth-
 2. Listens on `127.0.0.1:3128`
 3. Injects auth into CONNECT requests
 
-This is transparent when using `run-with-proxy.sh`.
+This is transparent when using `run-with-proxy.sh` or `verify-local.sh`.
