@@ -367,64 +367,70 @@ Use descriptive test names with backticks:
 
 ### Local Testing (before push)
 
-Use the provided scripts to run CI checks locally. These handle proxy authentication issues automatically.
+Use the provided scripts to run CI checks locally. These match the CI pipeline exactly.
 
 ```bash
-# Quick verification (ktlint + detekt, no Gradle needed)
+# Full CI simulation - runs all 5 steps (recommended before push)
+./scripts/verify-local.sh
+
+# Quick check during development (ktlint + detekt only)
+./scripts/verify-local.sh --quick
+
+# Standalone tools when Android SDK not available (may miss some rules)
 ./scripts/verify-local.sh --standalone
 
-# Full CI simulation via Gradle (exact CI match, requires ANDROID_HOME)
-./scripts/verify-local.sh --gradle
-
-# Or run individual Gradle tasks via proxy wrapper
+# Run individual Gradle tasks
 ./scripts/run-with-proxy.sh ktlintCheck
-./scripts/run-with-proxy.sh detekt
-./scripts/run-with-proxy.sh lintDebug
-./scripts/run-with-proxy.sh testDebugUnitTest
-./scripts/run-with-proxy.sh assembleDebug
+./scripts/run-with-proxy.sh testDebugUnitTest --tests "*.SimpleSunCalculatorTest"
+```
 
-# Run all CI checks at once
-./scripts/run-with-proxy.sh check
+### CI Pipeline Steps
+
+The CI runs these 5 steps in order. Local `./scripts/verify-local.sh` runs all of them:
+
+| Step | Gradle Task | Description |
+|------|-------------|-------------|
+| 1 | `ktlintCheck` | Code style |
+| 2 | `detekt` | Static analysis |
+| 3 | `lintDebug` | Android lint |
+| 4 | `testDebugUnitTest` | Unit tests |
+| 5 | `assembleDebug` | Build APK |
+
+### Verification Workflow
+
+```
+During development    → ./scripts/verify-local.sh --quick     (fast: ktlint + detekt)
+Before committing     → ./scripts/verify-local.sh --quick     (catch style issues early)
+Before pushing        → ./scripts/verify-local.sh             (full CI: all 5 steps)
 ```
 
 ### Important: ktlint Version Difference
 
-There is a version difference between standalone ktlint and the Gradle plugin:
-
 | Tool | ktlint Version | Notes |
 |------|---------------|-------|
-| Standalone (verify-local.sh --standalone) | 1.5.0 | May miss some rules |
-| Gradle plugin 12.1.2 | ~1.0-1.3 | Matches CI exactly |
+| `--standalone` mode | 1.5.0 | May miss some rules |
+| Default/`--quick` mode | ~1.0-1.3 (Gradle plugin) | Matches CI exactly |
 
-**Known difference:** The `value-argument-comment` rule flags inline comments in argument lists in older versions but not in 1.5.0. Always use Gradle for final verification.
-
-### CI Workflow
-
-```yaml
-# .github/workflows/ci.yml runs:
-1. ktlintCheck - Code style
-2. detekt - Static analysis
-3. lintDebug - Android-specific issues
-4. testDebugUnitTest - Unit tests
-5. assembleDebug - Build verification
-```
+**Known difference:** Inline comments in argument lists are only caught by older ktlint.
 
 ### Pre-commit Checklist
 
 Before committing, ensure:
-- [ ] `./scripts/verify-local.sh` passes (quick check)
-- [ ] `./scripts/run-with-proxy.sh ktlintCheck` passes (exact CI match)
+- [ ] `./scripts/verify-local.sh --quick` passes (style checks)
 - [ ] New code has tests
 - [ ] No `// TODO` without issue reference
 - [ ] No hardcoded strings (use resources)
 - [ ] No suppressed warnings without justification
 
+Before pushing, ensure:
+- [ ] `./scripts/verify-local.sh` passes (full CI simulation)
+
 ### Project Scripts
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/verify-local.sh` | Auto-detect best verification method |
-| `scripts/run-with-proxy.sh` | Run Gradle commands through local auth proxy |
+| `scripts/verify-local.sh` | Full CI simulation (all 5 steps) or quick checks |
+| `scripts/run-with-proxy.sh` | Run individual Gradle commands through local auth proxy |
 | `scripts/auth-proxy.py` | Local proxy that handles Java HTTPS auth issues |
 
 ---
