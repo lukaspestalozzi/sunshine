@@ -71,7 +71,7 @@ class TileDownloadWorker(
             handleDownloadFailure(params.regionId, e.message)
         }
 
-    private fun handleDownloadFailure(
+    private suspend fun handleDownloadFailure(
         regionId: String,
         errorMessage: String?,
     ): Result {
@@ -94,7 +94,7 @@ class TileDownloadWorker(
         return createDownloadResult(params.regionId, success)
     }
 
-    private fun initializeDownloadRecord(
+    private suspend fun initializeDownloadRecord(
         params: DownloadParams,
         totalTiles: Long,
     ) {
@@ -117,7 +117,7 @@ class TileDownloadWorker(
         downloadedRegionDao.insertOrUpdate(entity)
     }
 
-    private fun createDownloadResult(
+    private suspend fun createDownloadResult(
         regionId: String,
         success: Boolean,
     ): Result {
@@ -194,7 +194,7 @@ class TileDownloadWorker(
         maxY = latToTileY(bounds.south, zoom),
     )
 
-    private fun finalizeDownloadProgress(
+    private suspend fun finalizeDownloadProgress(
         regionId: String,
         downloadedCount: Long,
         totalBytes: Long,
