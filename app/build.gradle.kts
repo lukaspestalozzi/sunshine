@@ -92,6 +92,9 @@ dependencies {
     // DataStore
     implementation(libs.datastore.preferences)
 
+    // WorkManager
+    implementation(libs.workmanager.runtime)
+
     // Maps
     implementation(libs.osmdroid)
 
