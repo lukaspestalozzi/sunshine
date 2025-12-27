@@ -5,17 +5,18 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.sunshine.app.data.local.database.DownloadedRegionDao
-import com.sunshine.app.data.local.database.entities.DownloadedRegionEntity
 import com.sunshine.app.data.local.database.entities.DownloadStatus
+import com.sunshine.app.data.local.database.entities.DownloadedRegionEntity
 import com.sunshine.app.domain.model.BoundingBox
+import java.io.File
+import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import org.osmdroid.config.Configuration
-import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 
 /**
  * WorkManager worker that downloads map tiles for a specific region.
@@ -31,71 +32,82 @@ class TileDownloadWorker(
 
     override suspend fun doWork(): Result =
         withContext(Dispatchers.IO) {
-            val regionId = inputData.getString(KEY_REGION_ID) ?: return@withContext Result.failure()
-            val name = inputData.getString(KEY_NAME) ?: return@withContext Result.failure()
-            val north = inputData.getDouble(KEY_NORTH, Double.NaN)
-            val south = inputData.getDouble(KEY_SOUTH, Double.NaN)
-            val east = inputData.getDouble(KEY_EAST, Double.NaN)
-            val west = inputData.getDouble(KEY_WEST, Double.NaN)
-            val minZoom = inputData.getInt(KEY_MIN_ZOOM, -1)
-            val maxZoom = inputData.getInt(KEY_MAX_ZOOM, -1)
-
-            if (hasInvalidInput(north, south, east, west, minZoom, maxZoom)) {
-                return@withContext Result.failure()
-            }
-
-            try {
-                processDownload(regionId, name, north, south, east, west, minZoom, maxZoom)
-            } catch (e: Exception) {
-                downloadedRegionDao.updateStatus(regionId, DownloadStatus.FAILED.name)
-                Result.failure(
-                    workDataOf(
-                        KEY_REGION_ID to regionId,
-                        KEY_ERROR to (e.message ?: "Unknown error"),
-                    ),
-                )
-            }
+            val params = extractInputParams() ?: return@withContext Result.failure()
+            executeDownload(params)
         }
 
-    private fun hasInvalidInput(
+    private fun extractInputParams(): DownloadParams? {
+        val regionId = inputData.getString(KEY_REGION_ID)
+        val name = inputData.getString(KEY_NAME)
+        val north = inputData.getDouble(KEY_NORTH, Double.NaN)
+        val south = inputData.getDouble(KEY_SOUTH, Double.NaN)
+        val east = inputData.getDouble(KEY_EAST, Double.NaN)
+        val west = inputData.getDouble(KEY_WEST, Double.NaN)
+        val minZoom = inputData.getInt(KEY_MIN_ZOOM, -1)
+        val maxZoom = inputData.getInt(KEY_MAX_ZOOM, -1)
+
+        val hasValidStrings = regionId != null && name != null
+        val hasValidCoordinates = !hasInvalidCoordinates(north, south, east, west)
+        val hasValidZoom = minZoom >= 0 && maxZoom >= 0
+
+        return if (hasValidStrings && hasValidCoordinates && hasValidZoom) {
+            DownloadParams(regionId!!, name!!, north, south, east, west, minZoom, maxZoom)
+        } else {
+            null
+        }
+    }
+
+    private fun hasInvalidCoordinates(
         north: Double,
         south: Double,
         east: Double,
         west: Double,
-        minZoom: Int,
-        maxZoom: Int,
-    ): Boolean =
-        north.isNaN() ||
-            south.isNaN() ||
-            east.isNaN() ||
-            west.isNaN() ||
-            minZoom < 0 ||
-            maxZoom < 0
+    ): Boolean = north.isNaN() || south.isNaN() || east.isNaN() || west.isNaN()
 
-    @Suppress("LongParameterList")
-    private suspend fun processDownload(
+    private suspend fun executeDownload(params: DownloadParams): Result =
+        try {
+            processDownload(params)
+        } catch (e: IOException) {
+            handleDownloadFailure(params.regionId, e.message)
+        }
+
+    private fun handleDownloadFailure(
         regionId: String,
-        name: String,
-        north: Double,
-        south: Double,
-        east: Double,
-        west: Double,
-        minZoom: Int,
-        maxZoom: Int,
+        errorMessage: String?,
     ): Result {
-        val bounds = BoundingBox(north, south, east, west)
-        val totalTiles = estimateTileCount(bounds, minZoom, maxZoom)
+        downloadedRegionDao.updateStatus(regionId, DownloadStatus.FAILED.name)
+        return Result.failure(
+            workDataOf(
+                KEY_REGION_ID to regionId,
+                KEY_ERROR to (errorMessage ?: "Unknown error"),
+            ),
+        )
+    }
 
+    private suspend fun processDownload(params: DownloadParams): Result {
+        val bounds = BoundingBox(params.north, params.south, params.east, params.west)
+        val totalTiles = estimateTileCount(bounds, params.minZoom, params.maxZoom)
+
+        initializeDownloadRecord(params, totalTiles)
+
+        val success = downloadAllTiles(params.regionId, bounds, params.minZoom, params.maxZoom, totalTiles)
+        return createDownloadResult(params.regionId, success)
+    }
+
+    private fun initializeDownloadRecord(
+        params: DownloadParams,
+        totalTiles: Long,
+    ) {
         val entity =
             DownloadedRegionEntity(
-                regionId = regionId,
-                name = name,
-                north = north,
-                south = south,
-                east = east,
-                west = west,
-                minZoom = minZoom,
-                maxZoom = maxZoom,
+                regionId = params.regionId,
+                name = params.name,
+                north = params.north,
+                south = params.south,
+                east = params.east,
+                west = params.west,
+                minZoom = params.minZoom,
+                maxZoom = params.maxZoom,
                 totalTiles = totalTiles,
                 downloadedTiles = 0,
                 sizeBytes = 0,
@@ -103,37 +115,23 @@ class TileDownloadWorker(
                 status = DownloadStatus.DOWNLOADING.name,
             )
         downloadedRegionDao.insertOrUpdate(entity)
+    }
 
-        val success =
-            downloadTiles(
-                regionId = regionId,
-                bounds = bounds,
-                minZoom = minZoom,
-                maxZoom = maxZoom,
-                totalTiles = totalTiles,
-            )
-
+    private fun createDownloadResult(
+        regionId: String,
+        success: Boolean,
+    ): Result {
+        val status = if (success) DownloadStatus.COMPLETED else DownloadStatus.FAILED
+        downloadedRegionDao.updateStatus(regionId, status.name)
         return if (success) {
-            downloadedRegionDao.updateStatus(regionId, DownloadStatus.COMPLETED.name)
-            Result.success(
-                workDataOf(
-                    KEY_REGION_ID to regionId,
-                    KEY_STATUS to DownloadStatus.COMPLETED.name,
-                ),
-            )
+            Result.success(workDataOf(KEY_REGION_ID to regionId, KEY_STATUS to status.name))
         } else {
-            downloadedRegionDao.updateStatus(regionId, DownloadStatus.FAILED.name)
-            Result.failure(
-                workDataOf(
-                    KEY_REGION_ID to regionId,
-                    KEY_STATUS to DownloadStatus.FAILED.name,
-                ),
-            )
+            Result.failure(workDataOf(KEY_REGION_ID to regionId, KEY_STATUS to status.name))
         }
     }
 
-    @Suppress("MagicNumber", "NestedBlockDepth", "LoopWithTooManyJumpStatements")
-    private suspend fun downloadTiles(
+    @Suppress("NestedBlockDepth", "LoopWithTooManyJumpStatements")
+    private suspend fun downloadAllTiles(
         regionId: String,
         bounds: BoundingBox,
         minZoom: Int,
@@ -144,41 +142,69 @@ class TileDownloadWorker(
         var totalBytes = 0L
 
         for (zoom in minZoom..maxZoom) {
-            val minTileX = lonToTileX(bounds.west, zoom)
-            val maxTileX = lonToTileX(bounds.east, zoom)
-            val minTileY = latToTileY(bounds.north, zoom)
-            val maxTileY = latToTileY(bounds.south, zoom)
+            val result = downloadZoomLevel(regionId, bounds, zoom, downloadedCount, totalBytes, totalTiles)
+            if (result == null) return false
+            downloadedCount = result.first
+            totalBytes = result.second
+        }
 
-            for (x in minTileX..maxTileX) {
-                for (y in minTileY..maxTileY) {
-                    if (isStopped) {
-                        downloadedRegionDao.updateStatus(regionId, DownloadStatus.PAUSED.name)
-                        return false
-                    }
+        finalizeDownloadProgress(regionId, downloadedCount, totalBytes)
+        return true
+    }
 
-                    val tileUrl = getTileUrl(zoom, x.toInt(), y.toInt())
-                    val downloaded = downloadSingleTile(tileUrl)
+    @Suppress("NestedBlockDepth", "LoopWithTooManyJumpStatements")
+    private suspend fun downloadZoomLevel(
+        regionId: String,
+        bounds: BoundingBox,
+        zoom: Int,
+        startCount: Long,
+        startBytes: Long,
+        totalTiles: Long,
+    ): Pair<Long, Long>? {
+        var downloadedCount = startCount
+        var totalBytes = startBytes
+        val tileRange = calculateTileRange(bounds, zoom)
 
-                    if (downloaded > 0) {
-                        downloadedCount++
-                        totalBytes += downloaded
-
-                        if (downloadedCount % PROGRESS_UPDATE_INTERVAL == 0L) {
-                            updateDownloadProgress(regionId, downloadedCount, totalBytes, totalTiles)
-                        }
+        for (x in tileRange.minX..tileRange.maxX) {
+            for (y in tileRange.minY..tileRange.maxY) {
+                if (isStopped) {
+                    downloadedRegionDao.updateStatus(regionId, DownloadStatus.PAUSED.name)
+                    return null
+                }
+                val downloaded = downloadSingleTile(getTileUrl(zoom, x.toInt(), y.toInt()))
+                if (downloaded > 0) {
+                    downloadedCount++
+                    totalBytes += downloaded
+                    if (downloadedCount % PROGRESS_UPDATE_INTERVAL == 0L) {
+                        updateDownloadProgress(regionId, downloadedCount, totalBytes, totalTiles)
                     }
                 }
             }
         }
+        return Pair(downloadedCount, totalBytes)
+    }
 
+    private fun calculateTileRange(
+        bounds: BoundingBox,
+        zoom: Int,
+    ) = TileRange(
+        minX = lonToTileX(bounds.west, zoom),
+        maxX = lonToTileX(bounds.east, zoom),
+        minY = latToTileY(bounds.north, zoom),
+        maxY = latToTileY(bounds.south, zoom),
+    )
+
+    private fun finalizeDownloadProgress(
+        regionId: String,
+        downloadedCount: Long,
+        totalBytes: Long,
+    ) {
         downloadedRegionDao.updateProgress(
             regionId = regionId,
             downloadedTiles = downloadedCount,
             sizeBytes = totalBytes,
             status = DownloadStatus.COMPLETED.name,
         )
-
-        return true
     }
 
     private suspend fun updateDownloadProgress(
@@ -202,7 +228,7 @@ class TileDownloadWorker(
         )
     }
 
-    @Suppress("MagicNumber", "SwallowedException", "TooGenericExceptionCaught")
+    @Suppress("SwallowedException")
     private fun downloadSingleTile(tileUrl: String): Long =
         try {
             val connection = URL(tileUrl).openConnection() as HttpURLConnection
@@ -218,7 +244,7 @@ class TileDownloadWorker(
             } else {
                 0L
             }
-        } catch (e: Exception) {
+        } catch (e: IOException) {
             0L
         }
 
@@ -252,11 +278,8 @@ class TileDownloadWorker(
     ): Long {
         var total = 0L
         for (zoom in minZoom..maxZoom) {
-            val minTileX = lonToTileX(bounds.west, zoom)
-            val maxTileX = lonToTileX(bounds.east, zoom)
-            val minTileY = latToTileY(bounds.north, zoom)
-            val maxTileY = latToTileY(bounds.south, zoom)
-            total += (maxTileX - minTileX + 1) * (maxTileY - minTileY + 1)
+            val range = calculateTileRange(bounds, zoom)
+            total += (range.maxX - range.minX + 1) * (range.maxY - range.minY + 1)
         }
         return total
     }
@@ -280,6 +303,24 @@ class TileDownloadWorker(
         val y = (1.0 - Math.log(Math.tan(latRad) + 1.0 / Math.cos(latRad)) / Math.PI) / 2.0 * n
         return y.toLong().coerceIn(0, n - 1)
     }
+
+    private data class DownloadParams(
+        val regionId: String,
+        val name: String,
+        val north: Double,
+        val south: Double,
+        val east: Double,
+        val west: Double,
+        val minZoom: Int,
+        val maxZoom: Int,
+    )
+
+    private data class TileRange(
+        val minX: Long,
+        val maxX: Long,
+        val minY: Long,
+        val maxY: Long,
+    )
 
     companion object {
         const val KEY_REGION_ID = "region_id"
