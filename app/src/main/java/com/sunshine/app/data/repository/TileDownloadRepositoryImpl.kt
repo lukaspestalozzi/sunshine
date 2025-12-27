@@ -26,38 +26,39 @@ class TileDownloadRepositoryImpl(
     private val workManager = androidx.work.WorkManager.getInstance(context)
 
     override fun startDownload(region: DownloadableRegion) {
-        val workData =
-            workDataOf(
-                TileDownloadWorker.KEY_REGION_ID to region.id,
-                TileDownloadWorker.KEY_NAME to region.name,
-                TileDownloadWorker.KEY_NORTH to region.bounds.north,
-                TileDownloadWorker.KEY_SOUTH to region.bounds.south,
-                TileDownloadWorker.KEY_EAST to region.bounds.east,
-                TileDownloadWorker.KEY_WEST to region.bounds.west,
-                TileDownloadWorker.KEY_MIN_ZOOM to region.minZoom,
-                TileDownloadWorker.KEY_MAX_ZOOM to region.maxZoom,
-            )
-
-        val constraints =
-            Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .setRequiresStorageNotLow(true)
-                .build()
-
-        val downloadRequest =
-            OneTimeWorkRequestBuilder<TileDownloadWorker>()
-                .setInputData(workData)
-                .setConstraints(constraints)
-                .addTag(DOWNLOAD_WORK_TAG)
-                .addTag(region.id)
-                .build()
-
+        val downloadRequest = createDownloadRequest(region)
         workManager.enqueueUniqueWork(
             getWorkName(region.id),
             ExistingWorkPolicy.REPLACE,
             downloadRequest,
         )
     }
+
+    private fun createDownloadRequest(region: DownloadableRegion) =
+        OneTimeWorkRequestBuilder<TileDownloadWorker>()
+            .setInputData(createWorkData(region))
+            .setConstraints(createDownloadConstraints())
+            .addTag(DOWNLOAD_WORK_TAG)
+            .addTag(region.id)
+            .build()
+
+    private fun createWorkData(region: DownloadableRegion) =
+        workDataOf(
+            TileDownloadWorker.KEY_REGION_ID to region.id,
+            TileDownloadWorker.KEY_NAME to region.name,
+            TileDownloadWorker.KEY_NORTH to region.bounds.north,
+            TileDownloadWorker.KEY_SOUTH to region.bounds.south,
+            TileDownloadWorker.KEY_EAST to region.bounds.east,
+            TileDownloadWorker.KEY_WEST to region.bounds.west,
+            TileDownloadWorker.KEY_MIN_ZOOM to region.minZoom,
+            TileDownloadWorker.KEY_MAX_ZOOM to region.maxZoom,
+        )
+
+    private fun createDownloadConstraints() =
+        Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .setRequiresStorageNotLow(true)
+            .build()
 
     override fun cancelDownload(regionId: String) {
         workManager.cancelUniqueWork(getWorkName(regionId))

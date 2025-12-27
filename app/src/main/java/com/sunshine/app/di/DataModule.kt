@@ -22,32 +22,36 @@ import kotlinx.serialization.json.Json
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 
+private val migrationSql =
+    """
+    CREATE TABLE IF NOT EXISTS downloaded_regions (
+        regionId TEXT NOT NULL PRIMARY KEY,
+        name TEXT NOT NULL,
+        north REAL NOT NULL,
+        south REAL NOT NULL,
+        east REAL NOT NULL,
+        west REAL NOT NULL,
+        minZoom INTEGER NOT NULL,
+        maxZoom INTEGER NOT NULL,
+        totalTiles INTEGER NOT NULL,
+        downloadedTiles INTEGER NOT NULL,
+        sizeBytes INTEGER NOT NULL,
+        downloadedAt INTEGER NOT NULL,
+        status TEXT NOT NULL
+    )
+    """.trimIndent()
+
 /**
  * Migration from version 1 to 2: adds downloaded_regions table.
  */
-private val MIGRATION_1_2 = object : Migration(1, 2) {
-    override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL(
-            """
-            CREATE TABLE IF NOT EXISTS downloaded_regions (
-                regionId TEXT NOT NULL PRIMARY KEY,
-                name TEXT NOT NULL,
-                north REAL NOT NULL,
-                south REAL NOT NULL,
-                east REAL NOT NULL,
-                west REAL NOT NULL,
-                minZoom INTEGER NOT NULL,
-                maxZoom INTEGER NOT NULL,
-                totalTiles INTEGER NOT NULL,
-                downloadedTiles INTEGER NOT NULL,
-                sizeBytes INTEGER NOT NULL,
-                downloadedAt INTEGER NOT NULL,
-                status TEXT NOT NULL
-            )
-            """.trimIndent(),
-        )
+private val MIGRATION_1_2 = createMigration1To2()
+
+private fun createMigration1To2(): Migration =
+    object : Migration(1, 2) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(migrationSql)
+        }
     }
-}
 
 /**
  * Koin module for data layer dependencies (repositories, data sources).

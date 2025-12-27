@@ -17,16 +17,21 @@ import org.osmdroid.util.GeoPoint as OsmGeoPoint
 import org.osmdroid.util.MapTileIndex
 import org.osmdroid.views.MapView
 
+private const val MIN_ZOOM = 0
+private const val MAX_ZOOM = 17
+private const val TILE_SIZE = 256
+
 /**
  * OpenTopoMap tile source for hiking/outdoor use.
  * Provides topographic styling with contour lines and hill shading.
  */
-@Suppress("MagicNumber")
-private val openTopoMapTileSource = object : OnlineTileSourceBase(
+private val openTopoMapTileSource = OpenTopoMapTileSource()
+
+private class OpenTopoMapTileSource : OnlineTileSourceBase(
     "OpenTopoMap",
-    0,
-    17,
-    256,
+    MIN_ZOOM,
+    MAX_ZOOM,
+    TILE_SIZE,
     ".png",
     arrayOf(
         "https://a.tile.opentopomap.org/",
