@@ -10,6 +10,11 @@ import org.koin.dsl.module
  */
 val appModule =
     module {
-        viewModel { MapViewModel(sunCalculator = get()) }
+        viewModel {
+            MapViewModel(
+                sunCalculator = get(),
+                visibilityUseCase = get(),
+            )
+        }
         viewModel { SettingsViewModel(settingsRepository = get()) }
     }

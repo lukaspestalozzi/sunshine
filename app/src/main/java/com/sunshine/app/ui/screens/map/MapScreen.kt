@@ -95,10 +95,10 @@ fun MapScreen(
                     modifier = Modifier.fillMaxSize(),
                 )
 
-                // Sun position indicator overlay
-                uiState.sunPosition?.let { sunPos ->
+                // Sun position and visibility overlay
+                if (uiState.sunPosition != null) {
                     SunPositionOverlay(
-                        sunPosition = sunPos,
+                        uiState = uiState,
                         modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
                     )
                 }
@@ -116,17 +116,41 @@ fun MapScreen(
     }
 }
 
+@Suppress("CyclomaticComplexMethod") // UI conditional rendering naturally has many branches
 @Composable
 private fun SunPositionOverlay(
-    sunPosition: com.sunshine.app.domain.model.SunPosition,
+    uiState: MapUiState,
     modifier: Modifier = Modifier,
 ) {
+    val sunPosition = uiState.sunPosition ?: return
+    val visibility = uiState.visibility
+
     Card(modifier = modifier) {
         Column(modifier = Modifier.padding(8.dp)) {
+            // Visibility status (terrain-aware if available)
+            val visibilityText =
+                when {
+                    visibility != null && visibility.isSunVisible -> "Sun: Visible"
+                    visibility != null && !visibility.isSunVisible && sunPosition.isAboveHorizon ->
+                        "Sun: Blocked by terrain"
+                    sunPosition.isAboveHorizon -> "Sun: Above horizon"
+                    else -> "Sun: Below horizon"
+                }
+            val visibilityColor =
+                when {
+                    uiState.isSunVisibleWithTerrain ->
+                        MaterialTheme.colorScheme.primary
+                    sunPosition.isAboveHorizon ->
+                        MaterialTheme.colorScheme.tertiary
+                    else -> MaterialTheme.colorScheme.outline
+                }
+
             Text(
-                text = if (sunPosition.isAboveHorizon) "Sun: Above horizon" else "Sun: Below horizon",
+                text = visibilityText,
                 style = MaterialTheme.typography.labelMedium,
+                color = visibilityColor,
             )
+
             Text(
                 text = "Elevation: ${String.format(Locale.US, "%.1f", sunPosition.elevation)}°",
                 style = MaterialTheme.typography.labelSmall,
@@ -135,6 +159,30 @@ private fun SunPositionOverlay(
                 text = "Azimuth: ${String.format(Locale.US, "%.1f", sunPosition.azimuth)}°",
                 style = MaterialTheme.typography.labelSmall,
             )
+
+            // Show horizon angle if visibility data is available
+            visibility?.let {
+                Text(
+                    text = "Horizon: ${String.format(Locale.US, "%.1f", it.horizonAngle)}°",
+                    style = MaterialTheme.typography.labelSmall,
+                )
+                if (!it.isSunVisible && it.degreesUntilVisible != null) {
+                    Text(
+                        text = "${String.format(Locale.US, "%.1f", it.degreesUntilVisible)}° until visible",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                }
+            }
+
+            // Loading indicator
+            if (uiState.isLoadingVisibility) {
+                Text(
+                    text = "Loading terrain...",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+            }
         }
     }
 }

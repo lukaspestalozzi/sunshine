@@ -1,5 +1,6 @@
 package com.sunshine.app.di
 
+import com.sunshine.app.domain.usecase.CalculateSunVisibilityUseCase
 import org.koin.dsl.module
 
 /**
@@ -7,7 +8,11 @@ import org.koin.dsl.module
  */
 val domainModule =
     module {
-        // Use cases will be added here as the app grows
-        // Example:
-        // factory { CalculateSunVisibilityUseCase(sunCalculator = get(), elevationRepository = get()) }
+        // Use cases
+        factory {
+            CalculateSunVisibilityUseCase(
+                sunCalculator = get(),
+                elevationRepository = get(),
+            )
+        }
     }
