@@ -589,22 +589,31 @@ class ConnectivityObserver(context: Context) {
 
 ## 10. Development Phases
 
-### Phase 1: Foundation (Current)
-- [ ] Project setup (Gradle, dependencies)
-- [ ] Basic MVVM architecture
-- [ ] Koin DI setup
-- [ ] Map display with osmdroid
-- [ ] Basic navigation
+### Phase 1: Foundation ✅ Complete
+- [x] Project setup (Gradle, dependencies)
+- [x] Basic MVVM architecture
+- [x] Koin DI setup
+- [x] Map display with osmdroid
+- [x] Basic navigation
 
-### Phase 2: Core Features
-- [ ] Time/date slider UI
-- [ ] Sun position calculation (pluggable)
-- [ ] Elevation data fetching
-- [ ] Basic visibility overlay
+### Phase 2: Core Features ✅ Complete
+- [x] Time/date slider UI
+- [x] Sun position calculation (pluggable) - SimpleSunCalculator using NOAA algorithm
+- [x] Elevation data fetching - Open-Elevation API with Room caching
+- [x] Basic visibility overlay - Terrain-aware sun visibility in overlay card
 
-### Phase 3: Offline Capability
+**Phase 2 Implementation Details:**
+- Room database (`SunshineDatabase`) with elevation caching (`ElevationEntity`, `ElevationDao`)
+- Open-Elevation API client (`ElevationApi`) with Ktor
+- Offline-first `ElevationRepositoryImpl` with grid-based caching
+- `TerrainProfile` and `VisibilityResult` domain models
+- `CalculateSunVisibilityUseCase` combining sun position with terrain occlusion
+- Enhanced `MapUiState` and `MapViewModel` for visibility data
+- UI overlay showing: sun visible/blocked by terrain, horizon angle, degrees until visible
+
+### Phase 3: Offline Capability (Current)
 - [ ] Tile download manager
-- [ ] Elevation data caching
+- [x] Elevation data caching (implemented in Phase 2)
 - [ ] Offline mode detection
 - [ ] Download UI screen
 
