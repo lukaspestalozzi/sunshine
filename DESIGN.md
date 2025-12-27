@@ -611,13 +611,26 @@ class ConnectivityObserver(context: Context) {
 - Enhanced `MapUiState` and `MapViewModel` for visibility data
 - UI overlay showing: sun visible/blocked by terrain, horizon angle, degrees until visible
 
-### Phase 3: Offline Capability (Current)
-- [ ] Tile download manager
+### Phase 3: Offline Capability ✅ Complete
+- [x] Tile download manager - WorkManager-based background downloads
 - [x] Elevation data caching (implemented in Phase 2)
-- [ ] Offline mode detection
-- [ ] Download UI screen
+- [x] Offline mode detection - ConnectivityObserver with Flow
+- [x] Download UI screen - Region selection with progress tracking
 
-### Phase 4: Polish
+**Phase 3 Implementation Details:**
+- `ConnectivityObserver` for network state monitoring via Flow
+- OpenTopoMap tile source (topographic, hiking-optimized)
+- `DownloadableRegion` model with tile count/size estimation
+- `DefaultRegionProvider` with 10 predefined European regions (configurable)
+- `DownloadedRegionEntity` and `DownloadedRegionDao` for tracking downloads
+- `TileDownloadWorker` using WorkManager for background tile fetching
+- `TileDownloadRepositoryImpl` for download orchestration
+- `DownloadViewModel` and enhanced `DownloadScreen` UI
+- Room database migration (v1 → v2) for downloaded_regions table
+- Automatic tile caching during normal map usage
+- Transparent offline mode (cached tiles shown when offline)
+
+### Phase 4: Polish (Current)
 - [ ] Performance optimization
 - [ ] UI refinements
 - [ ] Error handling

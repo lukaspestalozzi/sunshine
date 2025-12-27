@@ -12,9 +12,35 @@ import com.sunshine.app.domain.model.GeoPoint
 import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent
 import org.osmdroid.events.ZoomEvent
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
 import org.osmdroid.util.GeoPoint as OsmGeoPoint
+import org.osmdroid.util.MapTileIndex
 import org.osmdroid.views.MapView
+
+/**
+ * OpenTopoMap tile source for hiking/outdoor use.
+ * Provides topographic styling with contour lines and hill shading.
+ */
+@Suppress("MagicNumber")
+private val openTopoMapTileSource = object : OnlineTileSourceBase(
+    "OpenTopoMap",
+    0,
+    17,
+    256,
+    ".png",
+    arrayOf(
+        "https://a.tile.opentopomap.org/",
+        "https://b.tile.opentopomap.org/",
+        "https://c.tile.opentopomap.org/",
+    ),
+) {
+    override fun getTileURLString(pMapTileIndex: Long): String {
+        val zoom = MapTileIndex.getZoom(pMapTileIndex)
+        val x = MapTileIndex.getX(pMapTileIndex)
+        val y = MapTileIndex.getY(pMapTileIndex)
+        return "$baseUrl$zoom/$x/$y$mImageFilenameEnding"
+    }
+}
 
 /**
  * Composable wrapper for osmdroid MapView.
@@ -31,7 +57,7 @@ fun OsmMapView(
     val mapView =
         remember {
             MapView(context).apply {
-                setTileSource(TileSourceFactory.MAPNIK)
+                setTileSource(openTopoMapTileSource)
                 setMultiTouchControls(true)
                 controller.setZoom(zoomLevel)
                 controller.setCenter(OsmGeoPoint(center.latitude, center.longitude))
