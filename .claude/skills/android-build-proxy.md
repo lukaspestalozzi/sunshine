@@ -29,7 +29,7 @@ Before committing     → ./scripts/verify-local.sh --quick     (catch style iss
 Before pushing        → ./scripts/verify-local.sh             (full CI: all 5 steps)
 ```
 
-**Always run full verification before pushing!** This ensures CI will pass.
+**⚠️ CRITICAL: Always run `./scripts/verify-local.sh` before pushing!** Never push without local verification. If CI fails, you must fix it locally before pushing again.
 
 ## Script Usage
 
