@@ -369,7 +369,7 @@ Use descriptive test names with backticks:
 
 **Prerequisite**: Android SDK must be available. If `ANDROID_HOME` is not set:
 
-1. Install Android SDK (see `.claude/skills/android-build-proxy.md` for detailed steps)
+1. Install Android SDK (see `.claude/skills/local-development.md` for detailed steps)
 2. Create `local.properties` in project root with `sdk.dir=/path/to/android-sdk`
 3. Required SDK components: `platforms;android-35`, `build-tools;35.0.0`
 
