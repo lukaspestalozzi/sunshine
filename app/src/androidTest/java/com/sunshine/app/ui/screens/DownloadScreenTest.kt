@@ -37,26 +37,27 @@ class DownloadScreenTest {
     private lateinit var downloadRepository: TileDownloadRepository
     private lateinit var connectivityObserver: ConnectivityObserver
 
-    private val testRegions = listOf(
-        DownloadableRegion(
-            id = "swiss_alps",
-            name = "Swiss Alps",
-            description = "Central Switzerland",
-            center = GeoPoint(46.8182, 8.2275),
-            radiusKm = 50.0,
-            minZoom = 8,
-            maxZoom = 15,
-        ),
-        DownloadableRegion(
-            id = "zurich",
-            name = "Zurich Area",
-            description = "Zurich and surroundings",
-            center = GeoPoint(47.3769, 8.5417),
-            radiusKm = 30.0,
-            minZoom = 10,
-            maxZoom = 16,
-        ),
-    )
+    private val testRegions =
+        listOf(
+            DownloadableRegion(
+                id = "swiss_alps",
+                name = "Swiss Alps",
+                description = "Central Switzerland",
+                center = GeoPoint(46.8182, 8.2275),
+                radiusKm = 50.0,
+                minZoom = 8,
+                maxZoom = 15,
+            ),
+            DownloadableRegion(
+                id = "zurich",
+                name = "Zurich Area",
+                description = "Zurich and surroundings",
+                center = GeoPoint(47.3769, 8.5417),
+                radiusKm = 30.0,
+                minZoom = 10,
+                maxZoom = 16,
+            ),
+        )
 
     @Before
     fun setup() {
@@ -75,11 +76,12 @@ class DownloadScreenTest {
         composeTestRule.setContent {
             DownloadScreen(
                 onNavigateBack = {},
-                viewModel = DownloadViewModel(
-                    regionProvider,
-                    downloadRepository,
-                    connectivityObserver,
-                ),
+                viewModel =
+                    DownloadViewModel(
+                        regionProvider,
+                        downloadRepository,
+                        connectivityObserver,
+                    ),
             )
         }
 
@@ -91,11 +93,12 @@ class DownloadScreenTest {
         composeTestRule.setContent {
             DownloadScreen(
                 onNavigateBack = {},
-                viewModel = DownloadViewModel(
-                    regionProvider,
-                    downloadRepository,
-                    connectivityObserver,
-                ),
+                viewModel =
+                    DownloadViewModel(
+                        regionProvider,
+                        downloadRepository,
+                        connectivityObserver,
+                    ),
             )
         }
 
@@ -109,11 +112,12 @@ class DownloadScreenTest {
         composeTestRule.setContent {
             DownloadScreen(
                 onNavigateBack = { navigatedBack = true },
-                viewModel = DownloadViewModel(
-                    regionProvider,
-                    downloadRepository,
-                    connectivityObserver,
-                ),
+                viewModel =
+                    DownloadViewModel(
+                        regionProvider,
+                        downloadRepository,
+                        connectivityObserver,
+                    ),
             )
         }
 
@@ -126,11 +130,12 @@ class DownloadScreenTest {
         composeTestRule.setContent {
             DownloadScreen(
                 onNavigateBack = {},
-                viewModel = DownloadViewModel(
-                    regionProvider,
-                    downloadRepository,
-                    connectivityObserver,
-                ),
+                viewModel =
+                    DownloadViewModel(
+                        regionProvider,
+                        downloadRepository,
+                        connectivityObserver,
+                    ),
             )
         }
 
@@ -142,11 +147,12 @@ class DownloadScreenTest {
         composeTestRule.setContent {
             DownloadScreen(
                 onNavigateBack = {},
-                viewModel = DownloadViewModel(
-                    regionProvider,
-                    downloadRepository,
-                    connectivityObserver,
-                ),
+                viewModel =
+                    DownloadViewModel(
+                        regionProvider,
+                        downloadRepository,
+                        connectivityObserver,
+                    ),
             )
         }
 
@@ -160,11 +166,12 @@ class DownloadScreenTest {
         composeTestRule.setContent {
             DownloadScreen(
                 onNavigateBack = {},
-                viewModel = DownloadViewModel(
-                    regionProvider,
-                    downloadRepository,
-                    connectivityObserver,
-                ),
+                viewModel =
+                    DownloadViewModel(
+                        regionProvider,
+                        downloadRepository,
+                        connectivityObserver,
+                    ),
             )
         }
 
@@ -177,11 +184,12 @@ class DownloadScreenTest {
         composeTestRule.setContent {
             DownloadScreen(
                 onNavigateBack = {},
-                viewModel = DownloadViewModel(
-                    regionProvider,
-                    downloadRepository,
-                    connectivityObserver,
-                ),
+                viewModel =
+                    DownloadViewModel(
+                        regionProvider,
+                        downloadRepository,
+                        connectivityObserver,
+                    ),
             )
         }
 
@@ -193,11 +201,12 @@ class DownloadScreenTest {
         composeTestRule.setContent {
             DownloadScreen(
                 onNavigateBack = {},
-                viewModel = DownloadViewModel(
-                    regionProvider,
-                    downloadRepository,
-                    connectivityObserver,
-                ),
+                viewModel =
+                    DownloadViewModel(
+                        regionProvider,
+                        downloadRepository,
+                        connectivityObserver,
+                    ),
             )
         }
 
@@ -212,11 +221,12 @@ class DownloadScreenTest {
         composeTestRule.setContent {
             DownloadScreen(
                 onNavigateBack = {},
-                viewModel = DownloadViewModel(
-                    regionProvider,
-                    downloadRepository,
-                    connectivityObserver,
-                ),
+                viewModel =
+                    DownloadViewModel(
+                        regionProvider,
+                        downloadRepository,
+                        connectivityObserver,
+                    ),
             )
         }
 
@@ -226,26 +236,28 @@ class DownloadScreenTest {
 
     @Test
     fun downloadScreen_showsCompletedStatus_forDownloadedRegions() {
-        val downloadProgress = listOf(
-            DownloadProgress(
-                regionId = "swiss_alps",
-                status = DownloadState.COMPLETED,
-                progress = 100,
-                downloadedTiles = 1000,
-                totalTiles = 1000,
-                bytesDownloaded = 50000000,
-            ),
-        )
+        val downloadProgress =
+            listOf(
+                DownloadProgress(
+                    regionId = "swiss_alps",
+                    status = DownloadState.COMPLETED,
+                    progress = 100,
+                    downloadedTiles = 1000,
+                    totalTiles = 1000,
+                    bytesDownloaded = 50000000,
+                ),
+            )
         every { downloadRepository.getDownloadProgress() } returns flowOf(downloadProgress)
 
         composeTestRule.setContent {
             DownloadScreen(
                 onNavigateBack = {},
-                viewModel = DownloadViewModel(
-                    regionProvider,
-                    downloadRepository,
-                    connectivityObserver,
-                ),
+                viewModel =
+                    DownloadViewModel(
+                        regionProvider,
+                        downloadRepository,
+                        connectivityObserver,
+                    ),
             )
         }
 
@@ -255,26 +267,28 @@ class DownloadScreenTest {
 
     @Test
     fun downloadScreen_showsDeleteButton_forDownloadedRegions() {
-        val downloadProgress = listOf(
-            DownloadProgress(
-                regionId = "swiss_alps",
-                status = DownloadState.COMPLETED,
-                progress = 100,
-                downloadedTiles = 1000,
-                totalTiles = 1000,
-                bytesDownloaded = 50000000,
-            ),
-        )
+        val downloadProgress =
+            listOf(
+                DownloadProgress(
+                    regionId = "swiss_alps",
+                    status = DownloadState.COMPLETED,
+                    progress = 100,
+                    downloadedTiles = 1000,
+                    totalTiles = 1000,
+                    bytesDownloaded = 50000000,
+                ),
+            )
         every { downloadRepository.getDownloadProgress() } returns flowOf(downloadProgress)
 
         composeTestRule.setContent {
             DownloadScreen(
                 onNavigateBack = {},
-                viewModel = DownloadViewModel(
-                    regionProvider,
-                    downloadRepository,
-                    connectivityObserver,
-                ),
+                viewModel =
+                    DownloadViewModel(
+                        regionProvider,
+                        downloadRepository,
+                        connectivityObserver,
+                    ),
             )
         }
 
@@ -283,26 +297,28 @@ class DownloadScreenTest {
 
     @Test
     fun downloadScreen_showsDownloadingStatus() {
-        val downloadProgress = listOf(
-            DownloadProgress(
-                regionId = "swiss_alps",
-                status = DownloadState.DOWNLOADING,
-                progress = 50,
-                downloadedTiles = 500,
-                totalTiles = 1000,
-                bytesDownloaded = 25000000,
-            ),
-        )
+        val downloadProgress =
+            listOf(
+                DownloadProgress(
+                    regionId = "swiss_alps",
+                    status = DownloadState.DOWNLOADING,
+                    progress = 50,
+                    downloadedTiles = 500,
+                    totalTiles = 1000,
+                    bytesDownloaded = 25000000,
+                ),
+            )
         every { downloadRepository.getDownloadProgress() } returns flowOf(downloadProgress)
 
         composeTestRule.setContent {
             DownloadScreen(
                 onNavigateBack = {},
-                viewModel = DownloadViewModel(
-                    regionProvider,
-                    downloadRepository,
-                    connectivityObserver,
-                ),
+                viewModel =
+                    DownloadViewModel(
+                        regionProvider,
+                        downloadRepository,
+                        connectivityObserver,
+                    ),
             )
         }
 
@@ -311,26 +327,28 @@ class DownloadScreenTest {
 
     @Test
     fun downloadScreen_showsCancelButton_whenDownloading() {
-        val downloadProgress = listOf(
-            DownloadProgress(
-                regionId = "swiss_alps",
-                status = DownloadState.DOWNLOADING,
-                progress = 50,
-                downloadedTiles = 500,
-                totalTiles = 1000,
-                bytesDownloaded = 25000000,
-            ),
-        )
+        val downloadProgress =
+            listOf(
+                DownloadProgress(
+                    regionId = "swiss_alps",
+                    status = DownloadState.DOWNLOADING,
+                    progress = 50,
+                    downloadedTiles = 500,
+                    totalTiles = 1000,
+                    bytesDownloaded = 25000000,
+                ),
+            )
         every { downloadRepository.getDownloadProgress() } returns flowOf(downloadProgress)
 
         composeTestRule.setContent {
             DownloadScreen(
                 onNavigateBack = {},
-                viewModel = DownloadViewModel(
-                    regionProvider,
-                    downloadRepository,
-                    connectivityObserver,
-                ),
+                viewModel =
+                    DownloadViewModel(
+                        regionProvider,
+                        downloadRepository,
+                        connectivityObserver,
+                    ),
             )
         }
 
@@ -339,26 +357,28 @@ class DownloadScreenTest {
 
     @Test
     fun downloadScreen_showsFailedStatus() {
-        val downloadProgress = listOf(
-            DownloadProgress(
-                regionId = "swiss_alps",
-                status = DownloadState.FAILED,
-                progress = 25,
-                downloadedTiles = 250,
-                totalTiles = 1000,
-                bytesDownloaded = 12500000,
-            ),
-        )
+        val downloadProgress =
+            listOf(
+                DownloadProgress(
+                    regionId = "swiss_alps",
+                    status = DownloadState.FAILED,
+                    progress = 25,
+                    downloadedTiles = 250,
+                    totalTiles = 1000,
+                    bytesDownloaded = 12500000,
+                ),
+            )
         every { downloadRepository.getDownloadProgress() } returns flowOf(downloadProgress)
 
         composeTestRule.setContent {
             DownloadScreen(
                 onNavigateBack = {},
-                viewModel = DownloadViewModel(
-                    regionProvider,
-                    downloadRepository,
-                    connectivityObserver,
-                ),
+                viewModel =
+                    DownloadViewModel(
+                        regionProvider,
+                        downloadRepository,
+                        connectivityObserver,
+                    ),
             )
         }
 
@@ -371,11 +391,12 @@ class DownloadScreenTest {
         composeTestRule.setContent {
             DownloadScreen(
                 onNavigateBack = {},
-                viewModel = DownloadViewModel(
-                    regionProvider,
-                    downloadRepository,
-                    connectivityObserver,
-                ),
+                viewModel =
+                    DownloadViewModel(
+                        regionProvider,
+                        downloadRepository,
+                        connectivityObserver,
+                    ),
             )
         }
 

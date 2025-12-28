@@ -24,6 +24,20 @@ class ElevationRepositoryImplTest {
 
     private val testPoint = GeoPoint(latitude = 46.8182, longitude = 8.2275)
 
+    private fun createElevationEntity(
+        lat: Double,
+        lon: Double,
+        elevation: Double,
+    ) = ElevationEntity(
+        gridLat = lat,
+        gridLon = lon,
+        latitude = lat,
+        longitude = lon,
+        elevation = elevation,
+        source = "open-elevation",
+        fetchedAt = System.currentTimeMillis(),
+    )
+
     @Before
     fun setup() {
         elevationDao = mockk(relaxed = true)
@@ -52,7 +66,7 @@ class ElevationRepositoryImplTest {
 
             // Assert
             assertTrue("Result should be success", result.isSuccess)
-            assertEquals(550.0, result.getOrNull(), 0.1)
+            assertEquals(550.0, result.getOrNull()!!, 0.1)
             coVerify(exactly = 0) { elevationApi.getElevation(any()) }
         }
 
@@ -68,7 +82,7 @@ class ElevationRepositoryImplTest {
 
             // Assert
             assertTrue("Result should be success", result.isSuccess)
-            assertEquals(1500.0, result.getOrNull(), 0.1)
+            assertEquals(1500.0, result.getOrNull()!!, 0.1)
             coVerify { elevationApi.getElevation(testPoint) }
         }
 
@@ -107,35 +121,9 @@ class ElevationRepositoryImplTest {
     fun `getElevations returns cached values`() =
         runBlocking {
             // Arrange
-            val points =
-                listOf(
-                    GeoPoint(46.8, 8.2),
-                    GeoPoint(46.9, 8.3),
-                )
-
-            val cachedEntity1 =
-                ElevationEntity(
-                    gridLat = 46.8,
-                    gridLon = 8.2,
-                    latitude = 46.8,
-                    longitude = 8.2,
-                    elevation = 500.0,
-                    source = "open-elevation",
-                    fetchedAt = System.currentTimeMillis(),
-                )
-            val cachedEntity2 =
-                ElevationEntity(
-                    gridLat = 46.9,
-                    gridLon = 8.3,
-                    latitude = 46.9,
-                    longitude = 8.3,
-                    elevation = 600.0,
-                    source = "open-elevation",
-                    fetchedAt = System.currentTimeMillis(),
-                )
-
-            coEvery { elevationDao.getElevation(46.8, 8.2) } returns cachedEntity1
-            coEvery { elevationDao.getElevation(46.9, 8.3) } returns cachedEntity2
+            val points = listOf(GeoPoint(46.8, 8.2), GeoPoint(46.9, 8.3))
+            coEvery { elevationDao.getElevation(46.8, 8.2) } returns createElevationEntity(46.8, 8.2, 500.0)
+            coEvery { elevationDao.getElevation(46.9, 8.3) } returns createElevationEntity(46.9, 8.3, 600.0)
 
             // Act
             val result = repository.getElevations(points)
@@ -232,9 +220,12 @@ class ElevationRepositoryImplTest {
     @Test
     fun `isAvailableOffline returns true when threshold met`() =
         runBlocking {
-            // Arrange
-            val bounds = BoundingBox(north = 47.0, south = 46.0, east = 9.0, west = 8.0)
-            coEvery { elevationDao.countInBounds(any(), any(), any(), any()) } returns 100
+            // Arrange: Use tiny bounds so expected count is small
+            // Resolution is 0.0003, so 0.0003 x 0.0003 box = ~4 expected points
+            val bounds = BoundingBox(north = 46.001, south = 46.0, east = 8.001, west = 8.0)
+            // Expected: ((0.001/0.0003)+1) * ((0.001/0.0003)+1) = 4*4 = 16 points
+            // Need 80% = 13 points minimum
+            coEvery { elevationDao.countInBounds(any(), any(), any(), any()) } returns 16
 
             // Act
             val result = repository.isAvailableOffline(bounds)
