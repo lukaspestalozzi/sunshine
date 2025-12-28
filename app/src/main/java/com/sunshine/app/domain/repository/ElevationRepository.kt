@@ -16,6 +16,15 @@ interface ElevationRepository {
     suspend fun getElevation(point: GeoPoint): Result<Double>
 
     /**
+     * Get elevations for multiple points in a single batch request.
+     * More efficient than calling getElevation multiple times.
+     *
+     * @param points The list of geographic points
+     * @return Map of points to elevations (may be partial if some fail)
+     */
+    suspend fun getElevations(points: List<GeoPoint>): Result<Map<GeoPoint, Double>>
+
+    /**
      * Get elevations for a grid of points within a bounding box.
      *
      * @param bounds The bounding box

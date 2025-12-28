@@ -44,6 +44,53 @@ class ElevationRepositoryImpl(
             }
     }
 
+    override suspend fun getElevations(points: List<GeoPoint>): Result<Map<GeoPoint, Double>> {
+        if (points.isEmpty()) {
+            return Result.success(emptyMap())
+        }
+
+        val (cached, pointsToFetch) = partitionCachedAndMissing(points)
+        return fetchMissingAndMerge(cached, pointsToFetch)
+    }
+
+    private suspend fun partitionCachedAndMissing(points: List<GeoPoint>): Pair<MutableMap<GeoPoint, Double>, List<GeoPoint>> {
+        val cached = mutableMapOf<GeoPoint, Double>()
+        val missing = mutableListOf<GeoPoint>()
+
+        for (point in points) {
+            val gridLat = toGridCoordinate(point.latitude)
+            val gridLon = toGridCoordinate(point.longitude)
+            val cachedValue = elevationDao.getElevation(gridLat, gridLon)
+
+            if (cachedValue != null) {
+                cached[point] = cachedValue.elevation
+            } else {
+                missing.add(point)
+            }
+        }
+        return cached to missing
+    }
+
+    private suspend fun fetchMissingAndMerge(
+        cached: MutableMap<GeoPoint, Double>,
+        pointsToFetch: List<GeoPoint>,
+    ): Result<Map<GeoPoint, Double>> {
+        if (pointsToFetch.isEmpty()) {
+            return Result.success(cached)
+        }
+
+        return fetchElevationsInBatches(pointsToFetch).fold(
+            onSuccess = { fetched ->
+                cached.putAll(fetched)
+                Result.success(cached)
+            },
+            onFailure = { error ->
+                // Return partial results if we have some cached data
+                if (cached.isNotEmpty()) Result.success(cached) else Result.failure(error)
+            },
+        )
+    }
+
     @Suppress("ReturnCount") // Multiple return paths for offline-first logic with partial results
     override suspend fun getElevationGrid(
         bounds: BoundingBox,
