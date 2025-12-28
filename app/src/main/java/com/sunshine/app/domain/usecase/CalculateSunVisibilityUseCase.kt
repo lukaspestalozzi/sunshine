@@ -11,10 +11,17 @@ import com.sunshine.app.suncalc.SunCalculator
 import java.time.LocalDateTime
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 
 /**
  * Use case for calculating sun visibility at a point or grid of points.
  * Combines sun position calculation with terrain elevation data.
+ *
+ * Performance optimizations:
+ * - Batch elevation fetching for terrain profiles
+ * - Parallel grid calculations using coroutines
  */
 class CalculateSunVisibilityUseCase(
     private val sunCalculator: SunCalculator,
@@ -41,8 +48,8 @@ class CalculateSunVisibilityUseCase(
                 elevationRepository.getElevation(location)
                     .getOrElse { DEFAULT_OBSERVER_ELEVATION }
 
-            // Get terrain profile in sun's direction
-            val terrainProfile = getTerrainProfile(location, observerElevation, sunPosition.azimuth)
+            // Get terrain profile in sun's direction (optimized with batch fetching)
+            val terrainProfile = getTerrainProfileBatch(location, observerElevation, sunPosition.azimuth)
 
             // Check if terrain blocks the sun
             val horizonAngle = terrainProfile.calculateHorizonAngle()
@@ -63,6 +70,7 @@ class CalculateSunVisibilityUseCase(
 
     /**
      * Calculate visibility grid for rendering as map overlay.
+     * Uses parallel processing for improved performance.
      */
     suspend fun calculateVisibilityGrid(
         bounds: BoundingBox,
@@ -70,27 +78,25 @@ class CalculateSunVisibilityUseCase(
         resolution: Double = VisibilityGrid.DEFAULT_RESOLUTION,
     ): Result<VisibilityGrid> =
         runCatching {
-            val points = mutableMapOf<GeoPoint, Boolean>()
-
             // Generate grid points
-            var lat = bounds.south
-            while (lat <= bounds.north) {
-                var lon = bounds.west
-                while (lon <= bounds.east) {
-                    val point = GeoPoint(lat, lon)
+            val gridPoints = generateGridPoints(bounds, resolution)
 
-                    // Calculate visibility at this point
-                    val visibility =
-                        calculateVisibility(point, dateTime)
-                            .getOrNull()
-                            ?.isSunVisible
-                            ?: false
-
-                    points[point] = visibility
-                    lon += resolution
+            // Calculate visibility in parallel for better performance
+            val results =
+                coroutineScope {
+                    gridPoints.map { point ->
+                        async {
+                            val visibility =
+                                calculateVisibility(point, dateTime)
+                                    .getOrNull()
+                                    ?.isSunVisible
+                                    ?: false
+                            point to visibility
+                        }
+                    }.awaitAll()
                 }
-                lat += resolution
-            }
+
+            val points = results.toMap()
 
             VisibilityGrid(
                 bounds = bounds,
@@ -100,30 +106,54 @@ class CalculateSunVisibilityUseCase(
         }
 
     /**
-     * Get terrain profile in a specific direction from observer.
+     * Generate grid points for a bounding box.
      */
-    private suspend fun getTerrainProfile(
+    private fun generateGridPoints(
+        bounds: BoundingBox,
+        resolution: Double,
+    ): List<GeoPoint> {
+        val points = mutableListOf<GeoPoint>()
+        var lat = bounds.south
+        while (lat <= bounds.north) {
+            var lon = bounds.west
+            while (lon <= bounds.east) {
+                points.add(GeoPoint(lat, lon))
+                lon += resolution
+            }
+            lat += resolution
+        }
+        return points
+    }
+
+    /**
+     * Get terrain profile using batch elevation fetching for better performance.
+     * Fetches all sample points in a single API call instead of multiple sequential calls.
+     */
+    private suspend fun getTerrainProfileBatch(
         observer: GeoPoint,
         observerElevation: Double,
         azimuth: Double,
     ): TerrainProfile {
-        val terrainPoints = mutableListOf<TerrainPoint>()
+        // Generate all sample points first
+        val samplePoints =
+            SAMPLE_DISTANCES.map { distance ->
+                distance to projectPoint(observer, azimuth, distance)
+            }
 
-        // Sample terrain at increasing distances
-        for (distance in SAMPLE_DISTANCES) {
-            val samplePoint = projectPoint(observer, azimuth, distance)
+        // Batch fetch elevations for all points
+        val pointsList = samplePoints.map { it.second }
+        val elevations =
+            elevationRepository.getElevations(pointsList)
+                .getOrElse { emptyMap() }
 
-            val elevation =
-                elevationRepository.getElevation(samplePoint)
-                    .getOrElse { observerElevation }
-
-            terrainPoints.add(
+        // Build terrain profile with fetched elevations
+        val terrainPoints =
+            samplePoints.map { (distance, point) ->
                 TerrainPoint(
                     distance = distance,
-                    elevation = elevation,
-                ),
-            )
-        }
+                    elevation = elevations[point] ?: observerElevation,
+                )
+            }
 
         return TerrainProfile(
             observer = observer,
