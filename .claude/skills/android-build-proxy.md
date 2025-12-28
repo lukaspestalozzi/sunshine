@@ -9,6 +9,64 @@
 | **Standalone (no Android SDK)** | `./scripts/verify-local.sh --standalone` |
 | **Individual Gradle task** | `./scripts/run-with-proxy.sh <task>` |
 
+## Environment Setup
+
+### Android SDK Installation (if not present)
+
+When `ANDROID_HOME` is not set or the SDK is missing, set up the Android SDK:
+
+```bash
+# 1. Create SDK directory
+mkdir -p ~/android-sdk
+
+# 2. Download Android command-line tools
+curl -L -o /tmp/cmdline-tools.zip \
+  "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
+unzip -q /tmp/cmdline-tools.zip -d ~/android-sdk
+mv ~/android-sdk/cmdline-tools ~/android-sdk/cmdline-tools-tmp
+mkdir -p ~/android-sdk/cmdline-tools/latest
+mv ~/android-sdk/cmdline-tools-tmp/* ~/android-sdk/cmdline-tools/latest/
+rm -rf ~/android-sdk/cmdline-tools-tmp
+
+# 3. Set environment variables
+export ANDROID_HOME=~/android-sdk
+export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
+
+# 4. Start auth proxy for SDK downloads (handles proxy authentication)
+python3 scripts/auth-proxy.py &
+PROXY_PID=$!
+sleep 2
+
+# 5. Accept licenses and install required components
+yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+  --proxy=http --proxy_host=127.0.0.1 --proxy_port=3128 \
+  --licenses
+
+$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+  --proxy=http --proxy_host=127.0.0.1 --proxy_port=3128 \
+  "platforms;android-35" "build-tools;35.0.0"
+
+# 6. Stop the auth proxy
+kill $PROXY_PID
+
+# 7. Create local.properties for Gradle
+echo "sdk.dir=$HOME/android-sdk" > local.properties
+```
+
+### Verifying SDK Setup
+
+```bash
+# Check ANDROID_HOME is set
+echo $ANDROID_HOME
+
+# Check local.properties exists
+cat local.properties
+
+# Verify SDK components installed
+ls $ANDROID_HOME/platforms/
+ls $ANDROID_HOME/build-tools/
+```
+
 ## CI Pipeline Steps
 
 The CI runs these 5 steps in order. Local verification matches this exactly:
@@ -84,7 +142,6 @@ valueRange = 0f..86399f,
 
 Already configured in `app/config/detekt/detekt.yml`:
 - `LongMethod`: Ignored for `@Composable` functions
-- `FunctionNaming`: Ignored for `@Composable` functions
 - `MaxLineLength`: Set to 140
 
 When suppressing rules, always add justification:
@@ -99,7 +156,7 @@ When suppressing rules, always add justification:
 
 | Mode | Requirements |
 |------|--------------|
-| Full/Quick | `ANDROID_HOME` set, Java 17+ |
+| Full/Quick | `ANDROID_HOME` set or `local.properties` with `sdk.dir`, Java 17+ |
 | Standalone | Java 17+, curl |
 
 ## How Proxy Works
@@ -110,3 +167,24 @@ Java's `HttpURLConnection` doesn't send proxy auth for HTTPS CONNECT. The `auth-
 3. Injects auth into CONNECT requests
 
 This is transparent when using `run-with-proxy.sh` or `verify-local.sh`.
+
+## Troubleshooting
+
+### "SDK location not found"
+Create `local.properties` in project root:
+```
+sdk.dir=/path/to/your/android-sdk
+```
+
+### Proxy authentication errors during SDK download
+Use the auth proxy:
+```bash
+python3 scripts/auth-proxy.py &
+sdkmanager --proxy=http --proxy_host=127.0.0.1 --proxy_port=3128 "platforms;android-35"
+```
+
+### Gradle daemon issues
+Kill stale daemons:
+```bash
+./gradlew --stop
+```

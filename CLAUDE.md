@@ -365,6 +365,16 @@ Use descriptive test names with backticks:
 
 ## CI Pipeline
 
+### Environment Setup
+
+**Prerequisite**: Android SDK must be available. If `ANDROID_HOME` is not set:
+
+1. Install Android SDK (see `.claude/skills/android-build-proxy.md` for detailed steps)
+2. Create `local.properties` in project root with `sdk.dir=/path/to/android-sdk`
+3. Required SDK components: `platforms;android-35`, `build-tools;35.0.0`
+
+**Proxy note**: Use `scripts/auth-proxy.py` for SDK downloads when behind an authenticated proxy.
+
 ### Local Testing (before push)
 
 Use the provided scripts to run CI checks locally. These match the CI pipeline exactly.
