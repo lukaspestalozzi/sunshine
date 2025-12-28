@@ -40,10 +40,11 @@ class CalculateSunVisibilityUseCaseTest {
             coEvery { elevationRepository.getElevation(any()) } returns Result.success(1000.0)
             coEvery {
                 elevationRepository.getElevations(any())
-            } returns Result.success(
-                // All terrain points at same elevation as observer (flat terrain)
-                mapOf(),
-            )
+            } returns
+                Result.success(
+                    // All terrain points at same elevation as observer (flat terrain)
+                    mapOf(),
+                )
 
             // Act
             val result = useCase.calculateVisibility(testLocation, testDateTime)
@@ -58,20 +59,21 @@ class CalculateSunVisibilityUseCaseTest {
     @Test
     fun `returns sun blocked when terrain is higher than sun elevation`() =
         runBlocking {
-            // Arrange: Sun at 10° elevation, but terrain creating 20° horizon angle
+            // Arrange: Sun at 10° elevation, but terrain creating high horizon angle
             val sunPosition = SunPosition(azimuth = 180.0, elevation = 10.0)
             coEvery { sunCalculator.calculateSunPosition(any(), any()) } returns sunPosition
             coEvery { elevationRepository.getElevation(any()) } returns Result.success(500.0)
 
-            // Create high terrain points to block the sun
-            val terrainElevations = mutableMapOf<GeoPoint, Double>()
-            // Add very high elevations at sample distances to create high horizon angle
-            CalculateSunVisibilityUseCase.SAMPLE_DISTANCES.forEachIndexed { index, _ ->
-                // Each sample point is much higher than observer
-                terrainElevations[GeoPoint(testLocation.latitude + 0.001 * index, testLocation.longitude)] =
-                    3000.0 + index * 500.0
+            // Mock getElevations to return high terrain for ANY requested points
+            // The use case calls projectPoint() to generate sample points, so we use coEvery with any()
+            // Return a map with very high elevations for each point requested
+            coEvery { elevationRepository.getElevations(any()) } answers {
+                val requestedPoints = firstArg<List<GeoPoint>>()
+                // Return extremely high elevations to create a steep horizon angle
+                // At 100m distance, 1000m height difference = atan(1000/100) ≈ 84° horizon
+                val elevations = requestedPoints.associateWith { 5000.0 }
+                Result.success(elevations)
             }
-            coEvery { elevationRepository.getElevations(any()) } returns Result.success(terrainElevations)
 
             // Act
             val result = useCase.calculateVisibility(testLocation, testDateTime)
