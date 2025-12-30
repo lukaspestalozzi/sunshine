@@ -6,10 +6,13 @@ import com.sunshine.app.data.remote.elevation.ElevationApi
 import com.sunshine.app.data.remote.elevation.ElevationResult
 import com.sunshine.app.domain.model.BoundingBox
 import com.sunshine.app.domain.model.GeoPoint
+import com.sunshine.app.domain.repository.SettingsRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -20,6 +23,7 @@ import org.junit.Test
 class ElevationRepositoryImplTest {
     private lateinit var elevationDao: ElevationDao
     private lateinit var elevationApi: ElevationApi
+    private lateinit var settingsRepository: SettingsRepository
     private lateinit var repository: ElevationRepositoryImpl
 
     private val testPoint = GeoPoint(latitude = 46.8182, longitude = 8.2275)
@@ -42,7 +46,10 @@ class ElevationRepositoryImplTest {
     fun setup() {
         elevationDao = mockk(relaxed = true)
         elevationApi = mockk()
-        repository = ElevationRepositoryImpl(elevationDao, elevationApi)
+        settingsRepository = mockk()
+        // Default to offline mode disabled
+        every { settingsRepository.offlineModeEnabled } returns flowOf(false)
+        repository = ElevationRepositoryImpl(elevationDao, elevationApi, settingsRepository)
     }
 
     @Test

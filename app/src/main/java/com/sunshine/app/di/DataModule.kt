@@ -102,6 +102,7 @@ val dataModule =
             ElevationRepositoryImpl(
                 elevationDao = get(),
                 elevationApi = get(),
+                settingsRepository = get(),
             )
         }
         single<TileDownloadRepository> {
