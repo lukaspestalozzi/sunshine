@@ -6,15 +6,19 @@ import com.sunshine.app.data.remote.elevation.ElevationApi
 import com.sunshine.app.domain.model.BoundingBox
 import com.sunshine.app.domain.model.GeoPoint
 import com.sunshine.app.domain.repository.ElevationRepository
+import com.sunshine.app.domain.repository.SettingsRepository
 import kotlin.math.floor
+import kotlinx.coroutines.flow.first
 
 /**
  * Offline-first implementation of ElevationRepository.
  * Checks local cache first, fetches from API if not available.
+ * Respects offline mode setting - when enabled, only returns cached data.
  */
 class ElevationRepositoryImpl(
     private val elevationDao: ElevationDao,
     private val elevationApi: ElevationApi,
+    private val settingsRepository: SettingsRepository,
 ) : ElevationRepository {
     override suspend fun getElevation(point: GeoPoint): Result<Double> {
         // Check cache first
@@ -24,6 +28,11 @@ class ElevationRepositoryImpl(
         val cached = elevationDao.getElevation(gridLat, gridLon)
         if (cached != null) {
             return Result.success(cached.elevation)
+        }
+
+        // Check if offline mode is enabled
+        if (settingsRepository.offlineModeEnabled.first()) {
+            return Result.failure(OfflineModeException("Elevation data not cached for this location"))
         }
 
         // Fetch from API
@@ -43,6 +52,9 @@ class ElevationRepositoryImpl(
                 )
             }
     }
+
+    /** Exception thrown when offline mode blocks a network request */
+    class OfflineModeException(message: String) : Exception(message)
 
     override suspend fun getElevations(points: List<GeoPoint>): Result<Map<GeoPoint, Double>> {
         if (points.isEmpty()) {
@@ -77,6 +89,16 @@ class ElevationRepositoryImpl(
     ): Result<Map<GeoPoint, Double>> {
         if (pointsToFetch.isEmpty()) {
             return Result.success(cached)
+        }
+
+        // Check if offline mode is enabled
+        if (settingsRepository.offlineModeEnabled.first()) {
+            // In offline mode, return cached data only (don't fail if we have some data)
+            return if (cached.isNotEmpty()) {
+                Result.success(cached)
+            } else {
+                Result.failure(OfflineModeException("Elevation data not cached for these locations"))
+            }
         }
 
         return fetchElevationsInBatches(pointsToFetch).fold(
@@ -117,6 +139,16 @@ class ElevationRepositoryImpl(
 
         // Fetch missing points from API in batches
         if (pointsToFetch.isNotEmpty()) {
+            // Check if offline mode is enabled
+            if (settingsRepository.offlineModeEnabled.first()) {
+                // In offline mode, return cached data only
+                return if (result.isNotEmpty()) {
+                    Result.success(result)
+                } else {
+                    Result.failure(OfflineModeException("Elevation grid data not cached for this area"))
+                }
+            }
+
             val batchResults = fetchElevationsInBatches(pointsToFetch)
             batchResults.onSuccess { elevations ->
                 result.putAll(elevations)
