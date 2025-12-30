@@ -1,8 +1,10 @@
 package com.sunshine.app.ui.screens.map
 
 import app.cash.turbine.test
+import com.sunshine.app.domain.model.BoundingBox
 import com.sunshine.app.domain.model.GeoPoint
 import com.sunshine.app.domain.model.SunPosition
+import com.sunshine.app.domain.model.VisibilityGrid
 import com.sunshine.app.domain.model.VisibilityResult
 import com.sunshine.app.domain.usecase.CalculateSunVisibilityUseCase
 import com.sunshine.app.suncalc.SunCalculator
@@ -43,12 +45,24 @@ class MapViewModelTest {
         // Default mock responses
         coEvery { sunCalculator.calculateSunPosition(any(), any()) } returns
             SunPosition(azimuth = 180.0, elevation = 45.0)
+        coEvery { sunCalculator.calculateSunrise(any(), any()) } returns
+            LocalTime.of(6, 30)
+        coEvery { sunCalculator.calculateSunset(any(), any()) } returns
+            LocalTime.of(20, 30)
         coEvery { visibilityUseCase.calculateVisibility(any(), any()) } returns
             Result.success(
                 VisibilityResult.visible(
                     location = GeoPoint.DEFAULT,
                     sunPosition = SunPosition(azimuth = 180.0, elevation = 45.0),
                     horizonAngle = 0.0,
+                ),
+            )
+        coEvery { visibilityUseCase.calculateVisibilityGrid(any(), any(), any()) } returns
+            Result.success(
+                VisibilityGrid(
+                    bounds = BoundingBox(north = 47.0, south = 46.0, east = 9.0, west = 8.0),
+                    resolution = 0.01,
+                    points = emptyMap(),
                 ),
             )
     }
