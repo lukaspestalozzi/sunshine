@@ -172,14 +172,14 @@ private fun createGridCellPolygon(
 ): VisibilityPolygon {
     val polygon = VisibilityPolygon()
 
-    // Create rectangle corners
+    // Create rectangle corners (last point closes polygon)
     val points =
         listOf(
             OsmGeoPoint(center.latitude - halfSize, center.longitude - halfSize),
             OsmGeoPoint(center.latitude - halfSize, center.longitude + halfSize),
             OsmGeoPoint(center.latitude + halfSize, center.longitude + halfSize),
             OsmGeoPoint(center.latitude + halfSize, center.longitude - halfSize),
-            OsmGeoPoint(center.latitude - halfSize, center.longitude - halfSize), // Close polygon
+            OsmGeoPoint(center.latitude - halfSize, center.longitude - halfSize),
         )
 
     polygon.points = points

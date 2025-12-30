@@ -37,10 +37,11 @@ data class MapUiState(
     val showGridOverlay: Boolean get() = visibilityGrid != null && sunPosition?.isAboveHorizon == true
 
     /** Calculate visible map bounds based on center and zoom */
+    @Suppress("MagicNumber") // Zoom factor calculation uses documented formula
     fun getVisibleBounds(): BoundingBox {
         // Approximate degrees visible at current zoom
         // At zoom 10, roughly 0.5 degrees visible; at zoom 15, roughly 0.015 degrees
-        val zoomFactor = 2.0.pow(zoomLevel - 10.0)
+        val zoomFactor = 2.0.pow(zoomLevel - DEFAULT_ZOOM)
         val degreesVisible = DEGREES_AT_ZOOM_10 / zoomFactor
         return BoundingBox(
             north = mapCenter.latitude + degreesVisible / 2,

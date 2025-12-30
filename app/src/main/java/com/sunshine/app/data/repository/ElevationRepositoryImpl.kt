@@ -20,6 +20,7 @@ class ElevationRepositoryImpl(
     private val elevationApi: ElevationApi,
     private val settingsRepository: SettingsRepository,
 ) : ElevationRepository {
+    @Suppress("ReturnCount") // Multiple return paths for offline-first logic with caching
     override suspend fun getElevation(point: GeoPoint): Result<Double> {
         // Check cache first
         val gridLat = toGridCoordinate(point.latitude)
@@ -83,6 +84,7 @@ class ElevationRepositoryImpl(
         return cached to missing
     }
 
+    @Suppress("ReturnCount") // Multiple return paths for offline-first logic with partial results
     private suspend fun fetchMissingAndMerge(
         cached: MutableMap<GeoPoint, Double>,
         pointsToFetch: List<GeoPoint>,
@@ -113,7 +115,7 @@ class ElevationRepositoryImpl(
         )
     }
 
-    @Suppress("ReturnCount") // Multiple return paths for offline-first logic with partial results
+    @Suppress("ReturnCount", "LongMethod") // Offline-first logic with caching and partial results
     override suspend fun getElevationGrid(
         bounds: BoundingBox,
         resolution: Double,

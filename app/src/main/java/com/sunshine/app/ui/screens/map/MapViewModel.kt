@@ -160,7 +160,7 @@ class MapViewModel(
             }
     }
 
-    @Suppress("TooGenericExceptionCaught", "SwallowedException")
+    @Suppress("TooGenericExceptionCaught", "SwallowedException", "LongMethod")
     private suspend fun updateVisibilityGrid() {
         val state = _uiState.value
 
@@ -213,23 +213,27 @@ class MapViewModel(
         // Minimum zoom level to show grid (avoid too many points)
         private const val MIN_ZOOM_FOR_GRID = 12.0
 
-        // Maximum grid points to calculate
-        private const val MAX_GRID_POINTS = 400
+        // Grid resolution thresholds based on zoom level
+        private const val ZOOM_LEVEL_HIGH = 16.0
+        private const val ZOOM_LEVEL_MEDIUM = 14.0
+        private const val ZOOM_LEVEL_LOW = 12.0
+        private const val RESOLUTION_HIGH = 0.0005
+        private const val RESOLUTION_MEDIUM = 0.001
+        private const val RESOLUTION_LOW = 0.002
 
         /**
          * Calculate grid resolution based on zoom level.
          * Higher zoom = finer resolution, but limit max points.
          */
-        private fun calculateGridResolution(zoomLevel: Double): Double {
+        private fun calculateGridResolution(zoomLevel: Double): Double =
             // At zoom 12: ~0.005 (roughly 500m)
             // At zoom 15: ~0.001 (roughly 100m)
             // At zoom 18: ~0.0002 (roughly 20m)
-            return when {
-                zoomLevel >= 16 -> 0.0005
-                zoomLevel >= 14 -> 0.001
-                zoomLevel >= 12 -> 0.002
+            when {
+                zoomLevel >= ZOOM_LEVEL_HIGH -> RESOLUTION_HIGH
+                zoomLevel >= ZOOM_LEVEL_MEDIUM -> RESOLUTION_MEDIUM
+                zoomLevel >= ZOOM_LEVEL_LOW -> RESOLUTION_LOW
                 else -> VisibilityGrid.DEFAULT_RESOLUTION
             }
-        }
     }
 }

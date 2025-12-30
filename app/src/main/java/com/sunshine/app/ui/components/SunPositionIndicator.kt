@@ -52,35 +52,38 @@ fun SunPositionIndicator(
     val heightPx = with(density) { containerHeight.toPx() }
 
     // Calculate sun indicator position on the edge of the container
-    val (offsetX, offsetY) = calculateEdgePosition(
-        azimuth = sunPosition.azimuth,
-        width = widthPx,
-        height = heightPx,
-    )
+    val (offsetX, offsetY) =
+        calculateEdgePosition(
+            azimuth = sunPosition.azimuth,
+            width = widthPx,
+            height = heightPx,
+        )
 
     // Indicator size
     val indicatorSize = 32.dp
     val halfSizePx = with(density) { indicatorSize.toPx() / 2 }
 
     // Determine color based on sun state
-    val sunColor = when {
-        !sunPosition.isAboveHorizon -> SUN_BELOW_HORIZON_COLOR
-        isVisible -> SUN_VISIBLE_COLOR
-        else -> SUN_BLOCKED_COLOR
-    }
+    val sunColor =
+        when {
+            !sunPosition.isAboveHorizon -> SUN_BELOW_HORIZON_COLOR
+            isVisible -> SUN_VISIBLE_COLOR
+            else -> SUN_BLOCKED_COLOR
+        }
 
     Box(
-        modifier = modifier
-            .offset {
-                IntOffset(
-                    x = (offsetX - halfSizePx).roundToInt(),
-                    y = (offsetY - halfSizePx).roundToInt(),
-                )
-            }
-            .size(indicatorSize)
-            .shadow(4.dp, CircleShape)
-            .background(sunColor, CircleShape)
-            .padding(4.dp),
+        modifier =
+            modifier
+                .offset {
+                    IntOffset(
+                        x = (offsetX - halfSizePx).roundToInt(),
+                        y = (offsetY - halfSizePx).roundToInt(),
+                    )
+                }
+                .size(indicatorSize)
+                .shadow(4.dp, CircleShape)
+                .background(sunColor, CircleShape)
+                .padding(4.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
