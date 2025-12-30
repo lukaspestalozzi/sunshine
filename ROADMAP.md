@@ -1,6 +1,6 @@
 # Sunshine 1.0 Release Roadmap
 
-> **Current Version:** 0.1.0
+> **Current Version:** 0.9.0
 > **Target Version:** 1.0.0
 > **Last Updated:** 2025-12-30
 
@@ -8,9 +8,9 @@
 
 ## Executive Summary
 
-The Sunshine app is **~75-80% complete** for a 1.0 release. All core MVP features from Phases 1-4 are implemented and tested. Remaining work focuses on visual polish, UI enhancements, and ensuring feature completeness.
+The Sunshine app is **~95% complete** for a 1.0 release. All core MVP features from Phases 1-4 are implemented and tested. Milestones 1 and 2 are now complete. Remaining work focuses on QA, performance profiling, and final polish.
 
-**Estimated effort to 1.0:** 1-2 weeks of focused development
+**Estimated effort to 1.0:** 3-5 days of focused development
 
 ---
 
@@ -35,163 +35,150 @@ The Sunshine app is **~75-80% complete** for a 1.0 release. All core MVP feature
 
 | Feature | Priority | Effort | Status |
 |---------|----------|--------|--------|
-| Visibility grid overlay | Must | Medium | Not started |
-| Functional offline mode toggle | Must | Low | UI exists, not enforced |
-| Sun position indicator on map | Must | Medium | Not started |
-| User-friendly error messages | Must | Low | Partial |
-| Playback controls (-1h, +1h) | Should | Low | Not started |
-| Sunrise/sunset time display | Should | Low | Functions exist, not shown |
-| Date picker dialog | Should | Low | Not started |
-| Performance optimization | Should | Medium | Not profiled |
+| Visibility grid overlay | Must | Medium | ✅ Complete |
+| Functional offline mode toggle | Must | Low | ✅ Complete |
+| Sun position indicator on map | Must | Medium | ✅ Complete |
+| User-friendly error messages | Must | Low | ✅ Complete |
+| Playback controls (-1h, +1h) | Should | Low | ✅ Complete |
+| Sunrise/sunset time display | Should | Low | ✅ Complete |
+| Date picker dialog | Should | Low | ✅ Complete |
+| Performance optimization | Should | Medium | Pending (debouncing added) |
 
 ---
 
 ## Release Milestones
 
-### Milestone 1: Core Visual Features (Must-Have)
+### Milestone 1: Core Visual Features (Must-Have) ✅ COMPLETE
 
 **Goal:** Make the app visually complete per design spec
 
-#### 1.1 Visibility Grid Overlay
-**Priority:** MUST | **Effort:** Medium (2-3 days)
+#### 1.1 Visibility Grid Overlay ✅
+**Priority:** MUST | **Effort:** Medium (2-3 days) | **Status:** Complete
 
-The `VisibilityGrid` model exists but is never rendered. Need to:
+Implemented visibility grid rendering using osmdroid Polygon overlays:
 
-- [ ] Add `VisibilityOverlay` composable in `ui/components/`
-- [ ] Call `calculateVisibilityGrid()` from `MapViewModel` when map bounds change
-- [ ] Render colored transparent layer on osmdroid map
-  - Yellow/orange for sunlit areas
-  - Blue/gray for shaded areas
-- [ ] Add debouncing to prevent excessive recalculation during pan/zoom
-- [ ] Consider resolution limits based on zoom level (performance)
+- [x] Integrated grid rendering directly in `OsmMapView.kt` using `VisibilityPolygon` class
+- [x] Call `calculateVisibilityGrid()` from `MapViewModel` when map bounds/time change
+- [x] Render colored transparent polygons on osmdroid map
+  - Yellow (`0x40FFEB3B`) for sunlit areas
+  - Gray-blue (`0x404A5568`) for shaded areas
+- [x] Added debouncing (500ms) to prevent excessive recalculation during pan/zoom
+- [x] Resolution adjusts based on zoom level (performance optimization)
 
-**Files to modify:**
-- `MapViewModel.kt` - Add grid calculation trigger
-- `MapScreen.kt` - Integrate overlay rendering
-- Create `ui/components/VisibilityOverlay.kt`
+**Files modified:**
+- `MapViewModel.kt` - Added `scheduleGridUpdate()` with debouncing
+- `MapUiState.kt` - Added `visibilityGrid`, `isLoadingGrid`, `getVisibleBounds()`
+- `OsmMapView.kt` - Added `updateVisibilityOverlay()` and `VisibilityPolygon` class
 
-**Technical considerations:**
-- `calculateVisibilityGrid()` spawns one coroutine per grid point - may need batching
-- Consider caching grid results for same bounds/time
-- Limit grid resolution at low zoom levels
+#### 1.2 Sun Position Indicator ✅
+**Priority:** MUST | **Effort:** Medium (1-2 days) | **Status:** Complete
 
-#### 1.2 Sun Position Indicator
-**Priority:** MUST | **Effort:** Medium (1-2 days)
+Created sun indicator at map edge showing azimuth direction:
 
-Show where the sun is on the map edge:
+- [x] Created `SunPositionIndicator.kt` composable
+- [x] Calculate screen position from sun azimuth using trigonometry
+- [x] Render sun icon (☀) at map edge in correct direction
+- [x] Color-coded: gold (visible), orange (blocked), gray (below horizon)
+- [x] Updates in real-time with time slider
 
-- [ ] Create `SunPositionIndicator` composable
-- [ ] Calculate screen position from sun azimuth
-- [ ] Render sun icon at map edge in correct direction
-- [ ] Update in real-time with time slider
+**Files created:**
+- `ui/components/SunPositionIndicator.kt`
 
-**Design:**
-```
-┌─────────────────────────┐
-│            ☀️           │  ← Sun icon at edge (azimuth 180° = south)
-│                         │
-│         [Map]           │
-│                         │
-└─────────────────────────┘
-```
+#### 1.3 Functional Offline Mode ✅
+**Priority:** MUST | **Effort:** Low (0.5 days) | **Status:** Complete
 
-#### 1.3 Functional Offline Mode
-**Priority:** MUST | **Effort:** Low (0.5 days)
+Offline mode now properly enforced in ElevationRepository:
 
-The settings toggle exists but doesn't actually restrict network:
+- [x] Read `offlineModeEnabled` via `SettingsRepository` in `ElevationRepositoryImpl`
+- [x] Skip API calls when offline mode enabled
+- [x] Return cached data only or `OfflineModeException` if not available
+- [x] Error shown via Snackbar with user-friendly message
 
-- [ ] Read `offlineModeEnabled` in `ElevationRepositoryImpl`
-- [ ] Skip API calls when offline mode enabled
-- [ ] Return cached data only or error if not available
-- [ ] Show toast/snackbar when offline mode blocks a request
+**Files modified:**
+- `ElevationRepositoryImpl.kt` - Added offline mode checks, created `OfflineModeException`
+- `DataModule.kt` - Inject `SettingsRepository` into `ElevationRepositoryImpl`
 
-**Files to modify:**
-- `ElevationRepositoryImpl.kt` - Check setting before API call
-- `SettingsRepository.kt` - Ensure setting is properly exposed
+#### 1.4 User-Friendly Error Messages ✅
+**Priority:** MUST | **Effort:** Low (0.5 days) | **Status:** Complete
 
-#### 1.4 User-Friendly Error Messages
-**Priority:** MUST | **Effort:** Low (0.5 days)
+Created error message mapper for user-friendly errors:
 
-Wrap technical errors with context:
+- [x] Created `ErrorMessageMapper` utility object
+- [x] Maps Ktor exceptions to user-friendly strings
+- [x] Integrated in `MapViewModel` error handling
 
-- [ ] Create `ErrorMessageMapper` utility
-- [ ] Map common exceptions to user-friendly strings
-- [ ] Use string resources for localization readiness
+**Files created:**
+- `util/ErrorMessageMapper.kt`
 
-**Examples:**
+**Error mappings implemented:**
 | Technical Error | User Message |
 |-----------------|--------------|
-| `UnknownHostException` | "No internet connection. Using cached data." |
-| `SocketTimeoutException` | "Server is slow. Please try again." |
-| `HttpException 429` | "Too many requests. Please wait a moment." |
-| Generic failure | "Something went wrong. Tap to retry." |
+| `UnknownHostException` | "No internet connection. Using cached data if available." |
+| `SocketTimeoutException` | "Server is slow to respond. Please try again." |
+| `OfflineModeException` | "Offline mode is enabled. Data not available for this location." |
+| `ClientRequestException 429` | "Too many requests. Please wait a moment." |
+| `ServerResponseException` | "Server is temporarily unavailable. Please try again later." |
 
 ---
 
-### Milestone 2: UI Polish (Should-Have)
+### Milestone 2: UI Polish (Should-Have) ✅ COMPLETE
 
 **Goal:** Complete the user interface per design spec
 
-#### 2.1 Playback Controls
-**Priority:** SHOULD | **Effort:** Low (0.5 days)
+#### 2.1 Playback Controls ✅
+**Priority:** SHOULD | **Effort:** Low (0.5 days) | **Status:** Complete
 
-Add time navigation buttons alongside slider:
+Added time navigation buttons alongside slider:
 
-- [ ] Add -1h and +1h buttons
-- [ ] Add Play/Pause button for animation
-- [ ] Implement animation loop (optional for 1.0)
+- [x] Add -1h and +1h buttons
+- [ ] Add Play/Pause button for animation (deferred to post-1.0)
+- [ ] Implement animation loop (deferred to post-1.0)
 
-**UI Layout:**
+**UI Layout (implemented):**
 ```
-[⏪ -1h] [▶️ Play] [⏩ +1h]
-|═══════════●═══════════════| 14:30
-```
-
-**Files to modify:**
-- `MapScreen.kt` - Add button row
-- `MapViewModel.kt` - Add `adjustTime(hours: Int)` function
-
-#### 2.2 Sunrise/Sunset Display
-**Priority:** SHOULD | **Effort:** Low (0.5 days)
-
-Show sunrise and sunset times in the overlay:
-
-- [ ] Call `calculateSunrise()` and `calculateSunset()` from ViewModel
-- [ ] Display in sun info overlay card
-- [ ] Update when date or location changes
-
-**Display:**
-```
-☀️ Sun Position
-Azimuth: 180° (South)
-Elevation: 45°
-─────────────────
-Sunrise: 06:23
-Sunset: 20:47
+[-1h]     14:30     [+1h]
+|═══════════●═══════════════|
 ```
 
-#### 2.3 Date Picker Dialog
-**Priority:** SHOULD | **Effort:** Low (0.5 days)
+**Files modified:**
+- `MapScreen.kt` - Added button row in `TimeControlPanel`
+- `MapViewModel.kt` - Added `onAdjustTime(hours: Int)` function
 
-Add proper date selection:
+#### 2.2 Sunrise/Sunset Display ✅
+**Priority:** SHOULD | **Effort:** Low (0.5 days) | **Status:** Complete
 
-- [ ] Add calendar icon button next to date display
-- [ ] Show Material 3 DatePicker dialog on tap
-- [ ] Update ViewModel with selected date
+Sunrise and sunset times now shown in the overlay:
 
-**Files to modify:**
-- `MapScreen.kt` - Add date picker trigger
-- Use `androidx.compose.material3.DatePicker`
+- [x] Call `calculateSunrise()` and `calculateSunset()` from ViewModel
+- [x] Display in sun info overlay card
+- [x] Update when date or location changes
 
-#### 2.4 Performance Optimization
-**Priority:** SHOULD | **Effort:** Medium (1-2 days)
+**Files modified:**
+- `MapViewModel.kt` - Calculate sunrise/sunset in `updateSunPosition()`
+- `MapUiState.kt` - Added `sunriseTime` and `sunsetTime` fields
+- `MapScreen.kt` - Display times in `SunPositionOverlay`
 
-Profile and optimize grid calculation:
+#### 2.3 Date Picker Dialog ✅
+**Priority:** SHOULD | **Effort:** Low (0.5 days) | **Status:** Complete
+
+Added Material 3 date picker:
+
+- [x] Made date row clickable to open picker
+- [x] Show Material 3 DatePickerDialog on tap
+- [x] Update ViewModel with selected date
+
+**Files modified:**
+- `MapScreen.kt` - Added `DatePickerDialogContent` composable
+
+#### 2.4 Performance Optimization ⏳
+**Priority:** SHOULD | **Effort:** Medium (1-2 days) | **Status:** Partial
+
+Some optimizations implemented, profiling pending:
 
 - [ ] Add performance logging/timing
 - [ ] Implement spatial batching for elevation requests
-- [ ] Limit grid point count based on zoom level
-- [ ] Consider using `Dispatchers.Default` for CPU-bound work
+- [x] Limit grid point count based on zoom level (resolution scales with zoom)
+- [x] Added debouncing (500ms) to prevent excessive recalculation
 - [ ] Cache visibility results for repeated queries
 
 **Performance targets:**
@@ -300,19 +287,19 @@ Profile and optimize grid calculation:
 ## Definition of Done for 1.0
 
 ### Functional Requirements
-- [ ] User can see sun visibility status for any point on map
-- [ ] User can change date and time with slider
-- [ ] User can download regions for offline use
-- [ ] App works fully offline with downloaded data
-- [ ] Visibility overlay shows sunlit/shaded areas on map
-- [ ] Sun position is indicated visually on map
+- [x] User can see sun visibility status for any point on map
+- [x] User can change date and time with slider
+- [x] User can download regions for offline use
+- [x] App works fully offline with downloaded data
+- [x] Visibility overlay shows sunlit/shaded areas on map
+- [x] Sun position is indicated visually on map
 
 ### Non-Functional Requirements
 - [ ] All CI checks pass (ktlint, detekt, lint, tests, build)
 - [ ] No crash on startup or common user flows
 - [ ] Visibility calculation completes in < 2 seconds
 - [ ] APK size < 20MB (excluding downloaded tiles)
-- [ ] Supports Android 10+ (API 29+)
+- [x] Supports Android 10+ (API 29+)
 
 ### Documentation
 - [ ] README with screenshots
@@ -324,29 +311,31 @@ Profile and optimize grid calculation:
 
 ## Timeline Estimate
 
-| Milestone | Duration | Cumulative |
-|-----------|----------|------------|
-| Milestone 1 (Must-Have) | 4-5 days | 4-5 days |
-| Milestone 2 (Should-Have) | 2-3 days | 6-8 days |
-| Milestone 3 (QA) | 2-3 days | 8-11 days |
-| Buffer & Polish | 2-3 days | 10-14 days |
+| Milestone | Duration | Cumulative | Status |
+|-----------|----------|------------|--------|
+| Milestone 1 (Must-Have) | 4-5 days | 4-5 days | ✅ Complete |
+| Milestone 2 (Should-Have) | 2-3 days | 6-8 days | ✅ Complete |
+| Milestone 3 (QA) | 2-3 days | 8-11 days | Pending |
+| Buffer & Polish | 1-2 days | 9-13 days | Pending |
 
-**Target: 1.0 release in ~2 weeks**
+**Target: 1.0 release in ~3-5 days** (QA and final polish remaining)
 
 ---
 
 ## Appendix: File Reference
 
-### Files to Create
-- `app/src/main/java/com/sunshine/app/ui/components/VisibilityOverlay.kt`
-- `app/src/main/java/com/sunshine/app/ui/components/SunPositionIndicator.kt`
-- `app/src/main/java/com/sunshine/app/util/ErrorMessageMapper.kt`
+### Files Created (Phase 2)
+- `app/src/main/java/com/sunshine/app/ui/components/SunPositionIndicator.kt` ✅
+- `app/src/main/java/com/sunshine/app/util/ErrorMessageMapper.kt` ✅
 
-### Files to Modify
-- `MapViewModel.kt` - Grid calculation, playback controls, sunrise/sunset
-- `MapScreen.kt` - UI integration for new components
-- `ElevationRepositoryImpl.kt` - Offline mode enforcement
-- `MapUiState.kt` - Add grid and sunrise/sunset fields
+### Files Modified (Phase 2)
+- `MapViewModel.kt` - Grid calculation, playback controls, sunrise/sunset ✅
+- `MapScreen.kt` - UI integration, date picker, playback controls ✅
+- `MapUiState.kt` - Added grid, sunrise/sunset, loading state fields ✅
+- `OsmMapView.kt` - Visibility grid overlay rendering ✅
+- `ElevationRepositoryImpl.kt` - Offline mode enforcement ✅
+- `DataModule.kt` - Added SettingsRepository dependency ✅
+- `ElevationRepositoryImplTest.kt` - Updated tests for new dependency ✅
 
 ### Files for Reference
 - `CalculateSunVisibilityUseCase.kt` - Has `calculateVisibilityGrid()` ready to use
