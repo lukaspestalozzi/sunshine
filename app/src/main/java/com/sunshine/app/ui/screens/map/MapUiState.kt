@@ -36,6 +36,9 @@ data class MapUiState(
     /** Whether grid overlay should be shown */
     val showGridOverlay: Boolean get() = visibilityGrid != null && sunPosition?.isAboveHorizon == true
 
+    /** Whether elevation data was unavailable (results may be inaccurate) */
+    val isElevationDegraded: Boolean get() = visibility?.isElevationDegraded ?: false
+
     /** Calculate visible map bounds based on center and zoom */
     @Suppress("MagicNumber") // Zoom factor calculation uses documented formula
     fun getVisibleBounds(): BoundingBox {
