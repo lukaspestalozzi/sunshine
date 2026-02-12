@@ -27,6 +27,16 @@ class SimpleSunCalculator : SunCalculator {
     override suspend fun calculateSunPosition(
         location: GeoPoint,
         dateTime: LocalDateTime,
+    ): SunPosition = calculateSunPositionSync(location, dateTime)
+
+    /**
+     * Pure computation of sun position — no I/O, no coroutines needed.
+     * Extracted so that [calculateSunEvent] can call it directly without runBlocking.
+     */
+    @Suppress("LongMethod") // Complex astronomical calculation is inherently long but cohesive
+    fun calculateSunPositionSync(
+        location: GeoPoint,
+        dateTime: LocalDateTime,
     ): SunPosition {
         val julianDate = toJulianDate(dateTime)
         val julianCentury = (julianDate - 2451545.0) / 36525.0
@@ -117,7 +127,7 @@ class SimpleSunCalculator : SunCalculator {
             // Binary search iterations
             val mid = (low + high) / 2
             val testTime = LocalDateTime.of(date, LocalTime.of((startMinute + mid) / 60, (startMinute + mid) % 60))
-            val position = kotlinx.coroutines.runBlocking { calculateSunPosition(location, testTime) }
+            val position = calculateSunPositionSync(location, testTime)
 
             if (isSunrise) {
                 if (position.elevation < 0) low = mid else high = mid
