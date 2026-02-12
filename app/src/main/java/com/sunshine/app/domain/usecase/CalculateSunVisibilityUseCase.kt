@@ -2,6 +2,7 @@ package com.sunshine.app.domain.usecase
 
 import com.sunshine.app.domain.model.BoundingBox
 import com.sunshine.app.domain.model.GeoPoint
+import com.sunshine.app.domain.model.SunPosition
 import com.sunshine.app.domain.model.TerrainPoint
 import com.sunshine.app.domain.model.TerrainProfile
 import com.sunshine.app.domain.model.VisibilityGrid
@@ -37,58 +38,51 @@ class CalculateSunVisibilityUseCase(
         dateTime: LocalDateTime,
     ): Result<VisibilityResult> =
         runCatching {
-            // Get sun position
             val sunPosition = sunCalculator.calculateSunPosition(location, dateTime)
-
-            // If sun is below horizon, no need to check terrain
             if (!sunPosition.isAboveHorizon) {
                 return@runCatching VisibilityResult.belowHorizon(location, sunPosition)
             }
+            checkTerrainVisibility(location, sunPosition)
+        }
 
-            // Get observer elevation (track failures for degraded-data indicator)
-            val observerElevationResult = elevationRepository.getElevation(location)
-            val observerDegraded = observerElevationResult.isFailure
-            val observerElevation =
-                observerElevationResult.getOrElse { DEFAULT_OBSERVER_ELEVATION }
+    /**
+     * Check whether terrain blocks the sun for an above-horizon sun position.
+     */
+    private suspend fun checkTerrainVisibility(
+        location: GeoPoint,
+        sunPosition: SunPosition,
+    ): VisibilityResult {
+        val observerElevationResult = elevationRepository.getElevation(location)
+        val observerElevation =
+            observerElevationResult.getOrElse { DEFAULT_OBSERVER_ELEVATION }
 
-            // Get terrain profile in sun's direction (optimized with batch fetching)
-            val profileResult =
-                getTerrainProfileBatch(location, observerElevation, sunPosition.azimuth)
-            val initialProfile = profileResult.first
-            val terrainDegraded = profileResult.second
-
-            // Refine profile where terrain has large elevation gradients
-            val terrainProfile = refineTerrainProfile(
+        val profileResult =
+            getTerrainProfileBatch(location, observerElevation, sunPosition.azimuth)
+        val terrainProfile =
+            refineTerrainProfile(
                 observer = location,
                 azimuth = sunPosition.azimuth,
-                initialProfile = initialProfile,
+                initialProfile = profileResult.first,
             )
-            val isElevationDegraded = observerDegraded || terrainDegraded
+        val isElevationDegraded =
+            observerElevationResult.isFailure || profileResult.second
 
-            // Check if terrain blocks the sun (accounting for atmospheric refraction)
-            val horizonAngle = terrainProfile.calculateHorizonAngle()
-            val apparentElevation =
-                sunPosition.elevation + atmosphericRefraction(sunPosition.elevation)
-            val isSunVisible = apparentElevation > horizonAngle
+        val horizonAngle = terrainProfile.calculateHorizonAngle()
+        val apparentElevation =
+            sunPosition.elevation + atmosphericRefraction(sunPosition.elevation)
 
-            if (isSunVisible) {
-                VisibilityResult.visible(
-                    location = location,
-                    sunPosition = sunPosition,
-                    horizonAngle = horizonAngle,
-                    isElevationDegraded = isElevationDegraded,
-                )
-            } else {
-                val degreesUntilVisible = horizonAngle - apparentElevation
-                VisibilityResult.blocked(
-                    location = location,
-                    sunPosition = sunPosition,
-                    horizonAngle = horizonAngle,
-                    degreesUntilVisible = degreesUntilVisible,
-                    isElevationDegraded = isElevationDegraded,
-                )
-            }
+        return if (apparentElevation > horizonAngle) {
+            VisibilityResult.visible(location, sunPosition, horizonAngle, isElevationDegraded)
+        } else {
+            VisibilityResult.blocked(
+                location = location,
+                sunPosition = sunPosition,
+                horizonAngle = horizonAngle,
+                degreesUntilVisible = horizonAngle - apparentElevation,
+                isElevationDegraded = isElevationDegraded,
+            )
         }
+    }
 
     /**
      * Calculate visibility grid for rendering as map overlay.
@@ -180,12 +174,13 @@ class CalculateSunVisibilityUseCase(
                 )
             }
 
-        val profile = TerrainProfile(
-            observer = observer,
-            observerElevation = observerElevation,
-            azimuth = azimuth,
-            points = terrainPoints,
-        )
+        val profile =
+            TerrainProfile(
+                observer = observer,
+                observerElevation = observerElevation,
+                azimuth = azimuth,
+                points = terrainPoints,
+            )
         return profile to isDegraded
     }
 
@@ -193,57 +188,41 @@ class CalculateSunVisibilityUseCase(
      * Refine a terrain profile by inserting midpoints between consecutive sample
      * points that have a large elevation gradient or a large distance gap.
      * This catches narrow ridges that fall between the coarse logarithmic samples.
-     *
-     * At most one refinement pass is performed (no recursion), adding up to
-     * 8 additional elevation queries batched into a single API call.
      */
     private suspend fun refineTerrainProfile(
         observer: GeoPoint,
         azimuth: Double,
         initialProfile: TerrainProfile,
     ): TerrainProfile {
-        val points = initialProfile.points
-        if (points.size < 2) return initialProfile
+        val midDistances = findRefinementGaps(initialProfile.points)
+        if (midDistances.isEmpty()) return initialProfile
 
-        // Find gaps that need refinement
-        val midpoints = mutableListOf<Double>() // distances to insert
-        for (i in 0 until points.size - 1) {
-            val current = points[i]
-            val next = points[i + 1]
-            val elevationDiff = abs(current.elevation - next.elevation)
-            val distanceGap = next.distance - current.distance
-
-            val needsRefinement =
-                elevationDiff > REFINEMENT_ELEVATION_THRESHOLD ||
-                    (distanceGap > REFINEMENT_DISTANCE_THRESHOLD &&
-                        elevationDiff > REFINEMENT_MIN_ELEVATION_DIFF)
-            if (needsRefinement) {
-                midpoints.add((current.distance + next.distance) / 2.0)
-            }
-        }
-
-        if (midpoints.isEmpty()) return initialProfile
-
-        // Batch fetch elevations for midpoints
-        val midGeoPoints = midpoints.map { distance ->
-            distance to projectPoint(observer, azimuth, distance)
-        }
+        val midGeoPoints = midDistances.map { it to projectPoint(observer, azimuth, it) }
         val midElevations =
             elevationRepository.getElevations(midGeoPoints.map { it.second })
                 .getOrElse { emptyMap() }
 
-        // Build new midpoint TerrainPoints
-        val newPoints = midGeoPoints.map { (distance, geoPoint) ->
-            TerrainPoint(
-                distance = distance,
-                elevation = midElevations[geoPoint] ?: initialProfile.observerElevation,
-            )
-        }
-
-        // Merge original + new points, sorted by distance
-        val mergedPoints = (points + newPoints).sortedBy { it.distance }
-
+        val newPoints =
+            midGeoPoints.map { (distance, geoPoint) ->
+                TerrainPoint(distance, midElevations[geoPoint] ?: initialProfile.observerElevation)
+            }
+        val mergedPoints = (initialProfile.points + newPoints).sortedBy { it.distance }
         return initialProfile.copy(points = mergedPoints)
+    }
+
+    /**
+     * Find distances where midpoints should be inserted for terrain refinement.
+     */
+    private fun findRefinementGaps(points: List<TerrainPoint>): List<Double> {
+        if (points.size < 2) return emptyList()
+        return (0 until points.size - 1).mapNotNull { i ->
+            val elevDiff = abs(points[i].elevation - points[i + 1].elevation)
+            val distGap = points[i + 1].distance - points[i].distance
+            val needsRefinement =
+                elevDiff > REFINEMENT_ELEVATION_THRESHOLD ||
+                    (distGap > REFINEMENT_DISTANCE_THRESHOLD && elevDiff > REFINEMENT_MIN_ELEVATION_DIFF)
+            if (needsRefinement) (points[i].distance + points[i + 1].distance) / 2.0 else null
+        }
     }
 
     /**
