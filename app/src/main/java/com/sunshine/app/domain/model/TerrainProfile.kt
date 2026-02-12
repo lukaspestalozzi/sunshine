@@ -42,8 +42,11 @@ data class TerrainPoint(
     val elevation: Double,
 ) {
     /**
-     * Calculate the angle from the observer to this point.
+     * Calculate the angle from the observer to this point, correcting for Earth curvature.
      * Positive angle means the point is above the observer's horizon.
+     *
+     * Earth curvature makes distant terrain appear lower than flat-earth geometry predicts.
+     * At 50 km, the drop is ~168 m (with standard atmospheric refraction factor k = 7/6).
      *
      * @param observerElevation The observer's elevation in meters
      * @return Angle in degrees above/below observer's horizon
@@ -51,8 +54,20 @@ data class TerrainPoint(
     fun angleFromObserver(observerElevation: Double): Double {
         if (distance <= 0) return 0.0
 
-        val heightDiff = elevation - observerElevation
-        // Simple angle calculation: arctan(height/distance) in degrees
-        return Math.toDegrees(kotlin.math.atan2(heightDiff, distance))
+        // Earth curvature correction: terrain drops by d²/(2·R·k) where k=7/6
+        // accounts for standard atmospheric refraction on the light path to terrain
+        val curvatureDrop =
+            (distance * distance) / (2.0 * EARTH_RADIUS_METERS * REFRACTION_FACTOR)
+        val correctedHeightDiff = elevation - observerElevation - curvatureDrop
+        return Math.toDegrees(kotlin.math.atan2(correctedHeightDiff, distance))
+    }
+
+    companion object {
+        /** Mean Earth radius in meters */
+        const val EARTH_RADIUS_METERS = 6_371_000.0
+
+        /** Standard atmospheric refraction factor for terrestrial line-of-sight (k = 7/6) */
+        @Suppress("MagicNumber")
+        const val REFRACTION_FACTOR = 7.0 / 6.0
     }
 }
