@@ -15,6 +15,7 @@ import java.time.LocalTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -252,5 +253,143 @@ class MapViewModelTest {
                 "Should have visibility data after calculation",
                 viewModel.uiState.value.hasVisibilityData,
             )
+        }
+
+    // ---- Rapid input and debouncing tests ----
+
+    @Test
+    fun `rapid map center changes all update state`() =
+        runTest {
+            viewModel = MapViewModel(sunCalculator, visibilityUseCase)
+            advanceUntilIdle()
+
+            val finalCenter = GeoPoint(latitude = 45.0, longitude = 7.0)
+            // Simulate rapid panning - many quick center changes
+            viewModel.onMapCenterChanged(GeoPoint(latitude = 46.0, longitude = 8.0))
+            viewModel.onMapCenterChanged(GeoPoint(latitude = 45.5, longitude = 7.5))
+            viewModel.onMapCenterChanged(finalCenter)
+            advanceUntilIdle()
+
+            assertEquals(
+                "Final map center should be the last one set",
+                finalCenter,
+                viewModel.uiState.value.mapCenter,
+            )
+        }
+
+    @Test
+    fun `grid update is debounced on rapid zoom changes`() =
+        runTest {
+            viewModel = MapViewModel(sunCalculator, visibilityUseCase)
+            advanceUntilIdle()
+
+            // Rapid zoom changes (within debounce window)
+            viewModel.onZoomChanged(13.0)
+            advanceTimeBy(100)
+            viewModel.onZoomChanged(14.0)
+            advanceTimeBy(100)
+            viewModel.onZoomChanged(15.0)
+            advanceTimeBy(100)
+
+            // At this point only 300ms have passed - debounce is 500ms
+            // Grid should not have been recalculated yet for the zoom changes
+            assertEquals(15.0, viewModel.uiState.value.zoomLevel, 0.1)
+
+            // Advance past debounce window
+            advanceUntilIdle()
+
+            // Now the grid update should have completed
+            assertFalse("Grid should not be loading", viewModel.uiState.value.isLoadingGrid)
+        }
+
+    @Test
+    fun `onAdjustTime advances by specified hours`() =
+        runTest {
+            viewModel = MapViewModel(sunCalculator, visibilityUseCase)
+            advanceUntilIdle()
+
+            val initialTime = viewModel.uiState.value.selectedTime
+            val initialDate = viewModel.uiState.value.selectedDate
+
+            viewModel.onAdjustTime(1)
+            advanceUntilIdle()
+
+            val newTime = viewModel.uiState.value.selectedTime
+            // One hour later (or date rolled over)
+            val expected = java.time.LocalDateTime.of(initialDate, initialTime).plusHours(1)
+            assertEquals(expected.toLocalTime(), newTime)
+        }
+
+    @Test
+    fun `onAdjustTime handles day boundary crossing`() =
+        runTest {
+            viewModel = MapViewModel(sunCalculator, visibilityUseCase)
+            // Set time to 23:30
+            viewModel.onTimeSelected(LocalTime.of(23, 30))
+            advanceUntilIdle()
+
+            val dateBefore = viewModel.uiState.value.selectedDate
+            viewModel.onAdjustTime(1)
+            advanceUntilIdle()
+
+            val dateAfter = viewModel.uiState.value.selectedDate
+            val timeAfter = viewModel.uiState.value.selectedTime
+
+            assertEquals("Date should advance by one day", dateBefore.plusDays(1), dateAfter)
+            assertEquals("Time should be 00:30", LocalTime.of(0, 30), timeAfter)
+        }
+
+    @Test
+    fun `visibility failure does not set error in ui state`() =
+        runTest {
+            // Visibility failures are non-critical per the ViewModel design
+            coEvery { visibilityUseCase.calculateVisibility(any(), any()) } returns
+                Result.failure(RuntimeException("Visibility failed"))
+
+            viewModel = MapViewModel(sunCalculator, visibilityUseCase)
+            advanceUntilIdle()
+
+            // Sun position should still work
+            assertNotNull("Sun position should be set", viewModel.uiState.value.sunPosition)
+            // Error should NOT be set (visibility failure is non-critical)
+            assertNull("Error should not be set for visibility failure", viewModel.uiState.value.error)
+        }
+
+    @Test
+    fun `sun position updates sunrise and sunset times`() =
+        runTest {
+            coEvery { sunCalculator.calculateSunrise(any(), any()) } returns LocalTime.of(5, 45)
+            coEvery { sunCalculator.calculateSunset(any(), any()) } returns LocalTime.of(21, 15)
+
+            viewModel = MapViewModel(sunCalculator, visibilityUseCase)
+            advanceUntilIdle()
+
+            assertEquals(LocalTime.of(5, 45), viewModel.uiState.value.sunriseTime)
+            assertEquals(LocalTime.of(21, 15), viewModel.uiState.value.sunsetTime)
+        }
+
+    @Test
+    fun `grid not calculated when sun below horizon`() =
+        runTest {
+            coEvery { sunCalculator.calculateSunPosition(any(), any()) } returns
+                SunPosition(azimuth = 0.0, elevation = -10.0)
+
+            viewModel = MapViewModel(sunCalculator, visibilityUseCase)
+            advanceUntilIdle()
+
+            assertNull("Grid should be null when sun is below horizon", viewModel.uiState.value.visibilityGrid)
+        }
+
+    @Test
+    fun `grid not calculated at low zoom levels`() =
+        runTest {
+            viewModel = MapViewModel(sunCalculator, visibilityUseCase)
+            advanceUntilIdle()
+
+            // Set zoom below the grid threshold (MIN_ZOOM_FOR_GRID = 12.0)
+            viewModel.onZoomChanged(8.0)
+            advanceUntilIdle()
+
+            assertNull("Grid should be null at low zoom", viewModel.uiState.value.visibilityGrid)
         }
 }
