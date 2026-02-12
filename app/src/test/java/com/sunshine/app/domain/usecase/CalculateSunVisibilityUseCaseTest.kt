@@ -257,6 +257,70 @@ class CalculateSunVisibilityUseCaseTest {
             assertTrue("Grid should include east boundary", lons.any { it >= 8.019 })
         }
 
+    // ---- Atmospheric refraction tests ----
+
+    @Test
+    fun `refraction makes sun visible when geometric elevation is slightly below horizon angle`() =
+        runBlocking {
+            // Sun geometric elevation 2.0°, refraction at 2° ≈ 0.28° → apparent ≈ 2.28°
+            // Terrain creates horizon angle of ~2.15° (below apparent, above geometric)
+            // Without refraction: 2.0 < 2.15 → blocked
+            // With refraction: 2.28 > 2.15 → visible
+            val sunPosition = SunPosition(azimuth = 180.0, elevation = 2.0)
+            coEvery { sunCalculator.calculateSunPosition(any(), any()) } returns sunPosition
+            coEvery { elevationRepository.getElevation(any()) } returns Result.success(1000.0)
+            coEvery { elevationRepository.getElevations(any()) } answers {
+                val points = firstArg<List<GeoPoint>>()
+                // Observer at 1000m. At 100m distance (closest sample),
+                // atan2(3.75, 100) ≈ 2.15° horizon angle
+                Result.success(points.associateWith { 1003.75 })
+            }
+
+            val result = useCase.calculateVisibility(testLocation, testDateTime)
+            val visibility = result.getOrNull()!!
+
+            assertTrue(
+                "Refraction should make sun visible (apparent elev 2.28° > horizon 2.15°)",
+                visibility.isSunVisible,
+            )
+        }
+
+    @Test
+    fun `refraction correction is negligible at high elevation`() {
+        // At 60° elevation, refraction should be < 0.05°
+        val refraction =
+            CalculateSunVisibilityUseCase.atmosphericRefraction(60.0)
+        assertTrue(
+            "Refraction at 60° should be < 0.05°, was $refraction",
+            refraction < 0.05,
+        )
+    }
+
+    @Test
+    fun `refraction correction is approximately 0_57 degrees at horizon`() {
+        // Standard atmospheric refraction at 0° elevation ≈ 0.57°
+        val refraction =
+            CalculateSunVisibilityUseCase.atmosphericRefraction(0.0)
+        assertEquals(
+            "Refraction at horizon should be ~0.57°",
+            0.57,
+            refraction,
+            0.1,
+        )
+    }
+
+    @Test
+    fun `refraction is zero for sun well below horizon`() {
+        val refraction =
+            CalculateSunVisibilityUseCase.atmosphericRefraction(-10.0)
+        assertEquals(
+            "Refraction below -1° should be 0",
+            0.0,
+            refraction,
+            0.001,
+        )
+    }
+
     private fun setupSunAboveHorizon() {
         val sunAbove = SunPosition(azimuth = 180.0, elevation = 60.0)
         coEvery { sunCalculator.calculateSunPosition(any(), any()) } returns sunAbove
