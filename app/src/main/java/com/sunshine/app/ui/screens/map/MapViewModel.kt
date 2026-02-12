@@ -10,6 +10,8 @@ import com.sunshine.app.util.ErrorMessageMapper
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.ZoneId
+import java.time.ZoneOffset
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -84,30 +86,32 @@ class MapViewModel(
     private fun updateSunPosition() {
         viewModelScope.launch {
             val state = _uiState.value
-            val dateTime = LocalDateTime.of(state.selectedDate, state.selectedTime)
+            val localDateTime = LocalDateTime.of(state.selectedDate, state.selectedTime)
+            val utcDateTime = localToUtc(localDateTime)
 
             try {
                 val sunPosition =
                     sunCalculator.calculateSunPosition(
                         location = state.mapCenter,
-                        dateTime = dateTime,
+                        dateTime = utcDateTime,
                     )
 
-                // Calculate sunrise and sunset times
-                val sunriseTime = sunCalculator.calculateSunrise(state.mapCenter, state.selectedDate)
-                val sunsetTime = sunCalculator.calculateSunset(state.mapCenter, state.selectedDate)
+                // Calculate sunrise/sunset in UTC, convert back to local for display
+                val utcDate = utcDateTime.toLocalDate()
+                val sunriseUtc = sunCalculator.calculateSunrise(state.mapCenter, utcDate)
+                val sunsetUtc = sunCalculator.calculateSunset(state.mapCenter, utcDate)
 
                 _uiState.update {
                     it.copy(
                         sunPosition = sunPosition,
-                        sunriseTime = sunriseTime,
-                        sunsetTime = sunsetTime,
+                        sunriseTime = sunriseUtc?.let { t -> utcTimeToLocal(t, utcDate) },
+                        sunsetTime = sunsetUtc?.let { t -> utcTimeToLocal(t, utcDate) },
                         error = null,
                     )
                 }
 
                 // Start visibility calculation (non-blocking)
-                updateVisibility(state.mapCenter, dateTime)
+                updateVisibility(state.mapCenter, utcDateTime)
 
                 // Schedule grid update with debouncing
                 scheduleGridUpdate()
@@ -177,7 +181,7 @@ class MapViewModel(
         }
 
         val bounds = state.getVisibleBounds()
-        val dateTime = LocalDateTime.of(state.selectedDate, state.selectedTime)
+        val dateTime = localToUtc(LocalDateTime.of(state.selectedDate, state.selectedTime))
 
         // Adjust resolution based on zoom level for performance
         val resolution = calculateGridResolution(state.zoomLevel)
@@ -207,6 +211,28 @@ class MapViewModel(
     }
 
     companion object {
+        /**
+         * Convert a local-timezone [LocalDateTime] to its UTC equivalent.
+         * The NOAA sun calculator assumes UTC input.
+         */
+        fun localToUtc(local: LocalDateTime): LocalDateTime =
+            local.atZone(ZoneId.systemDefault())
+                .withZoneSameInstant(ZoneOffset.UTC)
+                .toLocalDateTime()
+
+        /**
+         * Convert a UTC [LocalTime] (e.g. sunrise/sunset from the calculator)
+         * back to the device's local timezone for display.
+         */
+        fun utcTimeToLocal(
+            utcTime: LocalTime,
+            utcDate: LocalDate,
+        ): LocalTime =
+            LocalDateTime.of(utcDate, utcTime)
+                .atZone(ZoneOffset.UTC)
+                .withZoneSameInstant(ZoneId.systemDefault())
+                .toLocalTime()
+
         // Debounce delay for grid calculation
         private const val GRID_DEBOUNCE_MS = 500L
 
