@@ -5,7 +5,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TerrainProfileTest {
-
     // ---- Earth curvature correction tests ----
 
     @Test
@@ -17,9 +16,10 @@ class TerrainProfileTest {
         val correctedAngle = point.angleFromObserver(observerElevation)
 
         // Flat-earth angle: atan2(1500, 50000) ≈ 1.718°
-        val flatEarthAngle = Math.toDegrees(
-            kotlin.math.atan2(1500.0, 50_000.0),
-        )
+        val flatEarthAngle =
+            Math.toDegrees(
+                kotlin.math.atan2(1500.0, 50_000.0),
+            )
 
         assertTrue(
             "Curvature-corrected angle ($correctedAngle) should be less than " +
@@ -37,15 +37,17 @@ class TerrainProfileTest {
         val correctedAngle = point.angleFromObserver(observerElevation)
 
         // Flat-earth: atan2(100, 100) ≈ 45°
-        val flatEarthAngle = Math.toDegrees(
-            kotlin.math.atan2(100.0, 100.0),
-        )
+        val flatEarthAngle =
+            Math.toDegrees(
+                kotlin.math.atan2(100.0, 100.0),
+            )
 
+        // Within 0.01°
         assertEquals(
             "At 100m, curvature correction should be negligible",
             flatEarthAngle,
             correctedAngle,
-            0.01, // within 0.01°
+            0.01,
         )
     }
 
@@ -54,8 +56,9 @@ class TerrainProfileTest {
         // d²/(2·R·k) where R=6371000, k=7/6, d=50000
         // = 50000² / (2 * 6371000 * 7/6) = 2.5e9 / 14865667 ≈ 168.2m
         val d = 50_000.0
-        val expectedDrop = d * d /
-            (2.0 * TerrainPoint.EARTH_RADIUS_METERS * TerrainPoint.REFRACTION_FACTOR)
+        val expectedDrop =
+            d * d /
+                (2.0 * TerrainPoint.EARTH_RADIUS_METERS * TerrainPoint.REFRACTION_FACTOR)
 
         assertEquals(
             "Curvature drop at 50km should be ~168m (with k=7/6)",
@@ -85,15 +88,17 @@ class TerrainProfileTest {
         // Build a profile with one close point and one far point
         // Close point: 500m away, 100m higher than observer → large positive angle
         // Far point: 50km away, 100m higher than observer → angle reduced by curvature
-        val profile = TerrainProfile(
-            observer = GeoPoint(46.0, 8.0),
-            observerElevation = 1000.0,
-            azimuth = 180.0,
-            points = listOf(
-                TerrainPoint(distance = 500.0, elevation = 1100.0),
-                TerrainPoint(distance = 50_000.0, elevation = 1100.0),
-            ),
-        )
+        val profile =
+            TerrainProfile(
+                observer = GeoPoint(46.0, 8.0),
+                observerElevation = 1000.0,
+                azimuth = 180.0,
+                points =
+                    listOf(
+                        TerrainPoint(distance = 500.0, elevation = 1100.0),
+                        TerrainPoint(distance = 50_000.0, elevation = 1100.0),
+                    ),
+            )
 
         val horizonAngle = profile.calculateHorizonAngle()
 
