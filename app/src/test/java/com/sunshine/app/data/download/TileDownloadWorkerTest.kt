@@ -3,6 +3,7 @@ package com.sunshine.app.data.download
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
@@ -12,6 +13,9 @@ import org.junit.rules.TemporaryFolder
  * {cacheDir}/{sourceName}/{z}/{x}/{y}.png
  */
 class TileDownloadWorkerTest {
+    @get:Rule
+    val tempFolder = TemporaryFolder()
+
     @Test
     fun `tile source name matches osmdroid convention`() {
         assertEquals("OpenTopoMap", TileDownloadWorker.TILE_SOURCE_NAME)
@@ -19,8 +23,6 @@ class TileDownloadWorkerTest {
 
     @Test
     fun `tile cache path format matches osmdroid expected layout`() {
-        val tempFolder = TemporaryFolder()
-        tempFolder.create()
         val cacheDir = tempFolder.root
 
         val zoom = 15
@@ -29,32 +31,36 @@ class TileDownloadWorkerTest {
         val tilePath =
             File(
                 cacheDir,
-                "${TileDownloadWorker.TILE_SOURCE_NAME}/$zoom/$x/$y.png",
+                "${TileDownloadWorker.TILE_SOURCE_NAME}${File.separator}" +
+                    "$zoom${File.separator}$x${File.separator}$y.png",
             )
 
         // Verify the path structure: {cache}/OpenTopoMap/15/17059/11526.png
-        assertEquals(
-            "Tile path should follow osmdroid layout",
-            "${cacheDir.absolutePath}/OpenTopoMap/15/17059/11526.png",
-            tilePath.absolutePath,
-        )
+        val expected =
+            listOf(
+                cacheDir.absolutePath,
+                "OpenTopoMap",
+                "15",
+                "17059",
+                "11526.png",
+            ).joinToString(File.separator)
+        assertEquals("Tile path should follow osmdroid layout", expected, tilePath.absolutePath)
 
         // Verify directories can be created and file written
         tilePath.parentFile?.mkdirs()
         tilePath.writeBytes(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47))
         assertTrue("Tile file should exist after writing", tilePath.exists())
         assertEquals("Tile file should have correct size", 4L, tilePath.length())
-
-        tempFolder.delete()
     }
 
     @Test
     fun `tile path uses z-x-y structure not flat naming`() {
-        val cacheDir = File("/tmp/osmdroid")
+        val cacheDir = tempFolder.root
         val tilePath =
             File(
                 cacheDir,
-                "${TileDownloadWorker.TILE_SOURCE_NAME}/10/512/340.png",
+                "${TileDownloadWorker.TILE_SOURCE_NAME}${File.separator}" +
+                    "10${File.separator}512${File.separator}340.png",
             )
 
         // The path must contain separate directories for z, x, y

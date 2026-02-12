@@ -24,6 +24,12 @@ private const val MIN_ZOOM = 0
 private const val MAX_ZOOM = 17
 private const val TILE_SIZE = 256
 
+/**
+ * The tile source name used for osmdroid's tile provider and cache directories.
+ * Must be consistent everywhere: tile source registration, cache path, and download worker.
+ */
+const val OPEN_TOPO_MAP_SOURCE_NAME = "OpenTopoMap"
+
 // Colors for visibility overlay
 private const val SUNLIT_COLOR = 0x40FFEB3B // Semi-transparent yellow
 private const val SHADED_COLOR = 0x404A5568 // Semi-transparent gray-blue
@@ -35,7 +41,7 @@ private const val SHADED_COLOR = 0x404A5568 // Semi-transparent gray-blue
 private val openTopoMapTileSource = OpenTopoMapTileSource()
 
 private class OpenTopoMapTileSource : OnlineTileSourceBase(
-    "OpenTopoMap",
+    OPEN_TOPO_MAP_SOURCE_NAME,
     MIN_ZOOM,
     MAX_ZOOM,
     TILE_SIZE,

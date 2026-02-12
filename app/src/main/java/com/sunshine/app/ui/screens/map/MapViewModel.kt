@@ -86,8 +86,10 @@ class MapViewModel(
     private fun updateSunPosition() {
         viewModelScope.launch {
             val state = _uiState.value
-            val localDateTime = LocalDateTime.of(state.selectedDate, state.selectedTime)
-            val utcDateTime = localToUtc(localDateTime)
+            val utcDateTime =
+                localToUtc(
+                    LocalDateTime.of(state.selectedDate, state.selectedTime),
+                )
 
             try {
                 val sunPosition =
@@ -96,29 +98,35 @@ class MapViewModel(
                         dateTime = utcDateTime,
                     )
 
-                // Calculate sunrise/sunset in UTC, convert back to local for display
-                val utcDate = utcDateTime.toLocalDate()
-                val sunriseUtc = sunCalculator.calculateSunrise(state.mapCenter, utcDate)
-                val sunsetUtc = sunCalculator.calculateSunset(state.mapCenter, utcDate)
-
+                val (sunrise, sunset) = fetchSunriseSunset(state)
                 _uiState.update {
                     it.copy(
                         sunPosition = sunPosition,
-                        sunriseTime = sunriseUtc?.let { t -> utcTimeToLocal(t, utcDate) },
-                        sunsetTime = sunsetUtc?.let { t -> utcTimeToLocal(t, utcDate) },
+                        sunriseTime = sunrise,
+                        sunsetTime = sunset,
                         error = null,
                     )
                 }
 
-                // Start visibility calculation (non-blocking)
                 updateVisibility(state.mapCenter, utcDateTime)
-
-                // Schedule grid update with debouncing
                 scheduleGridUpdate()
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = ErrorMessageMapper.toUserMessage(e)) }
             }
         }
+    }
+
+    /**
+     * Fetch sunrise/sunset in UTC for the user's local date, then convert to local time.
+     * Uses selectedDate (not UTC date) to avoid date-shift at midnight crossings.
+     */
+    private suspend fun fetchSunriseSunset(state: MapUiState): Pair<LocalTime?, LocalTime?> {
+        val sunriseUtc = sunCalculator.calculateSunrise(state.mapCenter, state.selectedDate)
+        val sunsetUtc = sunCalculator.calculateSunset(state.mapCenter, state.selectedDate)
+        return Pair(
+            sunriseUtc?.let { utcTimeToLocal(it, state.selectedDate) },
+            sunsetUtc?.let { utcTimeToLocal(it, state.selectedDate) },
+        )
     }
 
     @Suppress("TooGenericExceptionCaught", "SwallowedException")
@@ -215,7 +223,7 @@ class MapViewModel(
          * Convert a local-timezone [LocalDateTime] to its UTC equivalent.
          * The NOAA sun calculator assumes UTC input.
          */
-        fun localToUtc(local: LocalDateTime): LocalDateTime =
+        internal fun localToUtc(local: LocalDateTime): LocalDateTime =
             local.atZone(ZoneId.systemDefault())
                 .withZoneSameInstant(ZoneOffset.UTC)
                 .toLocalDateTime()
@@ -224,7 +232,7 @@ class MapViewModel(
          * Convert a UTC [LocalTime] (e.g. sunrise/sunset from the calculator)
          * back to the device's local timezone for display.
          */
-        fun utcTimeToLocal(
+        internal fun utcTimeToLocal(
             utcTime: LocalTime,
             utcDate: LocalDate,
         ): LocalTime =

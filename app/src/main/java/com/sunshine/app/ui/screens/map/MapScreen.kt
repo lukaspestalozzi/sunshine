@@ -202,9 +202,10 @@ private fun SunPositionOverlay(
 
             if (uiState.isElevationDegraded) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Decorative icon; adjacent text describes the warning
                     Icon(
                         imageVector = Icons.Default.Warning,
-                        contentDescription = "Elevation data unavailable",
+                        contentDescription = null,
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(14.dp),
                     )

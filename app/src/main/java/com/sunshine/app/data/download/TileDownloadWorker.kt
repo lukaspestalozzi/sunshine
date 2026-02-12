@@ -8,6 +8,7 @@ import com.sunshine.app.data.local.database.DownloadedRegionDao
 import com.sunshine.app.data.local.database.entities.DownloadStatus
 import com.sunshine.app.data.local.database.entities.DownloadedRegionEntity
 import com.sunshine.app.domain.model.BoundingBox
+import com.sunshine.app.ui.components.OPEN_TOPO_MAP_SOURCE_NAME
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -353,8 +354,8 @@ class TileDownloadWorker(
         const val KEY_STATUS = "status"
         const val KEY_ERROR = "error"
 
-        /** Must match the tile source name used in OsmMapView */
-        const val TILE_SOURCE_NAME = "OpenTopoMap"
+        /** Delegates to the shared constant defined alongside the tile source in OsmMapView */
+        const val TILE_SOURCE_NAME = OPEN_TOPO_MAP_SOURCE_NAME
 
         private const val PROGRESS_UPDATE_INTERVAL = 50L
         private const val PROGRESS_MULTIPLIER = 100
