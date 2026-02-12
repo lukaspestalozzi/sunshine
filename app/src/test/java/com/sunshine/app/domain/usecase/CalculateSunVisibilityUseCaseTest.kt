@@ -380,6 +380,145 @@ class CalculateSunVisibilityUseCaseTest {
             )
         }
 
+    // ---- Adaptive terrain refinement tests ----
+
+    @Test
+    fun `refinement adds midpoints for large elevation gaps`() =
+        runBlocking {
+            // Setup sun above horizon
+            val sunPosition = SunPosition(azimuth = 180.0, elevation = 45.0)
+            coEvery { sunCalculator.calculateSunPosition(any(), any()) } returns sunPosition
+            coEvery { elevationRepository.getElevation(any()) } returns Result.success(1000.0)
+
+            // Track how many times getElevations is called
+            var batchCallCount = 0
+            coEvery { elevationRepository.getElevations(any()) } answers {
+                batchCallCount++
+                val points = firstArg<List<GeoPoint>>()
+                if (batchCallCount == 1) {
+                    // Initial profile: create a 300m elevation jump between 2km and 5km samples
+                    // SAMPLE_DISTANCES[4]=2000, SAMPLE_DISTANCES[5]=5000
+                    // Return 1000m for close points, 1300m for far points
+                    Result.success(
+                        points.mapIndexed { index, point ->
+                            point to if (index >= 5) 1300.0 else 1000.0
+                        }.toMap(),
+                    )
+                } else {
+                    // Refinement query: return elevations for midpoints
+                    Result.success(points.associateWith { 1150.0 })
+                }
+            }
+
+            useCase.calculateVisibility(testLocation, testDateTime)
+
+            assertTrue(
+                "Refinement should trigger a second batch call (was $batchCallCount)",
+                batchCallCount >= 2,
+            )
+        }
+
+    @Test
+    fun `refinement does not add midpoints for flat terrain`() =
+        runBlocking {
+            val sunPosition = SunPosition(azimuth = 180.0, elevation = 45.0)
+            coEvery { sunCalculator.calculateSunPosition(any(), any()) } returns sunPosition
+            coEvery { elevationRepository.getElevation(any()) } returns Result.success(1000.0)
+
+            var batchCallCount = 0
+            coEvery { elevationRepository.getElevations(any()) } answers {
+                batchCallCount++
+                val points = firstArg<List<GeoPoint>>()
+                // All terrain at same elevation — no refinement needed
+                Result.success(points.associateWith { 1000.0 })
+            }
+
+            useCase.calculateVisibility(testLocation, testDateTime)
+
+            assertEquals(
+                "Flat terrain should only need one batch call",
+                1,
+                batchCallCount,
+            )
+        }
+
+    @Test
+    fun `refined profile catches ridge between sample points`() =
+        runBlocking {
+            // Sun at low elevation (5°), observer at 1000m
+            // Initial profile: flat at 1000m (no blocking)
+            // But the midpoint between 2km and 5km has a ridge at 1200m
+            // atan2(200, 3500) ≈ 3.27° > 5° → not blocking at 5°
+            // Actually let's use a more dramatic case:
+            // Sun at 3° elevation. Ridge at midpoint (3500m) at 1200m.
+            // atan2(200, 3500) ≈ 3.27° > 3° apparent → blocks!
+            // But initial samples at 2km (1000m) and 5km (1000m) show 0° horizon.
+            val sunPosition = SunPosition(azimuth = 180.0, elevation = 3.0)
+            coEvery { sunCalculator.calculateSunPosition(any(), any()) } returns sunPosition
+            coEvery { elevationRepository.getElevation(any()) } returns Result.success(1000.0)
+
+            var batchCallCount = 0
+            coEvery { elevationRepository.getElevations(any()) } answers {
+                batchCallCount++
+                val points = firstArg<List<GeoPoint>>()
+                if (batchCallCount == 1) {
+                    // Initial profile: gradually increasing to trigger refinement
+                    // Point at 2km=1000, 5km=1300 (300m diff → triggers refinement)
+                    // Other points: flat at 1000m
+                    Result.success(
+                        points.mapIndexed { index, point ->
+                            point to if (index >= 5) 1300.0 else 1000.0
+                        }.toMap(),
+                    )
+                } else {
+                    // Refinement: ridge at midpoint is VERY high
+                    Result.success(points.associateWith { 2000.0 })
+                }
+            }
+
+            val result = useCase.calculateVisibility(testLocation, testDateTime)
+            val visibility = result.getOrNull()!!
+
+            assertFalse(
+                "Ridge at refined midpoint should block the sun",
+                visibility.isSunVisible,
+            )
+        }
+
+    @Test
+    fun `refinement preserves all original sample points`() =
+        runBlocking {
+            val sunPosition = SunPosition(azimuth = 180.0, elevation = 45.0)
+            coEvery { sunCalculator.calculateSunPosition(any(), any()) } returns sunPosition
+            coEvery { elevationRepository.getElevation(any()) } returns Result.success(1000.0)
+
+            var initialPointCount = 0
+            coEvery { elevationRepository.getElevations(any()) } answers {
+                val points = firstArg<List<GeoPoint>>()
+                if (initialPointCount == 0) {
+                    initialPointCount = points.size
+                    // Create elevation jump to trigger refinement
+                    Result.success(
+                        points.mapIndexed { index, point ->
+                            point to if (index >= 5) 1300.0 else 1000.0
+                        }.toMap(),
+                    )
+                } else {
+                    Result.success(points.associateWith { 1150.0 })
+                }
+            }
+
+            val result = useCase.calculateVisibility(testLocation, testDateTime)
+            assertTrue("Result should succeed", result.isSuccess)
+
+            // The initial profile has 9 points (SAMPLE_DISTANCES.size)
+            assertEquals(
+                "Initial profile should have 9 sample points",
+                9,
+                initialPointCount,
+            )
+        }
+
     private fun setupSunAboveHorizon() {
         val sunAbove = SunPosition(azimuth = 180.0, elevation = 60.0)
         coEvery { sunCalculator.calculateSunPosition(any(), any()) } returns sunAbove
