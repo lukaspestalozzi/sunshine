@@ -9,6 +9,7 @@ import com.sunshine.app.domain.model.VisibilityResult
 import com.sunshine.app.domain.repository.ElevationRepository
 import com.sunshine.app.suncalc.SunCalculator
 import java.time.LocalDateTime
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.tan
@@ -53,8 +54,15 @@ class CalculateSunVisibilityUseCase(
             // Get terrain profile in sun's direction (optimized with batch fetching)
             val profileResult =
                 getTerrainProfileBatch(location, observerElevation, sunPosition.azimuth)
-            val terrainProfile = profileResult.first
+            val initialProfile = profileResult.first
             val terrainDegraded = profileResult.second
+
+            // Refine profile where terrain has large elevation gradients
+            val terrainProfile = refineTerrainProfile(
+                observer = location,
+                azimuth = sunPosition.azimuth,
+                initialProfile = initialProfile,
+            )
             val isElevationDegraded = observerDegraded || terrainDegraded
 
             // Check if terrain blocks the sun (accounting for atmospheric refraction)
@@ -182,6 +190,63 @@ class CalculateSunVisibilityUseCase(
     }
 
     /**
+     * Refine a terrain profile by inserting midpoints between consecutive sample
+     * points that have a large elevation gradient or a large distance gap.
+     * This catches narrow ridges that fall between the coarse logarithmic samples.
+     *
+     * At most one refinement pass is performed (no recursion), adding up to
+     * 8 additional elevation queries batched into a single API call.
+     */
+    private suspend fun refineTerrainProfile(
+        observer: GeoPoint,
+        azimuth: Double,
+        initialProfile: TerrainProfile,
+    ): TerrainProfile {
+        val points = initialProfile.points
+        if (points.size < 2) return initialProfile
+
+        // Find gaps that need refinement
+        val midpoints = mutableListOf<Double>() // distances to insert
+        for (i in 0 until points.size - 1) {
+            val current = points[i]
+            val next = points[i + 1]
+            val elevationDiff = abs(current.elevation - next.elevation)
+            val distanceGap = next.distance - current.distance
+
+            val needsRefinement =
+                elevationDiff > REFINEMENT_ELEVATION_THRESHOLD ||
+                    (distanceGap > REFINEMENT_DISTANCE_THRESHOLD &&
+                        elevationDiff > REFINEMENT_MIN_ELEVATION_DIFF)
+            if (needsRefinement) {
+                midpoints.add((current.distance + next.distance) / 2.0)
+            }
+        }
+
+        if (midpoints.isEmpty()) return initialProfile
+
+        // Batch fetch elevations for midpoints
+        val midGeoPoints = midpoints.map { distance ->
+            distance to projectPoint(observer, azimuth, distance)
+        }
+        val midElevations =
+            elevationRepository.getElevations(midGeoPoints.map { it.second })
+                .getOrElse { emptyMap() }
+
+        // Build new midpoint TerrainPoints
+        val newPoints = midGeoPoints.map { (distance, geoPoint) ->
+            TerrainPoint(
+                distance = distance,
+                elevation = midElevations[geoPoint] ?: initialProfile.observerElevation,
+            )
+        }
+
+        // Merge original + new points, sorted by distance
+        val mergedPoints = (points + newPoints).sortedBy { it.distance }
+
+        return initialProfile.copy(points = mergedPoints)
+    }
+
+    /**
      * Project a point from origin in a given direction and distance.
      */
     @Suppress("MagicNumber") // Standard coordinate bounds (-90/90 lat, -180/180 lon)
@@ -231,6 +296,15 @@ class CalculateSunVisibilityUseCase(
                 20000.0,
                 50000.0,
             )
+
+        /** Refine if elevation difference between consecutive points exceeds this (meters) */
+        const val REFINEMENT_ELEVATION_THRESHOLD = 200.0
+
+        /** Refine if distance gap exceeds this AND elevation diff > MIN (meters) */
+        const val REFINEMENT_DISTANCE_THRESHOLD = 2000.0
+
+        /** Minimum elevation diff to trigger refinement in large gaps (meters) */
+        const val REFINEMENT_MIN_ELEVATION_DIFF = 50.0
 
         /**
          * Atmospheric refraction correction in degrees (Meeus/Bennett formula).
