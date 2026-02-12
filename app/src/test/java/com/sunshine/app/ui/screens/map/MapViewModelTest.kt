@@ -406,132 +406,147 @@ class MapViewModelTest {
 
     @Test
     fun `localToUtc converts CET to UTC correctly`() {
-        // CET is UTC+1
-        TimeZone.setDefault(TimeZone.getTimeZone("Europe/Zurich"))
+        withTimeZone("Europe/Zurich") {
+            // January (standard time, no DST): CET = UTC+1
+            val local = LocalDateTime.of(2024, 1, 15, 14, 0)
+            val utc = MapViewModel.localToUtc(local)
 
-        // January (standard time, no DST): CET = UTC+1
-        val local = LocalDateTime.of(2024, 1, 15, 14, 0)
-        val utc = MapViewModel.localToUtc(local)
-
-        assertEquals(
-            "14:00 CET should be 13:00 UTC",
-            LocalDateTime.of(2024, 1, 15, 13, 0),
-            utc,
-        )
+            assertEquals(
+                "14:00 CET should be 13:00 UTC",
+                LocalDateTime.of(2024, 1, 15, 13, 0),
+                utc,
+            )
+        }
     }
 
     @Test
     fun `localToUtc handles DST correctly`() {
-        // CEST is UTC+2 (summer)
-        TimeZone.setDefault(TimeZone.getTimeZone("Europe/Zurich"))
+        withTimeZone("Europe/Zurich") {
+            // July (DST active): CEST = UTC+2
+            val local = LocalDateTime.of(2024, 7, 15, 14, 0)
+            val utc = MapViewModel.localToUtc(local)
 
-        // July (DST active): CEST = UTC+2
-        val local = LocalDateTime.of(2024, 7, 15, 14, 0)
-        val utc = MapViewModel.localToUtc(local)
-
-        assertEquals(
-            "14:00 CEST should be 12:00 UTC",
-            LocalDateTime.of(2024, 7, 15, 12, 0),
-            utc,
-        )
+            assertEquals(
+                "14:00 CEST should be 12:00 UTC",
+                LocalDateTime.of(2024, 7, 15, 12, 0),
+                utc,
+            )
+        }
     }
 
     @Test
     fun `utcTimeToLocal converts UTC to CET correctly`() {
-        TimeZone.setDefault(TimeZone.getTimeZone("Europe/Zurich"))
+        withTimeZone("Europe/Zurich") {
+            // January (standard time): CET = UTC+1
+            val utcTime = LocalTime.of(5, 30)
+            val utcDate = LocalDate.of(2024, 1, 15)
+            val localTime = MapViewModel.utcTimeToLocal(utcTime, utcDate)
 
-        // January (standard time): CET = UTC+1
-        val utcTime = LocalTime.of(5, 30)
-        val utcDate = LocalDate.of(2024, 1, 15)
-        val localTime = MapViewModel.utcTimeToLocal(utcTime, utcDate)
-
-        assertEquals(
-            "05:30 UTC should be 06:30 CET",
-            LocalTime.of(6, 30),
-            localTime,
-        )
+            assertEquals(
+                "05:30 UTC should be 06:30 CET",
+                LocalTime.of(6, 30),
+                localTime,
+            )
+        }
     }
 
     @Test
     fun `utcTimeToLocal handles day boundary`() {
-        TimeZone.setDefault(TimeZone.getTimeZone("Europe/Zurich"))
+        withTimeZone("Europe/Zurich") {
+            // 23:30 UTC → 00:30 CET next day
+            val utcTime = LocalTime.of(23, 30)
+            val utcDate = LocalDate.of(2024, 1, 15)
+            val localTime = MapViewModel.utcTimeToLocal(utcTime, utcDate)
 
-        // 23:30 UTC → 00:30 CET next day
-        val utcTime = LocalTime.of(23, 30)
-        val utcDate = LocalDate.of(2024, 1, 15)
-        val localTime = MapViewModel.utcTimeToLocal(utcTime, utcDate)
-
-        assertEquals(
-            "23:30 UTC should be 00:30 CET (next day)",
-            LocalTime.of(0, 30),
-            localTime,
-        )
+            assertEquals(
+                "23:30 UTC should be 00:30 CET (next day)",
+                LocalTime.of(0, 30),
+                localTime,
+            )
+        }
     }
 
     @Test
     fun `localToUtc is identity in UTC timezone`() {
-        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+        withTimeZone("UTC") {
+            val local = LocalDateTime.of(2024, 6, 15, 12, 0)
+            val utc = MapViewModel.localToUtc(local)
 
-        val local = LocalDateTime.of(2024, 6, 15, 12, 0)
-        val utc = MapViewModel.localToUtc(local)
-
-        assertEquals("UTC → UTC should be identity", local, utc)
+            assertEquals("UTC → UTC should be identity", local, utc)
+        }
     }
 
     @Test
     fun `sun calculator receives UTC datetime not local`() =
         runTest {
-            TimeZone.setDefault(TimeZone.getTimeZone("Europe/Zurich"))
+            withTimeZone("Europe/Zurich") {
+                val dateTimeSlot = slot<LocalDateTime>()
+                coEvery {
+                    sunCalculator.calculateSunPosition(any(), capture(dateTimeSlot))
+                } returns SunPosition(azimuth = 180.0, elevation = 45.0)
 
-            val dateTimeSlot = slot<LocalDateTime>()
-            coEvery {
-                sunCalculator.calculateSunPosition(any(), capture(dateTimeSlot))
-            } returns SunPosition(azimuth = 180.0, elevation = 45.0)
+                viewModel = MapViewModel(sunCalculator, visibilityUseCase)
 
-            viewModel = MapViewModel(sunCalculator, visibilityUseCase)
+                // Set a specific local time: 14:00 CET in January = 13:00 UTC
+                viewModel.onDateSelected(LocalDate.of(2024, 1, 15))
+                viewModel.onTimeSelected(LocalTime.of(14, 0))
+                advanceUntilIdle()
 
-            // Set a specific local time: 14:00 CET in January = 13:00 UTC
-            viewModel.onDateSelected(LocalDate.of(2024, 1, 15))
-            viewModel.onTimeSelected(LocalTime.of(14, 0))
-            advanceUntilIdle()
+                coVerify { sunCalculator.calculateSunPosition(any(), any()) }
+                val capturedDateTime = dateTimeSlot.captured
 
-            coVerify { sunCalculator.calculateSunPosition(any(), any()) }
-            val capturedDateTime = dateTimeSlot.captured
-
-            assertEquals(
-                "Calculator should receive UTC hour (13), not local (14)",
-                13,
-                capturedDateTime.hour,
-            )
+                assertEquals(
+                    "Calculator should receive UTC hour (13), not local (14)",
+                    13,
+                    capturedDateTime.hour,
+                )
+            }
         }
 
     @Test
     fun `sunrise sunset times are converted from UTC to local for display`() =
         runTest {
-            TimeZone.setDefault(TimeZone.getTimeZone("Europe/Zurich"))
+            withTimeZone("Europe/Zurich") {
+                // Mock returns UTC times
+                coEvery { sunCalculator.calculateSunrise(any(), any()) } returns
+                    LocalTime.of(5, 0) // 5:00 UTC
+                coEvery { sunCalculator.calculateSunset(any(), any()) } returns
+                    LocalTime.of(17, 0) // 17:00 UTC
 
-            // Mock returns UTC times
-            coEvery { sunCalculator.calculateSunrise(any(), any()) } returns
-                LocalTime.of(5, 0) // 5:00 UTC
-            coEvery { sunCalculator.calculateSunset(any(), any()) } returns
-                LocalTime.of(17, 0) // 17:00 UTC
+                viewModel = MapViewModel(sunCalculator, visibilityUseCase)
 
-            viewModel = MapViewModel(sunCalculator, visibilityUseCase)
+                // Set a January date (CET = UTC+1)
+                viewModel.onDateSelected(LocalDate.of(2024, 1, 15))
+                viewModel.onTimeSelected(LocalTime.of(12, 0))
+                advanceUntilIdle()
 
-            // Set a January date (CET = UTC+1)
-            viewModel.onDateSelected(LocalDate.of(2024, 1, 15))
-            viewModel.onTimeSelected(LocalTime.of(12, 0))
-            advanceUntilIdle()
-
-            assertEquals(
-                "Sunrise 05:00 UTC should display as 06:00 CET",
-                LocalTime.of(6, 0),
-                viewModel.uiState.value.sunriseTime,
-            )
-            assertEquals(
-                "Sunset 17:00 UTC should display as 18:00 CET",
-                LocalTime.of(18, 0),
-                viewModel.uiState.value.sunsetTime,
-            )
+                assertEquals(
+                    "Sunrise 05:00 UTC should display as 06:00 CET",
+                    LocalTime.of(6, 0),
+                    viewModel.uiState.value.sunriseTime,
+                )
+                assertEquals(
+                    "Sunset 17:00 UTC should display as 18:00 CET",
+                    LocalTime.of(18, 0),
+                    viewModel.uiState.value.sunsetTime,
+                )
+            }
         }
+
+    /**
+     * Runs [block] with the JVM default timezone temporarily set to [zoneId],
+     * restoring the previous timezone even if the block throws.
+     */
+    private fun <T> withTimeZone(
+        zoneId: String,
+        block: () -> T,
+    ): T {
+        val previous = TimeZone.getDefault()
+        TimeZone.setDefault(TimeZone.getTimeZone(zoneId))
+        try {
+            return block()
+        } finally {
+            TimeZone.setDefault(previous)
+        }
+    }
 }
