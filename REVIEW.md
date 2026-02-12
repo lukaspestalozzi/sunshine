@@ -7,7 +7,7 @@ Sunshine is a well-structured Android app with clean MVVM architecture, good lay
 That said, two areas stand out where focused investment would significantly improve the product:
 
 1. **Terrain occlusion algorithm correctness** - the core feature of the app (showing where the sun *actually* shines, considering terrain) has physics modeling gaps that produce incorrect results in realistic Alpine scenarios.
-2. **Test coverage for critical paths** - the existing tests verify basic behaviors but leave the most failure-prone components entirely untested, creating a blind spot for regressions and production bugs.
+2. ~~**Test coverage for critical paths**~~ **RESOLVED** - 56 tests added across 6 files. See [Area 2 Status](#area-2-test-coverage-for-critical-paths-resolved) below.
 
 ---
 
@@ -88,46 +88,79 @@ The sun position calculation doesn't account for atmospheric refraction, which b
 
 ---
 
-## Area 2: Test Coverage for Critical Paths
+## Area 2: Test Coverage for Critical Paths (RESOLVED)
 
-The project has 5 test files with reasonable tests for the code paths they cover. But several components that are most likely to fail in production have **zero tests**. The testing gap is not in quantity but in what is left out.
+> **Status: RESOLVED.** 56 tests added across 6 files (3 new, 3 extended). All pass CI.
 
-### 2.1 Components with zero test coverage
+The original review identified that 5 test files existed but left the most failure-prone components entirely untested. This has been addressed:
 
-| Component | Risk Level | Why It Matters |
-|-----------|-----------|----------------|
-| `DownloadViewModel` | High | Manages offline region downloads; users depend on progress tracking |
-| `SettingsViewModel` | Medium | Stores offline mode preference; wrong state = wrong app behavior |
-| `ConnectivityObserver` | High | Determines online/offline behavior; race conditions in callbacks |
-| `ErrorMessageMapper` | Medium | User-facing error messages; unmapped exceptions show "Something went wrong" |
-| `TileDownloadRepositoryImpl` | High | WorkManager integration for background downloads |
+### 2.1 Components with zero test coverage — FIXED
 
-`ConnectivityObserver` in particular has race conditions (e.g., `onLost` calls `hasActiveConnection()` which could return true if a different network came online between the callback and the check) that are only discoverable through testing.
+| Component | Status | Tests Added | Test File |
+|-----------|--------|-------------|-----------|
+| `DownloadViewModel` | **Covered** | 10 tests | `DownloadViewModelTest.kt` (new) |
+| `ConnectivityObserver` | **Covered** | 10 tests | `ConnectivityObserverTest.kt` (new) |
+| `ErrorMessageMapper` | **Covered** | 10 tests | `ErrorMessageMapperTest.kt` (new) |
+| `SettingsViewModel` | Remaining | — | Simple enough to defer |
+| `TileDownloadRepositoryImpl` | Remaining | — | WorkManager integration; would need instrumented tests |
 
-### 2.2 Existing tests lack edge cases for the core algorithm
+**DownloadViewModelTest** covers: initial state, download progress flow updates, completed state detection, storage tracking, online/offline reflection, delegation to repository, `formatStorageSize` formatting, and `RegionWithStatus.statusText` for all 6 download states.
 
-`SimpleSunCalculatorTest` has 5 tests that verify basic properties (sun below horizon at midnight, above at noon, higher in summer). These are necessary but insufficient. Missing test cases:
+**ConnectivityObserverTest** covers: initial flow emission (online/offline), `onAvailable`/`onLost`/`onCapabilitiesChanged` callback behavior, callback registration verification, and `hasActiveConnection()` for all three cases (internet capability present, absent, no network). Uses `mockkConstructor` to handle `NetworkRequest.Builder` in pure JVM tests.
 
-- **Polar regions** (latitude > 66.5 deg): midnight sun and polar night. The binary search in `calculateSunEvent` assumes the sun rises and sets every day, which is false at high latitudes. The function should return `null` for these cases, but this is untested.
-- **Accuracy validation against reference data**: No test compares calculated azimuth/elevation against known-good values (e.g., NOAA Solar Calculator output for a specific location/time). The current tests only check directional properties ("sun is above horizon at noon") but not numeric accuracy. A bug that returns 45 deg elevation instead of 66.5 deg would pass all current tests.
-- **Timezone handling**: `SimpleSunCalculator` converts `LocalDateTime` to Julian date via `ZoneOffset.UTC`. If the caller passes local time instead of UTC (which `MapViewModel` does - it uses `LocalDateTime.of(state.selectedDate, state.selectedTime)` with no timezone conversion), all results are off by the timezone offset. For CET (UTC+1), this is a 1-hour error in sunrise/sunset times.
+**ErrorMessageMapperTest** covers: `UnknownHostException`, `SocketTimeoutException`, `OfflineModeException`, `ClientRequestException` (TooManyRequests, NotFound, other status), `ServerResponseException`, unknown exceptions with/without messages, and `IOException`.
 
-### 2.3 Visibility grid calculation untested
+### 2.2 Existing tests lack edge cases for the core algorithm — FIXED
 
-`CalculateSunVisibilityUseCase.calculateVisibilityGrid()` generates a grid of points, launches parallel coroutines for each, and collects results. This is the most computationally expensive operation in the app and the most visible to users (it renders the map overlay). Yet:
+`SimpleSunCalculatorTest` expanded from 5 to 17 tests (+12):
 
-- No test verifies that grid generation produces the correct number of points for a given bounding box and resolution.
-- No test checks behavior when the grid contains thousands of points (performance).
-- No test verifies that a failed visibility calculation for one grid point (line 91: `.getOrNull() ?: false`) doesn't corrupt the entire grid.
-- The floating-point loop in `generateGridPoints` (line 117-124, using `lat += resolution`) accumulates precision errors over many iterations. No test verifies that the generated grid covers the full bounding box without gaps.
+| Category | Tests Added | What They Verify |
+|----------|-------------|------------------|
+| Numerical accuracy | 3 | Summer/winter solstice elevation within 3deg of NOAA-derived values; azimuth ~180deg at solar noon |
+| Polar regions | 2 | Midnight sun (70degN, June 21, midnight UTC: sun above horizon); polar night (70degN, Dec 21, noon UTC: sun below horizon) |
+| Sunrise/sunset | 4 | Reasonable hour ranges, sunrise < sunset ordering, summer day longer than winter |
+| Continuity | 1 | Elevation monotonically increases from morning to noon |
+| Southern hemisphere | 1 | December elevation > June elevation at Cape Town |
 
-### 2.4 No integration test for the offline-first data flow
+**Remaining gap**: Timezone contract between `MapViewModel` (local time) and `SimpleSunCalculator` (assumes UTC) is not tested. This is an architectural issue that belongs to Area 1 fixes.
 
-The `ElevationRepositoryImplTest` tests cache hits and API calls independently, but there is no test for the full offline-first sequence: check cache, miss, fetch from API, cache result, subsequent lookup returns cached value. This is the fundamental data flow of the app and a regression here breaks the offline experience.
+### 2.3 Visibility grid calculation untested — FIXED
 
-### 2.5 MapViewModel event handling under rapid input
+`CalculateSunVisibilityUseCaseTest` expanded with 6 grid tests:
 
-`MapViewModel.onMapCenterChanged()` is called on every map pan event (potentially 60 times/second). Each call launches a new coroutine via `updateSunPosition()`, which in turn launches visibility and grid calculations. While the grid is debounced (500ms), the sun position and visibility calculations are not. No test verifies behavior under rapid sequential calls - whether old coroutines are properly cancelled, whether state updates are consistent, or whether resource consumption is bounded.
+- Grid returns correct bounds and resolution
+- Grid produces correct point count (3x3 = 9 for 0.02deg box at 0.01 resolution)
+- All points visible with flat terrain and high sun
+- All points false when sun below horizon
+- Intermittent elevation failures don't corrupt the grid (defaults to false)
+- Grid covers all four corners of the bounding box
+
+**Remaining gap**: No large-scale performance test (thousands of points). This is better suited for an instrumented test or benchmark.
+
+### 2.4 No integration test for the offline-first data flow — REMAINING
+
+This was not addressed. The existing `ElevationRepositoryImplTest` still tests cache and API independently. A full round-trip integration test (miss -> fetch -> cache -> hit) would require an in-memory Room database, which is better suited for an Android instrumented test.
+
+### 2.5 MapViewModel event handling under rapid input — FIXED
+
+`MapViewModelTest` expanded with 8 tests:
+
+- Rapid `onMapCenterChanged` calls settle to final value
+- Grid update debounced: zoom changes within 300ms don't trigger recalculation
+- `onAdjustTime` advances correctly; handles day boundary (23:30 + 1h = 00:30 next day)
+- Visibility calculation failure is non-critical (no error in UI state)
+- Sunrise/sunset times propagated to UI state
+- Grid null when sun below horizon
+- Grid null at low zoom levels (below threshold)
+
+### Remaining test gaps (lower priority)
+
+| Gap | Risk | Reason Deferred |
+|-----|------|-----------------|
+| `SettingsViewModel` | Low | Thin wrapper around DataStore; low failure risk |
+| `TileDownloadRepositoryImpl` | Medium | WorkManager integration needs instrumented test environment |
+| Offline-first integration test | Medium | Needs in-memory Room DB (instrumented test) |
+| Large-scale grid performance | Low | Better as a benchmark, not a unit test |
 
 ---
 
