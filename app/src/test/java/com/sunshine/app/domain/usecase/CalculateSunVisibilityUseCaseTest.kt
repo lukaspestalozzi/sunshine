@@ -321,6 +321,65 @@ class CalculateSunVisibilityUseCaseTest {
         )
     }
 
+    // ---- Elevation degraded flag tests ----
+
+    @Test
+    fun `visibility result is degraded when observer elevation fails`() =
+        runBlocking {
+            val sunPosition = SunPosition(azimuth = 180.0, elevation = 45.0)
+            coEvery { sunCalculator.calculateSunPosition(any(), any()) } returns sunPosition
+            coEvery {
+                elevationRepository.getElevation(any())
+            } returns Result.failure(Exception("Network error"))
+            coEvery {
+                elevationRepository.getElevations(any())
+            } returns Result.success(emptyMap())
+
+            val result = useCase.calculateVisibility(testLocation, testDateTime)
+            val visibility = result.getOrNull()!!
+
+            assertTrue(
+                "Result should be degraded when observer elevation fails",
+                visibility.isElevationDegraded,
+            )
+        }
+
+    @Test
+    fun `visibility result is degraded when terrain elevation fails`() =
+        runBlocking {
+            val sunPosition = SunPosition(azimuth = 180.0, elevation = 45.0)
+            coEvery { sunCalculator.calculateSunPosition(any(), any()) } returns sunPosition
+            coEvery {
+                elevationRepository.getElevation(any())
+            } returns Result.success(1000.0)
+            coEvery {
+                elevationRepository.getElevations(any())
+            } returns Result.failure(Exception("Network error"))
+
+            val result = useCase.calculateVisibility(testLocation, testDateTime)
+            val visibility = result.getOrNull()!!
+
+            assertTrue(
+                "Result should be degraded when terrain elevation fails",
+                visibility.isElevationDegraded,
+            )
+        }
+
+    @Test
+    fun `visibility result is not degraded when all elevation lookups succeed`() =
+        runBlocking {
+            setupSunAboveHorizon()
+            setupFlatTerrain()
+
+            val result = useCase.calculateVisibility(testLocation, testDateTime)
+            val visibility = result.getOrNull()!!
+
+            assertFalse(
+                "Result should not be degraded when all lookups succeed",
+                visibility.isElevationDegraded,
+            )
+        }
+
     private fun setupSunAboveHorizon() {
         val sunAbove = SunPosition(azimuth = 180.0, elevation = 60.0)
         coEvery { sunCalculator.calculateSunPosition(any(), any()) } returns sunAbove

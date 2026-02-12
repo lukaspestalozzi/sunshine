@@ -44,13 +44,18 @@ class CalculateSunVisibilityUseCase(
                 return@runCatching VisibilityResult.belowHorizon(location, sunPosition)
             }
 
-            // Get observer elevation
+            // Get observer elevation (track failures for degraded-data indicator)
+            val observerElevationResult = elevationRepository.getElevation(location)
+            val observerDegraded = observerElevationResult.isFailure
             val observerElevation =
-                elevationRepository.getElevation(location)
-                    .getOrElse { DEFAULT_OBSERVER_ELEVATION }
+                observerElevationResult.getOrElse { DEFAULT_OBSERVER_ELEVATION }
 
             // Get terrain profile in sun's direction (optimized with batch fetching)
-            val terrainProfile = getTerrainProfileBatch(location, observerElevation, sunPosition.azimuth)
+            val profileResult =
+                getTerrainProfileBatch(location, observerElevation, sunPosition.azimuth)
+            val terrainProfile = profileResult.first
+            val terrainDegraded = profileResult.second
+            val isElevationDegraded = observerDegraded || terrainDegraded
 
             // Check if terrain blocks the sun (accounting for atmospheric refraction)
             val horizonAngle = terrainProfile.calculateHorizonAngle()
@@ -59,7 +64,12 @@ class CalculateSunVisibilityUseCase(
             val isSunVisible = apparentElevation > horizonAngle
 
             if (isSunVisible) {
-                VisibilityResult.visible(location, sunPosition, horizonAngle)
+                VisibilityResult.visible(
+                    location = location,
+                    sunPosition = sunPosition,
+                    horizonAngle = horizonAngle,
+                    isElevationDegraded = isElevationDegraded,
+                )
             } else {
                 val degreesUntilVisible = horizonAngle - apparentElevation
                 VisibilityResult.blocked(
@@ -67,6 +77,7 @@ class CalculateSunVisibilityUseCase(
                     sunPosition = sunPosition,
                     horizonAngle = horizonAngle,
                     degreesUntilVisible = degreesUntilVisible,
+                    isElevationDegraded = isElevationDegraded,
                 )
             }
         }
@@ -131,12 +142,15 @@ class CalculateSunVisibilityUseCase(
     /**
      * Get terrain profile using batch elevation fetching for better performance.
      * Fetches all sample points in a single API call instead of multiple sequential calls.
+     *
+     * @return Pair of (TerrainProfile, isDegraded) where isDegraded is true
+     *         if the batch elevation lookup failed.
      */
     private suspend fun getTerrainProfileBatch(
         observer: GeoPoint,
         observerElevation: Double,
         azimuth: Double,
-    ): TerrainProfile {
+    ): Pair<TerrainProfile, Boolean> {
         // Generate all sample points first
         val samplePoints =
             SAMPLE_DISTANCES.map { distance ->
@@ -145,9 +159,9 @@ class CalculateSunVisibilityUseCase(
 
         // Batch fetch elevations for all points
         val pointsList = samplePoints.map { it.second }
-        val elevations =
-            elevationRepository.getElevations(pointsList)
-                .getOrElse { emptyMap() }
+        val elevationsResult = elevationRepository.getElevations(pointsList)
+        val isDegraded = elevationsResult.isFailure
+        val elevations = elevationsResult.getOrElse { emptyMap() }
 
         // Build terrain profile with fetched elevations
         val terrainPoints =
@@ -158,12 +172,13 @@ class CalculateSunVisibilityUseCase(
                 )
             }
 
-        return TerrainProfile(
+        val profile = TerrainProfile(
             observer = observer,
             observerElevation = observerElevation,
             azimuth = azimuth,
             points = terrainPoints,
         )
+        return profile to isDegraded
     }
 
     /**

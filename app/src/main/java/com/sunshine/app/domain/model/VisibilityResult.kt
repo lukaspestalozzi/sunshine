@@ -18,6 +18,8 @@ data class VisibilityResult(
     val degreesUntilVisible: Double?,
     /** Estimated time when sun becomes visible (if currently blocked) */
     val nextSunTime: LocalTime?,
+    /** True when elevation data was unavailable and results may be inaccurate */
+    val isElevationDegraded: Boolean = false,
 ) {
     companion object {
         /**
@@ -27,6 +29,7 @@ data class VisibilityResult(
             location: GeoPoint,
             sunPosition: SunPosition,
             horizonAngle: Double,
+            isElevationDegraded: Boolean = false,
         ) = VisibilityResult(
             location = location,
             isSunVisible = true,
@@ -34,6 +37,7 @@ data class VisibilityResult(
             horizonAngle = horizonAngle,
             degreesUntilVisible = null,
             nextSunTime = null,
+            isElevationDegraded = isElevationDegraded,
         )
 
         /**
@@ -45,6 +49,7 @@ data class VisibilityResult(
             horizonAngle: Double,
             degreesUntilVisible: Double,
             nextSunTime: LocalTime? = null,
+            isElevationDegraded: Boolean = false,
         ) = VisibilityResult(
             location = location,
             isSunVisible = false,
@@ -52,6 +57,7 @@ data class VisibilityResult(
             horizonAngle = horizonAngle,
             degreesUntilVisible = degreesUntilVisible,
             nextSunTime = nextSunTime,
+            isElevationDegraded = isElevationDegraded,
         )
 
         /**
@@ -67,6 +73,7 @@ data class VisibilityResult(
             horizonAngle = 0.0,
             degreesUntilVisible = null,
             nextSunTime = null,
+            isElevationDegraded = false,
         )
     }
 }
