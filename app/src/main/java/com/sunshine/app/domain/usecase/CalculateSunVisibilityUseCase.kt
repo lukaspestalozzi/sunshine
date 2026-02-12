@@ -11,6 +11,7 @@ import com.sunshine.app.suncalc.SunCalculator
 import java.time.LocalDateTime
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.tan
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -51,14 +52,16 @@ class CalculateSunVisibilityUseCase(
             // Get terrain profile in sun's direction (optimized with batch fetching)
             val terrainProfile = getTerrainProfileBatch(location, observerElevation, sunPosition.azimuth)
 
-            // Check if terrain blocks the sun
+            // Check if terrain blocks the sun (accounting for atmospheric refraction)
             val horizonAngle = terrainProfile.calculateHorizonAngle()
-            val isSunVisible = sunPosition.elevation > horizonAngle
+            val apparentElevation =
+                sunPosition.elevation + atmosphericRefraction(sunPosition.elevation)
+            val isSunVisible = apparentElevation > horizonAngle
 
             if (isSunVisible) {
                 VisibilityResult.visible(location, sunPosition, horizonAngle)
             } else {
-                val degreesUntilVisible = horizonAngle - sunPosition.elevation
+                val degreesUntilVisible = horizonAngle - apparentElevation
                 VisibilityResult.blocked(
                     location = location,
                     sunPosition = sunPosition,
@@ -213,5 +216,24 @@ class CalculateSunVisibilityUseCase(
                 20000.0,
                 50000.0,
             )
+
+        /**
+         * Atmospheric refraction correction in degrees (Meeus/Bennett formula).
+         * Makes the sun appear higher than its geometric position,
+         * especially near the horizon (~0.57deg at 0deg elevation).
+         *
+         * @param geometricElevationDeg geometric sun elevation in degrees
+         * @return refraction offset in degrees (always >= 0)
+         */
+        @Suppress("MagicNumber") // Meeus/Bennett atmospheric refraction formula constants
+        fun atmosphericRefraction(geometricElevationDeg: Double): Double {
+            // Below -1deg the formula diverges; refraction is irrelevant there
+            if (geometricElevationDeg < -1.0) return 0.0
+            // Meeus/Bennett formula: R = 1.02 / tan(h + 10.3/(h + 5.11)) / 60
+            // where h is elevation in degrees and R is refraction in degrees
+            val h = geometricElevationDeg.coerceAtLeast(0.0)
+            val tanArg = Math.toRadians(h + 10.3 / (h + 5.11))
+            return 1.02 / tan(tanArg) / 60.0
+        }
     }
 }
