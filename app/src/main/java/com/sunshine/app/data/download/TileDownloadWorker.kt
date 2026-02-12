@@ -171,7 +171,13 @@ class TileDownloadWorker(
                     downloadedRegionDao.updateStatus(regionId, DownloadStatus.PAUSED.name)
                     return null
                 }
-                val downloaded = downloadSingleTile(getTileUrl(zoom, x.toInt(), y.toInt()))
+                val downloaded =
+                    downloadSingleTile(
+                        tileUrl = getTileUrl(zoom, x.toInt(), y.toInt()),
+                        zoom = zoom,
+                        x = x.toInt(),
+                        y = y.toInt(),
+                    )
                 if (downloaded > 0) {
                     downloadedCount++
                     totalBytes += downloaded
@@ -229,7 +235,12 @@ class TileDownloadWorker(
     }
 
     @Suppress("SwallowedException")
-    private fun downloadSingleTile(tileUrl: String): Long =
+    private fun downloadSingleTile(
+        tileUrl: String,
+        zoom: Int,
+        x: Int,
+        y: Int,
+    ): Long =
         try {
             val connection = URL(tileUrl).openConnection() as HttpURLConnection
             connection.setRequestProperty("User-Agent", applicationContext.packageName)
@@ -239,7 +250,7 @@ class TileDownloadWorker(
 
             if (connection.responseCode == HttpURLConnection.HTTP_OK) {
                 val bytes = connection.inputStream.readBytes()
-                saveTileToCache(tileUrl, bytes)
+                saveTileToCache(zoom, x, y, bytes)
                 bytes.size.toLong()
             } else {
                 0L
@@ -248,15 +259,20 @@ class TileDownloadWorker(
             0L
         }
 
+    /**
+     * Save a tile to osmdroid's file-based cache using the directory layout
+     * that osmdroid's tile providers expect: {cacheDir}/{source}/{z}/{x}/{y}.png
+     */
     private fun saveTileToCache(
-        tileUrl: String,
+        zoom: Int,
+        x: Int,
+        y: Int,
         bytes: ByteArray,
     ) {
         val cacheDir = Configuration.getInstance().osmdroidTileCache
-        val fileName = tileUrl.hashCode().toString() + ".tile"
-        val cacheFile = File(cacheDir, fileName)
-        cacheFile.parentFile?.mkdirs()
-        cacheFile.writeBytes(bytes)
+        val tilePath = File(cacheDir, "$TILE_SOURCE_NAME/$zoom/$x/$y.png")
+        tilePath.parentFile?.mkdirs()
+        tilePath.writeBytes(bytes)
     }
 
     @Suppress("MagicNumber")
@@ -336,6 +352,9 @@ class TileDownloadWorker(
         const val KEY_TOTAL_TILES = "total_tiles"
         const val KEY_STATUS = "status"
         const val KEY_ERROR = "error"
+
+        /** Must match the tile source name used in OsmMapView */
+        const val TILE_SOURCE_NAME = "OpenTopoMap"
 
         private const val PROGRESS_UPDATE_INTERVAL = 50L
         private const val PROGRESS_MULTIPLIER = 100
