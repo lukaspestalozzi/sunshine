@@ -1,5 +1,6 @@
 package com.sunshine.app.domain.usecase
 
+import com.sunshine.app.domain.model.BoundingBox
 import com.sunshine.app.domain.model.GeoPoint
 import com.sunshine.app.domain.model.SunPosition
 import com.sunshine.app.domain.repository.ElevationRepository
@@ -156,4 +157,123 @@ class CalculateSunVisibilityUseCaseTest {
             assertEquals("Latitude should match", testLocation.latitude, visibility.location.latitude, 0.0001)
             assertEquals("Longitude should match", testLocation.longitude, visibility.location.longitude, 0.0001)
         }
+
+    // ---- Grid calculation tests ----
+
+    @Test
+    fun `grid returns success with correct bounds and resolution`() =
+        runBlocking {
+            setupSunAboveHorizon()
+            setupFlatTerrain()
+
+            val bounds = smallBounds
+            val result = useCase.calculateVisibilityGrid(bounds, testDateTime, resolution = 0.01)
+
+            assertTrue("Grid result should be success", result.isSuccess)
+            val grid = result.getOrNull()!!
+            assertEquals(bounds, grid.bounds)
+            assertEquals(0.01, grid.resolution, 0.0001)
+        }
+
+    @Test
+    fun `grid produces correct number of points`() =
+        runBlocking {
+            setupSunAboveHorizon()
+            setupFlatTerrain()
+
+            // Bounds: 0.02° x 0.02° with resolution 0.01
+            // Expected: 3 lat steps (46.0, 46.01, 46.02) x 3 lon steps (8.0, 8.01, 8.02) = 9
+            val bounds = BoundingBox(north = 46.02, south = 46.0, east = 8.02, west = 8.0)
+            val result = useCase.calculateVisibilityGrid(bounds, testDateTime, resolution = 0.01)
+
+            val grid = result.getOrNull()!!
+            assertEquals("Grid should have 9 points (3x3)", 9, grid.points.size)
+        }
+
+    @Test
+    fun `grid points all visible with flat terrain and high sun`() =
+        runBlocking {
+            setupSunAboveHorizon()
+            setupFlatTerrain()
+
+            val result = useCase.calculateVisibilityGrid(smallBounds, testDateTime, resolution = 0.01)
+
+            val grid = result.getOrNull()!!
+            assertTrue("All grid points should be visible", grid.points.values.all { it })
+        }
+
+    @Test
+    fun `grid points all not visible when sun below horizon`() =
+        runBlocking {
+            val sunBelow = SunPosition(azimuth = 0.0, elevation = -10.0)
+            coEvery { sunCalculator.calculateSunPosition(any(), any()) } returns sunBelow
+
+            val result = useCase.calculateVisibilityGrid(smallBounds, testDateTime, resolution = 0.01)
+
+            val grid = result.getOrNull()!!
+            assertTrue("All grid points should be false when sun is below horizon", grid.points.values.none { it })
+        }
+
+    @Test
+    fun `grid handles single-point failure gracefully`() =
+        runBlocking {
+            // Alternate between success and failure for elevation lookups
+            val sunPosition = SunPosition(azimuth = 180.0, elevation = 60.0)
+            coEvery { sunCalculator.calculateSunPosition(any(), any()) } returns sunPosition
+            coEvery { elevationRepository.getElevation(any()) } returns Result.success(1000.0)
+
+            var callCount = 0
+            coEvery { elevationRepository.getElevations(any()) } answers {
+                callCount++
+                if (callCount % 2 == 0) {
+                    Result.failure(Exception("Intermittent failure"))
+                } else {
+                    Result.success(emptyMap())
+                }
+            }
+
+            val result = useCase.calculateVisibilityGrid(smallBounds, testDateTime, resolution = 0.01)
+
+            // Grid should still succeed - individual failures default to false
+            assertTrue("Grid result should be success even with intermittent failures", result.isSuccess)
+        }
+
+    @Test
+    fun `grid covers all corners of bounding box`() =
+        runBlocking {
+            setupSunAboveHorizon()
+            setupFlatTerrain()
+
+            val bounds = BoundingBox(north = 46.02, south = 46.0, east = 8.02, west = 8.0)
+            val result = useCase.calculateVisibilityGrid(bounds, testDateTime, resolution = 0.01)
+            val grid = result.getOrNull()!!
+
+            val lats = grid.points.keys.map { it.latitude }.toSet()
+            val lons = grid.points.keys.map { it.longitude }.toSet()
+
+            assertTrue("Grid should include south boundary", lats.any { it <= 46.001 })
+            assertTrue("Grid should include north boundary", lats.any { it >= 46.019 })
+            assertTrue("Grid should include west boundary", lons.any { it <= 8.001 })
+            assertTrue("Grid should include east boundary", lons.any { it >= 8.019 })
+        }
+
+    private fun setupSunAboveHorizon() {
+        val sunAbove = SunPosition(azimuth = 180.0, elevation = 60.0)
+        coEvery { sunCalculator.calculateSunPosition(any(), any()) } returns sunAbove
+    }
+
+    private fun setupFlatTerrain() {
+        coEvery { elevationRepository.getElevation(any()) } returns Result.success(1000.0)
+        coEvery { elevationRepository.getElevations(any()) } returns Result.success(emptyMap())
+    }
+
+    companion object {
+        private val smallBounds =
+            BoundingBox(
+                north = 46.02,
+                south = 46.0,
+                east = 8.02,
+                west = 8.0,
+            )
+    }
 }
