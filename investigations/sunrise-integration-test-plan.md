@@ -448,8 +448,12 @@ the interface itself is plain Kotlin).
 
 ```kotlin
 class MockSettingsRepository : SettingsRepository {
-    override val offlineModeEnabled: Flow<Boolean> = flowOf(false)
-    override suspend fun setOfflineModeEnabled(enabled: Boolean) { /* no-op */ }
+    private val _offlineModeEnabled = MutableStateFlow(false)
+    override val offlineModeEnabled: Flow<Boolean> = _offlineModeEnabled
+
+    override suspend fun setOfflineModeEnabled(enabled: Boolean) {
+        _offlineModeEnabled.value = enabled
+    }
 }
 ```
 
