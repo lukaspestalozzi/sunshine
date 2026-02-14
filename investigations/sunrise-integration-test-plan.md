@@ -35,7 +35,7 @@ JVM unit test (`src/test/`). Fast, no emulator required.
                        └─────┬─────┘
                              │
                     ┌────────▼────────┐
-                    │ FakeElevationApi│  ← returns real SRTM data from fixture
+                    │ MockElevationApi│  ← returns real SRTM data from fixture
                     └────────┬────────┘
                              │
  ── ALL REAL BELOW ──────────┼──────────────────────────────────────
@@ -45,7 +45,7 @@ JVM unit test (`src/test/`). Fast, no emulator required.
                     └──┬─────────────────┬─┘
                        │                 │
               ┌────────▼──────┐   ┌──────▼──────────┐
-              │FakeElevationDao│   │FakeSettingsRepo │
+              │MockElevationDao│   │MockSettingsRepo │
               │ (HashMap)     │   │ (offline=false)  │
               └───────────────┘   └─────────────────┘
                        │
@@ -58,23 +58,23 @@ JVM unit test (`src/test/`). Fast, no emulator required.
               └───────────────────────────┘
 ```
 
-### Why FakeElevationDao instead of Room
+### Why MockElevationDao instead of Room
 
 Room requires Android context (instrumented test). Using a simple
-HashMap-backed fake for the DAO lets us run as a fast JVM test while still
+HashMap-backed mock for the DAO lets us run as a fast JVM test while still
 exercising the real `ElevationRepositoryImpl` caching and batch logic. The DAO
 SQL itself is already covered by `ElevationDaoTest` (androidTest).
 
 ### Components
 
-| Component | Real/Fake | Rationale |
+| Component | Real/Mock | Rationale |
 |-----------|-----------|-----------|
 | `SimpleSunCalculator` | **Real** | Core algorithm under test |
 | `CalculateSunVisibilityUseCase` | **Real** | Orchestration under test |
 | `ElevationRepositoryImpl` | **Real** | Caching/batching under test |
-| `ElevationApi` | **Fake** | External HTTP connection — the mock boundary |
-| `ElevationDao` | **Fake** | HashMap-backed; avoids Room/Android dependency |
-| `SettingsRepository` | **Fake** | Returns `offlineModeEnabled = false` |
+| `ElevationApi` | **Mock** | External HTTP connection — the mock boundary |
+| `ElevationDao` | **Mock** | HashMap-backed; avoids Room/Android dependency |
+| `SettingsRepository` | **Mock** | Returns `offlineModeEnabled = false` |
 
 ---
 
@@ -300,7 +300,7 @@ hikers when they'll actually get sun, not just astronomical sunrise. The
 SE mountain wall at 5km (1903m) creates a ~15° horizon angle, massively
 delaying visible sunrise.
 
-**Setup**: Full pipeline with real SE terrain elevation data.
+**Setup**: Full pipeline with real SE terrain elevation data (via mocks).
 
 **Test cases**:
 - At 07:10 UTC (astronomical sunrise): sun at 0° elevation, terrain
@@ -324,7 +324,7 @@ sun is visible from Interlaken center.
 maximum terrain horizon angle in this direction is <1° (at 50km). The sun
 should be visible within minutes of astronomical sunrise.
 
-**Setup**: Full pipeline with real NE terrain elevation data.
+**Setup**: Full pipeline with real NE terrain elevation data (via mocks).
 
 **Test cases**:
 - At 03:34 UTC (astronomical sunrise): sun at ~0° + 0.57° refraction ≈ 0.57°
@@ -395,51 +395,34 @@ app/src/test/java/com/sunshine/app/integration/
 ├── SunriseIntegrationTest.kt          # Main test class
 ├── fixtures/
 │   └── InterlakenElevationFixture.kt  # Real SRTM elevation data
-├── fakes/
-│   ├── FakeElevationApi.kt            # Returns fixture data
-│   ├── FakeElevationDao.kt            # HashMap-backed DAO
-│   └── FakeSettingsRepository.kt      # Returns offline=false
+├── mocks/
+│   ├── MockElevationDao.kt            # HashMap-backed DAO
+│   └── MockSettingsRepository.kt      # Returns offline=false
 ```
 
-### 6.2 FakeElevationApi
+### 6.2 MockElevationApi
+
+Since `ElevationApi` is a concrete class (not an interface), we use MockK
+to mock it. The mock's `answers` block looks up real elevation data from
+the fixture, providing realistic SRTM responses without HTTP calls.
 
 ```kotlin
-class FakeElevationApi(
-    private val elevationData: Map<Pair<Double, Double>, Double>
-) {
-    // Look up elevation by grid-coordinate matching
-    // For any point not in the fixture, return nearest neighbor or
-    // a default valley elevation (570m)
-
-    suspend fun getElevations(points: List<GeoPoint>): Result<List<ElevationResult>> {
-        val results = points.map { point ->
-            val gridLat = toGridCoordinate(point.latitude)
-            val gridLon = toGridCoordinate(point.longitude)
-            val elevation = elevationData[gridLat to gridLon]
-                ?: findNearest(point)
-                ?: DEFAULT_ELEVATION
-            ElevationResult(point.latitude, point.longitude, elevation)
-        }
-        return Result.success(results)
+elevationApi = mockk()
+coEvery { elevationApi.getElevations(any()) } answers {
+    val points = firstArg<List<GeoPoint>>()
+    val fixture = InterlakenElevationFixture.getAllElevations()
+    val results = points.map { point ->
+        val elevation = fixture.findNearest(point) ?: 570.0
+        ElevationResult(point.latitude, point.longitude, elevation)
     }
+    Result.success(results)
 }
 ```
 
-**Note**: Since `ElevationApi` is a concrete class (not an interface), we have
-two options:
-1. **MockK**: `coEvery { fakeApi.getElevations(any()) } answers { ... }`
-2. **Wrap or subclass**: Create a subclass or use MockK's `spyk`
-3. **Extract interface**: Refactor `ElevationApi` to implement an interface
-   (cleanest, but changes production code)
-
-**Recommendation**: Use MockK for the `ElevationApi` mock. The mock's answer
-block looks up real elevation data from the fixture, making it functionally
-equivalent to a fake.
-
-### 6.3 FakeElevationDao
+### 6.3 MockElevationDao
 
 ```kotlin
-class FakeElevationDao : ElevationDao {
+class MockElevationDao : ElevationDao {
     private val store = mutableMapOf<Pair<Double, Double>, ElevationEntity>()
 
     override suspend fun getElevation(gridLat: Double, gridLon: Double): ElevationEntity? =
@@ -457,14 +440,14 @@ class FakeElevationDao : ElevationDao {
 }
 ```
 
-**Problem**: `ElevationDao` is a Room `@Dao` interface. Implementing it
-directly works for a fake in JVM tests (Room annotations are just markers;
+**Note**: `ElevationDao` is a Room `@Dao` interface. Implementing it
+directly works for a mock in JVM tests (Room annotations are just markers;
 the interface itself is plain Kotlin).
 
-### 6.4 FakeSettingsRepository
+### 6.4 MockSettingsRepository
 
 ```kotlin
-class FakeSettingsRepository : SettingsRepository {
+class MockSettingsRepository : SettingsRepository {
     override val offlineModeEnabled: Flow<Boolean> = flowOf(false)
     override suspend fun setOfflineModeEnabled(enabled: Boolean) { /* no-op */ }
 }
@@ -561,16 +544,16 @@ fixture matches exactly what the use case will request.
 class SunriseIntegrationTest {
     private lateinit var sunCalculator: SimpleSunCalculator
     private lateinit var elevationApi: ElevationApi  // MockK mock
-    private lateinit var elevationDao: FakeElevationDao
-    private lateinit var settingsRepository: FakeSettingsRepository
+    private lateinit var elevationDao: MockElevationDao
+    private lateinit var settingsRepository: MockSettingsRepository
     private lateinit var elevationRepository: ElevationRepositoryImpl
     private lateinit var visibilityUseCase: CalculateSunVisibilityUseCase
 
     @Before
     fun setup() {
         sunCalculator = SimpleSunCalculator()
-        elevationDao = FakeElevationDao()
-        settingsRepository = FakeSettingsRepository()
+        elevationDao = MockElevationDao()
+        settingsRepository = MockSettingsRepository()
 
         // Mock ElevationApi with real SRTM data
         elevationApi = mockk()
@@ -590,7 +573,7 @@ class SunriseIntegrationTest {
             Result.success(elevation)
         }
 
-        // Wire real repository with fakes
+        // Wire real repository with mocks
         elevationRepository = ElevationRepositoryImpl(
             elevationDao = elevationDao,
             elevationApi = elevationApi,
@@ -713,13 +696,13 @@ needs without requiring a massive DEM.
    - Query Open-Elevation API for real SRTM elevations
    - Store as a Kotlin object with maps
 
-2. **Create the fake classes**
-   - `FakeElevationDao` — HashMap-backed DAO
-   - `FakeSettingsRepository` — returns offline=false
-   - (No FakeElevationApi class needed; use MockK on the existing class)
+2. **Create the mock classes**
+   - `MockElevationDao` — HashMap-backed DAO
+   - `MockSettingsRepository` — returns offline=false
+   - (ElevationApi is mocked via MockK on the existing class)
 
 3. **Write the test class** (`SunriseIntegrationTest.kt`)
-   - Setup method wires all real + fake components
+   - Setup method wires all real + mock components
    - Implement scenarios 1-8 as individual @Test methods
    - Use `runBlocking` for coroutine tests
 
