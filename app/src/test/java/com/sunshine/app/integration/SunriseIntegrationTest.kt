@@ -334,18 +334,20 @@ class SunriseIntegrationTest {
     @Test
     fun `summer sunrise terrain delay is less than winter delay`() =
         runBlocking {
-            val summerVisibleTime = findFirstVisibleTime(
-                date = summerSolstice,
-                startTime = LocalTime.of(3, 34),
-                maxMinutes = 60,
-                stepMinutes = 5,
-            )
-            val winterVisibleTime = findFirstVisibleTime(
-                date = winterSolstice,
-                startTime = LocalTime.of(7, 10),
-                maxMinutes = 240,
-                stepMinutes = 15,
-            )
+            val summerVisibleTime =
+                findFirstVisibleTime(
+                    date = summerSolstice,
+                    startTime = LocalTime.of(3, 34),
+                    maxMinutes = 60,
+                    stepMinutes = 5,
+                )
+            val winterVisibleTime =
+                findFirstVisibleTime(
+                    date = winterSolstice,
+                    startTime = LocalTime.of(7, 10),
+                    maxMinutes = 240,
+                    stepMinutes = 15,
+                )
 
             assertNotNull("Summer visible sunrise should be found", summerVisibleTime)
             assertNotNull("Winter visible sunrise should be found", winterVisibleTime)
@@ -429,12 +431,14 @@ class SunriseIntegrationTest {
             assertNotNull("Should find a summer time with sun at ~5deg", summerAt5deg)
             assertNotNull("Should find a winter time with sun at ~5deg", winterAt5deg)
 
-            val summerVis = visibilityUseCase.calculateVisibility(interlakenCenter, summerAt5deg!!)
-                .also { assertTrue("Summer result should succeed", it.isSuccess) }
-                .getOrThrow()
-            val winterVis = visibilityUseCase.calculateVisibility(interlakenCenter, winterAt5deg!!)
-                .also { assertTrue("Winter result should succeed", it.isSuccess) }
-                .getOrThrow()
+            val summerVis =
+                visibilityUseCase.calculateVisibility(interlakenCenter, summerAt5deg!!)
+                    .also { assertTrue("Summer result should succeed", it.isSuccess) }
+                    .getOrThrow()
+            val winterVis =
+                visibilityUseCase.calculateVisibility(interlakenCenter, winterAt5deg!!)
+                    .also { assertTrue("Winter result should succeed", it.isSuccess) }
+                    .getOrThrow()
 
             // Summer sunrise (NE, flat terrain): visible at 5deg
             assertTrue("Sun at ~5deg from NE (summer) should be visible", summerVis.isSunVisible)
@@ -470,8 +474,10 @@ class SunriseIntegrationTest {
         return null
     }
 
-    private fun delayMinutes(actual: LocalTime, reference: LocalTime): Int =
-        (actual.toSecondOfDay() - reference.toSecondOfDay()) / 60
+    private fun delayMinutes(
+        actual: LocalTime,
+        reference: LocalTime,
+    ): Int = (actual.toSecondOfDay() - reference.toSecondOfDay()) / 60
 
     private fun assertTimeWithinMinutes(
         expected: LocalTime,
