@@ -34,9 +34,11 @@ jobs:
         run: ./gradlew lintDebug
 
       - name: Run unit tests
+        if: ${{ !cancelled() }}
         run: ./gradlew testDebugUnitTest
 
       - name: Build debug APK
+        if: ${{ !cancelled() }}
         run: ./gradlew assembleDebug
 
       - name: Upload build reports
