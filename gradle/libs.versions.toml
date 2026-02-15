@@ -42,11 +42,17 @@ mockk = "1.13.13"
 turbine = "1.2.0"
 coroutinesTest = "1.9.0"
 
+# Sun Calculation
+commonsSuncalc = "3.11"
+
 # Code Quality
 ktlint = "12.1.2"
 detekt = "1.23.7"
 
 [libraries]
+# Sun Calculation
+commons-suncalc = { group = "org.shredzone.commons", name = "commons-suncalc", version.ref = "commonsSuncalc" }
+
 # AndroidX Core
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }

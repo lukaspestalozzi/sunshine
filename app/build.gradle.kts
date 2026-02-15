@@ -104,6 +104,9 @@ dependencies {
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
 
+    // Sun Calculation (evaluation)
+    testImplementation(libs.commons.suncalc)
+
     // Testing
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
