@@ -4,21 +4,188 @@
 
 Sunshine is an Android app that shows users where the sun actually shines at any given time, considering terrain (mountains, hills). Target users are hikers in the Alps region. The app must work offline with previously downloaded data.
 
+**Current version:** 0.1.0 (MVP) — Phases 1-4 complete. QA and Phase 5 (extended features) remain.
+
 **Key documents:**
 - `DESIGN.md` - Architecture, tech stack, and feature specifications
+- `ROADMAP.md` - 1.0 release roadmap and remaining work
+- `REVIEW.md` - Code review guidelines
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|------------|
-| Language | Kotlin |
-| UI | Jetpack Compose |
-| Architecture | MVVM |
-| DI | Koin |
-| Maps | osmdroid (OpenStreetMap) |
-| Database | Room + DataStore |
-| Min SDK | API 29 (Android 10) |
-| Build | Gradle with Kotlin DSL |
+| Component | Technology | Version |
+|-----------|------------|---------|
+| Language | Kotlin | 2.0.21 |
+| UI | Jetpack Compose (Material 3) | BOM 2024.12.01 |
+| Architecture | MVVM | - |
+| DI | Koin | 4.0.0 |
+| Maps | osmdroid (OpenStreetMap) | 6.1.20 |
+| Database | Room + DataStore | 2.6.1 / 1.1.1 |
+| Networking | Ktor Client | 3.0.2 |
+| Background Work | WorkManager | 2.10.0 |
+| Compile SDK | API 35 (Android 15) | - |
+| Min SDK | API 29 (Android 10) | - |
+| Target SDK | API 35 (Android 15) | - |
+| JVM Target | 17 | - |
+| Build | Gradle with Kotlin DSL | AGP 8.7.2 |
+| Code Quality | ktlint 12.1.2, detekt 1.23.7 | - |
+
+Dependencies are managed via version catalog at `gradle/libs.versions.toml`.
+
+---
+
+## Codebase Structure
+
+Single-module Android app (`app/`). Package root: `com.sunshine.app`.
+
+```
+com.sunshine.app/
+├── SunshineApp.kt                          # Application class (Koin init, osmdroid config)
+├── MainActivity.kt                         # Single activity, Compose entry point
+│
+├── ui/                                     # UI Layer
+│   ├── theme/                              # Material 3 theme (Color, Theme, Type)
+│   ├── components/
+│   │   ├── OsmMapView.kt                   # osmdroid map Compose wrapper + visibility overlay
+│   │   └── SunPositionIndicator.kt         # Sun direction indicator at map edge
+│   ├── screens/
+│   │   ├── map/
+│   │   │   ├── MapScreen.kt                # Main screen: map, time slider, date picker, sun info
+│   │   │   ├── MapViewModel.kt             # Sun position, visibility, grid calculations
+│   │   │   └── MapUiState.kt               # UI state with computed properties
+│   │   ├── download/
+│   │   │   ├── DownloadScreen.kt           # Region selection and download progress
+│   │   │   └── DownloadViewModel.kt        # Download orchestration
+│   │   └── settings/
+│   │       ├── SettingsScreen.kt           # User preferences (offline mode)
+│   │       └── SettingsViewModel.kt
+│   └── navigation/
+│       └── NavGraph.kt                     # Compose navigation (map, download, settings)
+│
+├── domain/                                 # Domain Layer (no Android dependencies)
+│   ├── model/
+│   │   ├── GeoPoint.kt                     # Lat/lon with validation (default: Swiss Alps)
+│   │   ├── SunPosition.kt                  # Azimuth + elevation angle
+│   │   ├── TerrainProfile.kt               # Terrain samples with horizon angle calculation
+│   │   ├── VisibilityResult.kt             # Visible/blocked/below-horizon with details
+│   │   ├── VisibilityGrid.kt               # Grid of visibility results for map overlay
+│   │   ├── BoundingBox.kt                  # Geographic rectangular bounds
+│   │   └── DownloadableRegion.kt           # Region metadata for downloads
+│   ├── repository/                         # Interfaces (ports)
+│   │   ├── ElevationRepository.kt          # Elevation data access
+│   │   ├── RegionProvider.kt               # Available downloadable regions
+│   │   ├── SettingsRepository.kt           # User settings
+│   │   └── TileDownloadRepository.kt       # Tile download orchestration
+│   └── usecase/
+│       └── CalculateSunVisibilityUseCase.kt # Core logic: sun + terrain = visibility
+│
+├── data/                                   # Data Layer
+│   ├── connectivity/
+│   │   └── ConnectivityObserver.kt         # Network state monitoring via Flow
+│   ├── download/
+│   │   └── TileDownloadWorker.kt           # WorkManager background tile downloads
+│   ├── local/database/
+│   │   ├── SunshineDatabase.kt             # Room database (v2, migration 1→2)
+│   │   ├── ElevationDao.kt                 # Elevation cache queries (~30m grid)
+│   │   ├── DownloadedRegionDao.kt          # Download tracking
+│   │   └── entities/
+│   │       ├── ElevationEntity.kt          # Cached elevation point
+│   │       └── DownloadedRegionEntity.kt   # Region download metadata
+│   ├── remote/elevation/
+│   │   └── ElevationApi.kt                 # Open-Elevation API (Ktor, batch, retry)
+│   └── repository/
+│       ├── ElevationRepositoryImpl.kt      # Offline-first elevation access
+│       ├── SettingsRepositoryImpl.kt       # DataStore preferences
+│       ├── DefaultRegionProvider.kt        # 10 predefined European regions
+│       └── TileDownloadRepositoryImpl.kt   # Download orchestration via WorkManager
+│
+├── suncalc/                                # Sun Calculation (Strategy Pattern)
+│   ├── SunCalculator.kt                    # Interface: position, sunrise, sunset
+│   └── SimpleSunCalculator.kt              # NOAA algorithm implementation
+│
+├── di/                                     # Koin Dependency Injection
+│   ├── AppModule.kt                        # ViewModels
+│   ├── DataModule.kt                       # Database, DAOs, API, repositories
+│   ├── DomainModule.kt                     # Use cases
+│   └── SunCalcModule.kt                    # SunCalculator binding
+│
+└── util/
+    └── ErrorMessageMapper.kt               # Exception → user-friendly messages
+```
+
+### Key Architectural Patterns
+
+- **Offline-first:** `ElevationRepositoryImpl` checks local Room cache before API calls. Offline mode skips network entirely.
+- **Pluggable sun calculator:** `SunCalculator` interface with `SimpleSunCalculator` (NOAA) implementation, swappable via Koin.
+- **Terrain-aware visibility:** `CalculateSunVisibilityUseCase` combines sun position with terrain profile to determine occlusion. Accounts for atmospheric refraction (Meeus/Bennett) and earth curvature.
+- **Batch elevation fetching:** Single API call per grid instead of per-point. Chunked to API max (100 points/request).
+- **Grid-based caching:** Elevation data aligned to ~30m grid precision for cache efficiency.
+- **Debounced grid updates:** 500ms debounce on visibility grid recalculation during map pan/zoom.
+- **Adaptive resolution:** Grid resolution scales with zoom level for performance.
+- **WorkManager downloads:** Background tile downloads survive app restarts.
+- **Flow-based reactivity:** StateFlow for UI state, Turbine for testing Flows.
+
+### Test Structure
+
+```
+app/src/test/java/com/sunshine/app/        # Unit tests (~47 total)
+├── suncalc/SimpleSunCalculatorTest.kt      # Sun position accuracy
+├── domain/
+│   ├── model/GeoPointTest.kt               # Coordinate validation
+│   ├── model/TerrainProfileTest.kt         # Horizon angle calculations
+│   └── usecase/CalculateSunVisibilityUseCaseTest.kt  # 6 tests
+├── data/
+│   ├── connectivity/ConnectivityObserverTest.kt
+│   ├── download/TileDownloadWorkerTest.kt
+│   └── repository/ElevationRepositoryImplTest.kt     # 11 tests
+├── ui/
+│   ├── screens/map/MapViewModelTest.kt               # 14 tests
+│   ├── screens/download/DownloadViewModelTest.kt
+│   └── util/ErrorMessageMapperTest.kt
+└── integration/
+    ├── SunriseIntegrationTest.kt           # End-to-end sunrise calculation
+    ├── fixtures/InterlakenElevationFixture.kt
+    └── mocks/MockElevationDao.kt, MockSettingsRepository.kt
+
+app/src/androidTest/                        # Instrumentation tests
+├── data/local/database/
+│   ├── ElevationDaoTest.kt                 # 8 tests (Room in-memory)
+│   └── DownloadedRegionDaoTest.kt          # 12 tests
+└── ui/screens/
+    ├── MapScreenTest.kt                    # 12 tests (Compose UI)
+    └── DownloadScreenTest.kt               # 15 tests
+```
+
+**Test libraries:** JUnit 4, MockK 1.13.13, Turbine 1.2.0, kotlinx-coroutines-test 1.9.0
+
+### Project Files (Non-Source)
+
+```
+sunshine/
+├── .github/workflows/ci.yml               # GitHub Actions CI (5-step pipeline)
+├── .claude/skills/local-development.md     # SDK setup guide
+├── app/config/detekt/detekt.yml            # Static analysis config
+├── scripts/
+│   ├── verify-local.sh                     # Local CI simulation
+│   ├── run-with-proxy.sh                   # Gradle with auth proxy
+│   ├── auth-proxy.py                       # HTTPS auth proxy for SDK downloads
+│   └── setup-offline-build.sh              # Offline build configuration
+├── investigations/                         # Bug/behavior investigation docs
+│   └── sunrise-integration-test-plan.md
+├── DESIGN.md                               # Full architecture & design spec
+├── ROADMAP.md                              # 1.0 release roadmap
+└── REVIEW.md                               # Code review guidelines
+```
+
+### Detekt Configuration
+
+Located at `app/config/detekt/detekt.yml`:
+- Max issues: 0 (strict — any issue fails the build)
+- Long method threshold: 30 lines (ignores `@Composable` functions)
+- Max function parameters: 8 (constructor: 10)
+- Max functions per file: 20
+- Line length: 140 characters
+- Magic numbers: ignored in property declarations, annotations, enums
 
 ---
 
@@ -622,9 +789,37 @@ Leave the codebase clean for the next session.
 
 ---
 
+## Project Status
+
+### Completed (Phases 1-4)
+
+| Phase | Scope |
+|-------|-------|
+| 1. Foundation | Project setup, MVVM, Koin DI, osmdroid map, navigation |
+| 2. Core Features | Time slider, NOAA sun calculator, elevation API + caching, terrain-aware visibility overlay |
+| 3. Offline | WorkManager tile downloads, ConnectivityObserver, offline mode, region download UI |
+| 4. Polish | Batch elevation fetching, parallel grid calculation, retry with backoff, error messages, 47+ tests |
+
+### Remaining for 1.0 (see `ROADMAP.md`)
+
+- QA: Database migration testing, edge cases (polar, equator, DST), device testing
+- Performance: Profiling, spatial batching, visibility result caching
+- Docs: README screenshots, CHANGELOG
+
+### Known Limitations
+
+1. Sun calculator uses custom NOAA implementation (not battle-tested `commons-suncalc` library). Sufficient for hiking (~1 min accuracy).
+2. Open-Elevation API is free but rate-limited. Aggressive caching mitigates this.
+3. Visibility grid uses one coroutine per grid point — may need optimization for large areas.
+4. No local DEM files yet — elevation requires API or cached data.
+
+---
+
 ## Resources
 
 - [Kotlin Coding Conventions](https://kotlinlang.org/docs/coding-conventions.html)
 - [Android Architecture Guide](https://developer.android.com/topic/architecture)
 - [Compose Testing](https://developer.android.com/jetpack/compose/testing)
+- [NOAA Solar Calculator](https://gml.noaa.gov/grad/solcalc/) - Reference for `SimpleSunCalculator`
 - [DESIGN.md](./DESIGN.md) - Project architecture and specifications
+- [ROADMAP.md](./ROADMAP.md) - Release roadmap and remaining work
