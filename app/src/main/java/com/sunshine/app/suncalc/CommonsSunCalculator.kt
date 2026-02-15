@@ -12,8 +12,9 @@ import org.shredzone.commons.suncalc.SunTimes
 /**
  * Sun calculator implementation using the commons-suncalc library (v3.11).
  *
- * Uses well-tested astronomical algorithms from the library as an alternative
- * to the custom NOAA implementation in [SimpleSunCalculator].
+ * Uses [LibSunPosition.getTrueAltitude] (geometric elevation without refraction)
+ * because [com.sunshine.app.domain.usecase.CalculateSunVisibilityUseCase] applies
+ * its own Meeus/Bennett refraction correction.
  */
 class CommonsSunCalculator : SunCalculator {
     override suspend fun calculateSunPosition(
@@ -30,7 +31,7 @@ class CommonsSunCalculator : SunCalculator {
 
         return SunPosition(
             azimuth = position.azimuth,
-            elevation = position.altitude,
+            elevation = position.trueAltitude,
         )
     }
 
