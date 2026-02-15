@@ -9,7 +9,7 @@ import com.sunshine.app.integration.fixtures.InterlakenElevationFixture
 import com.sunshine.app.integration.fixtures.findNearest
 import com.sunshine.app.integration.mocks.MockElevationDao
 import com.sunshine.app.integration.mocks.MockSettingsRepository
-import com.sunshine.app.suncalc.SimpleSunCalculator
+import com.sunshine.app.suncalc.CommonsSunCalculator
 import io.mockk.coEvery
 import io.mockk.mockk
 import java.time.LocalDate
@@ -27,14 +27,14 @@ import org.junit.Test
  * End-to-end integration test for the sunrise visibility pipeline.
  *
  * Uses real SRTM elevation data for the Interlaken area to verify the full
- * computation pipeline: sun position (NOAA) -> terrain profiles -> visibility.
+ * computation pipeline: sun position (commons-suncalc) -> terrain profiles -> visibility.
  *
  * Only the HTTP network boundary is mocked (ElevationApi); everything else runs
  * with real implementations.
  */
 @Suppress("LargeClass")
 class SunriseIntegrationTest {
-    private lateinit var sunCalculator: SimpleSunCalculator
+    private lateinit var sunCalculator: CommonsSunCalculator
     private lateinit var elevationApi: ElevationApi
     private lateinit var elevationDao: MockElevationDao
     private lateinit var settingsRepository: MockSettingsRepository
@@ -43,7 +43,7 @@ class SunriseIntegrationTest {
 
     @Before
     fun setup() {
-        sunCalculator = SimpleSunCalculator()
+        sunCalculator = CommonsSunCalculator()
         elevationDao = MockElevationDao()
         settingsRepository = MockSettingsRepository()
         elevationApi = setupElevationApiMock()
@@ -89,10 +89,8 @@ class SunriseIntegrationTest {
     }
 
     // ---- Scenario 1: Astronomical Sunrise/Sunset Accuracy ----
-    // Reference times from timeanddate.com are in comments. SimpleSunCalculator
-    // has a systematic ~5-6 min offset (sunrise late, sunset early) due to its
-    // binary search resolution. Expected values are calibrated to the calculator's
-    // actual output so the integration pipeline is tested consistently.
+    // Reference times from timeanddate.com for Interlaken.
+    // commons-suncalc produces sub-minute accuracy vs these references.
 
     @Test
     fun `summer solstice sunrise matches calculator output`() =
@@ -100,7 +98,7 @@ class SunriseIntegrationTest {
             // timeanddate.com: 03:34 UTC
             val sunrise = sunCalculator.calculateSunrise(interlakenCenter, summerSolstice)
             assertNotNull("Sunrise should exist on summer solstice", sunrise)
-            assertTimeWithinMinutes(LocalTime.of(3, 40), sunrise!!, TOLERANCE, "Summer sunrise")
+            assertTimeWithinMinutes(LocalTime.of(3, 34), sunrise!!, TOLERANCE, "Summer sunrise")
         }
 
     @Test
@@ -109,7 +107,7 @@ class SunriseIntegrationTest {
             // timeanddate.com: 19:25 UTC
             val sunset = sunCalculator.calculateSunset(interlakenCenter, summerSolstice)
             assertNotNull("Sunset should exist on summer solstice", sunset)
-            assertTimeWithinMinutes(LocalTime.of(19, 19), sunset!!, TOLERANCE, "Summer sunset")
+            assertTimeWithinMinutes(LocalTime.of(19, 25), sunset!!, TOLERANCE, "Summer sunset")
         }
 
     @Test
@@ -118,7 +116,7 @@ class SunriseIntegrationTest {
             // timeanddate.com: 07:10 UTC
             val sunrise = sunCalculator.calculateSunrise(interlakenCenter, winterSolstice)
             assertNotNull("Sunrise should exist on winter solstice", sunrise)
-            assertTimeWithinMinutes(LocalTime.of(7, 16), sunrise!!, TOLERANCE, "Winter sunrise")
+            assertTimeWithinMinutes(LocalTime.of(7, 10), sunrise!!, TOLERANCE, "Winter sunrise")
         }
 
     @Test
@@ -127,7 +125,7 @@ class SunriseIntegrationTest {
             // timeanddate.com: 15:43 UTC
             val sunset = sunCalculator.calculateSunset(interlakenCenter, winterSolstice)
             assertNotNull("Sunset should exist on winter solstice", sunset)
-            assertTimeWithinMinutes(LocalTime.of(15, 37), sunset!!, TOLERANCE, "Winter sunset")
+            assertTimeWithinMinutes(LocalTime.of(15, 43), sunset!!, TOLERANCE, "Winter sunset")
         }
 
     @Test
@@ -136,7 +134,7 @@ class SunriseIntegrationTest {
             // timeanddate.com: 05:31 UTC
             val sunrise = sunCalculator.calculateSunrise(interlakenCenter, springEquinox)
             assertNotNull("Sunrise should exist on spring equinox", sunrise)
-            assertTimeWithinMinutes(LocalTime.of(5, 36), sunrise!!, TOLERANCE, "Spring sunrise")
+            assertTimeWithinMinutes(LocalTime.of(5, 31), sunrise!!, TOLERANCE, "Spring sunrise")
         }
 
     @Test
@@ -145,7 +143,7 @@ class SunriseIntegrationTest {
             // timeanddate.com: 17:41 UTC
             val sunset = sunCalculator.calculateSunset(interlakenCenter, springEquinox)
             assertNotNull("Sunset should exist on spring equinox", sunset)
-            assertTimeWithinMinutes(LocalTime.of(17, 36), sunset!!, TOLERANCE, "Spring sunset")
+            assertTimeWithinMinutes(LocalTime.of(17, 41), sunset!!, TOLERANCE, "Spring sunset")
         }
 
     @Test
@@ -154,7 +152,7 @@ class SunriseIntegrationTest {
             // timeanddate.com: 05:15 UTC
             val sunrise = sunCalculator.calculateSunrise(interlakenCenter, autumnEquinox)
             assertNotNull("Sunrise should exist on autumn equinox", sunrise)
-            assertTimeWithinMinutes(LocalTime.of(5, 20), sunrise!!, TOLERANCE, "Autumn sunrise")
+            assertTimeWithinMinutes(LocalTime.of(5, 15), sunrise!!, TOLERANCE, "Autumn sunrise")
         }
 
     @Test
@@ -163,7 +161,7 @@ class SunriseIntegrationTest {
             // timeanddate.com: 17:25 UTC
             val sunset = sunCalculator.calculateSunset(interlakenCenter, autumnEquinox)
             assertNotNull("Sunset should exist on autumn equinox", sunset)
-            assertTimeWithinMinutes(LocalTime.of(17, 21), sunset!!, TOLERANCE, "Autumn sunset")
+            assertTimeWithinMinutes(LocalTime.of(17, 25), sunset!!, TOLERANCE, "Autumn sunset")
         }
 
     @Test

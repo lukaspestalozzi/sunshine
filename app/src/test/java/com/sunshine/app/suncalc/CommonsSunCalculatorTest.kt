@@ -11,15 +11,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-class SimpleSunCalculatorTest {
-    private lateinit var calculator: SimpleSunCalculator
+class CommonsSunCalculatorTest {
+    private lateinit var calculator: CommonsSunCalculator
 
     @Before
     fun setup() {
-        calculator = SimpleSunCalculator()
+        calculator = CommonsSunCalculator()
     }
 
-    // ---- Existing directional tests ----
+    // ---- Directional tests ----
 
     @Test
     fun `sun is below horizon at midnight in Swiss Alps`() =
@@ -95,13 +95,11 @@ class SimpleSunCalculatorTest {
             )
         }
 
-    // ---- Numerical accuracy tests (NOAA reference values) ----
+    // ---- Numerical accuracy tests ----
 
     @Test
     fun `summer solstice max elevation at Bern matches expected`() =
         runBlocking {
-            // Max elevation at summer solstice ≈ 90 - |lat - declination| = 90 - |46.95 - 23.44| ≈ 66.5°
-            // Solar noon at Bern (lon 7.45°E) ≈ 11:30 UTC
             val location = GeoPoint(latitude = 46.95, longitude = 7.45)
             val solarNoon = LocalDateTime.of(2024, Month.JUNE, 21, 11, 30)
 
@@ -118,7 +116,6 @@ class SimpleSunCalculatorTest {
     @Test
     fun `winter solstice max elevation at Bern matches expected`() =
         runBlocking {
-            // Max elevation at winter solstice ≈ 90 - |lat + declination| = 90 - |46.95 + 23.44| ≈ 19.6°
             val location = GeoPoint(latitude = 46.95, longitude = 7.45)
             val solarNoon = LocalDateTime.of(2024, Month.DECEMBER, 21, 11, 45)
 
@@ -135,7 +132,6 @@ class SimpleSunCalculatorTest {
     @Test
     fun `azimuth at solar noon is approximately south`() =
         runBlocking {
-            // At solar noon in northern hemisphere, sun should be due south (180°)
             val location = GeoPoint(latitude = 46.95, longitude = 7.45)
             val solarNoon = LocalDateTime.of(2024, Month.JUNE, 21, 11, 30)
 
@@ -152,11 +148,9 @@ class SimpleSunCalculatorTest {
     @Test
     fun `elevation varies continuously through the day`() =
         runBlocking {
-            // Sun should rise, reach peak, then descend - test monotonicity
             val location = bern
             val date = LocalDate.of(2024, Month.JUNE, 21)
 
-            // Morning: elevation should increase from 6:00 to 12:00 UTC
             val earlyMorning =
                 calculator.calculateSunPosition(
                     location,
@@ -188,7 +182,6 @@ class SimpleSunCalculatorTest {
     @Test
     fun `midnight sun at high latitude during summer`() =
         runBlocking {
-            // At 70°N on June 21, the sun should be above horizon even at midnight
             val arcticLocation = GeoPoint(latitude = 70.0, longitude = 25.0)
             val midnight = LocalDateTime.of(2024, Month.JUNE, 21, 0, 0)
 
@@ -203,7 +196,6 @@ class SimpleSunCalculatorTest {
     @Test
     fun `polar night at high latitude during winter`() =
         runBlocking {
-            // At 70°N on December 21, the sun should be below horizon even at noon
             val arcticLocation = GeoPoint(latitude = 70.0, longitude = 25.0)
             val noon = LocalDateTime.of(2024, Month.DECEMBER, 21, 12, 0)
 
@@ -225,8 +217,6 @@ class SimpleSunCalculatorTest {
 
             val sunrise = calculator.calculateSunrise(location, date)
 
-            // Bern sunrise on June 21 is approximately 05:30 local (03:30 UTC)
-            // The calculator works in UTC, so expect roughly 3:00-5:00 UTC
             assertNotNull("Sunrise should exist in summer", sunrise)
             assertTrue(
                 "Sunrise hour should be between 3 and 6 UTC, was $sunrise",
@@ -242,8 +232,6 @@ class SimpleSunCalculatorTest {
 
             val sunset = calculator.calculateSunset(location, date)
 
-            // Bern sunset on June 21 is approximately 21:30 local (19:30 UTC)
-            // Expect roughly 19:00-21:00 UTC
             assertNotNull("Sunset should exist in summer", sunset)
             assertTrue(
                 "Sunset hour should be between 18 and 22 UTC, was $sunset",
@@ -292,7 +280,6 @@ class SimpleSunCalculatorTest {
     @Test
     fun `southern hemisphere has opposite seasonal pattern`() =
         runBlocking {
-            // Cape Town, South Africa (-33.9°)
             val capeTown = GeoPoint(latitude = -33.9, longitude = 18.4)
             val juneSolarNoon = LocalDateTime.of(2024, Month.JUNE, 21, 11, 0)
             val decSolarNoon = LocalDateTime.of(2024, Month.DECEMBER, 21, 11, 0)
