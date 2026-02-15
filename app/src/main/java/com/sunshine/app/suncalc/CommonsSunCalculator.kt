@@ -10,7 +10,8 @@ import org.shredzone.commons.suncalc.SunPosition as LibSunPosition
 import org.shredzone.commons.suncalc.SunTimes
 
 /**
- * Sun calculator implementation using the commons-suncalc library (v3.11).
+ * Sun calculator implementation using the commons-suncalc library.
+ * Version is managed in `gradle/libs.versions.toml` (key: `commonsSuncalc`).
  *
  * Uses [LibSunPosition.getTrueAltitude] (geometric elevation without refraction)
  * because [com.sunshine.app.domain.usecase.CalculateSunVisibilityUseCase] applies

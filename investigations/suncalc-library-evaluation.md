@@ -2,11 +2,12 @@
 
 ## Summary
 
-Evaluated `commons-suncalc` v3.11 (by shred) as a replacement for the custom
-`SimpleSunCalculator` (NOAA algorithm). Both implementations produce very similar
-results for sun position. The main difference is in sunrise/sunset timing accuracy.
+Evaluated `commons-suncalc` (by shred; version managed in `gradle/libs.versions.toml`)
+as a replacement for the custom `SimpleSunCalculator` (NOAA algorithm). Both
+implementations produce very similar results for sun position. The main difference
+is in sunrise/sunset timing accuracy.
 
-**Recommendation: Switch to `commons-suncalc`.**
+**Outcome: Switched to `commons-suncalc`.** SimpleSunCalculator has been removed.
 
 ---
 
@@ -101,20 +102,22 @@ Both implementations agree on:
   When switching, verify whether double refraction correction occurs and adjust
   accordingly (use `getTrueAltitude()` if the use case already handles refraction).
 
-## Migration Steps (if approved)
+## Migration (completed)
 
-1. Move `commons-suncalc` from `testImplementation` to `implementation`
-2. Move `CommonsSunCalculator.kt` from test to main sources
-3. Update Koin binding in `SunCalcModule.kt`
-4. Decide on refraction: use `altitude` (with refraction) or `trueAltitude` (without)
-   based on what `CalculateSunVisibilityUseCase` expects
-5. Update existing `SimpleSunCalculatorTest` assertions (sunrise/sunset times will
-   shift by ~5 min toward correct values)
-6. Update `SunriseIntegrationTest` calibrated values
-7. Keep `SimpleSunCalculator` temporarily for A/B comparison, remove later
+All migration steps have been implemented:
+
+1. Moved `commons-suncalc` from `testImplementation` to `implementation`
+2. Moved `CommonsSunCalculator.kt` from test to main sources
+3. Updated Koin binding in `SunCalcModule.kt` to use `CommonsSunCalculator`
+4. Used `trueAltitude` (geometric, no refraction) because
+   `CalculateSunVisibilityUseCase` applies its own Meeus/Bennett correction
+5. Renamed `SimpleSunCalculatorTest` to `CommonsSunCalculatorTest`
+6. Updated `SunriseIntegrationTest` expected times to timeanddate.com references
+   (no more ~6 min offset calibration)
+7. Deleted `SimpleSunCalculator.kt` and `SunCalculatorComparisonTest.kt`
 
 ## Files
 
-- Adapter: `app/src/test/java/com/sunshine/app/suncalc/CommonsSunCalculator.kt`
-- Comparison tests: `app/src/test/java/com/sunshine/app/suncalc/SunCalculatorComparisonTest.kt`
-- Dependency: `gradle/libs.versions.toml` (commonsSuncalc = "3.11")
+- Adapter: `app/src/main/java/com/sunshine/app/suncalc/CommonsSunCalculator.kt`
+- Tests: `app/src/test/java/com/sunshine/app/suncalc/CommonsSunCalculatorTest.kt`
+- Dependency: `gradle/libs.versions.toml` (key: `commonsSuncalc`)
