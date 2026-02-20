@@ -359,6 +359,80 @@ You're a collaborator, not a shell script.
 
 ---
 
+## Workflow Orchestration
+
+### Plan-First Default
+
+Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions):
+- Write plan to `tasks/todo.md` with checkable items and verification steps
+- Get confirmation before starting implementation
+- If something goes sideways: **STOP**, update the plan, re-plan immediately — don't keep pushing
+- Use plan mode for verification strategy, not just building
+- Write detailed specs upfront to reduce ambiguity
+
+See `.claude/skills/plan-task.md` for the full workflow.
+
+### Subagent Strategy
+
+Keep the main context window clean:
+- Use subagents (Task tool) liberally for research, exploration, and parallel analysis
+- One task per subagent for focused execution
+- For complex problems, throw more compute at it — spin up multiple subagents in parallel
+- Offload: codebase exploration, API research, test analysis, diff review, investigation
+
+### Self-Improvement Loop
+
+After ANY correction from the user:
+1. Update `tasks/lessons.md` with context, mistake, and a concrete prevention rule
+2. Write rules specific enough to prevent the exact same mistake
+3. Ruthlessly iterate on these rules until mistake rate drops
+4. Review `tasks/lessons.md` at session start for relevant project lessons
+
+See `.claude/skills/capture-lesson.md` for the entry format.
+
+### Verification Before Done
+
+Never mark a task complete without proving it works:
+- Run the relevant tests, check logs, demonstrate correctness
+- For behavioral changes: diff behavior between main branch and your changes
+- Ask: "Would a staff engineer approve this?"
+- `./scripts/verify-local.sh` is the minimum bar before pushing
+
+### Elegance Check (Non-Trivial Changes Only)
+
+For changes touching 3+ files or implementing new features:
+- Pause before presenting. Ask: "Is there a more elegant way?"
+- If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"
+- Skip for simple, obvious fixes — don't over-engineer
+- "Elegant" = clear, minimal, correct. Not clever.
+
+See `.claude/skills/review-elegance.md` for the full checklist.
+
+### Autonomous Bug Fixing
+
+When given a bug report, failing test, or CI failure:
+- **Just fix it.** Don't ask for hand-holding
+- Point at logs, errors, failing tests — then resolve them
+- Zero context switching required from the user
+- Go fix failing CI tests without being told how
+
+See `.claude/skills/fix-bug.md` for the full workflow.
+
+### Task File Management
+
+| File | Purpose |
+|------|---------|
+| `tasks/todo.md` | Current task plan with checkable items |
+| `tasks/lessons.md` | Accumulated correction rules (newest first) |
+
+- Plans go in `tasks/todo.md` — the file is the cross-session source of truth
+- Also use the TodoWrite tool for real-time UI progress during a session
+- Mark items complete as you go
+- Add a `## Review` section to `tasks/todo.md` on task completion
+- Capture lessons in `tasks/lessons.md` after any correction
+
+---
+
 ## Coding Principles
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
