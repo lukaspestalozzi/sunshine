@@ -129,8 +129,12 @@ class ElevationRepositoryImplTest {
         runBlocking {
             // Arrange
             val points = listOf(GeoPoint(46.8, 8.2), GeoPoint(46.9, 8.3))
-            coEvery { elevationDao.getElevation(46.8, 8.2) } returns createElevationEntity(46.8, 8.2, 500.0)
-            coEvery { elevationDao.getElevation(46.9, 8.3) } returns createElevationEntity(46.9, 8.3, 600.0)
+            coEvery {
+                elevationDao.getElevationsInBounds(any(), any(), any(), any())
+            } returns listOf(
+                createElevationEntity(46.8, 8.2, 500.0),
+                createElevationEntity(46.9, 8.3, 600.0),
+            )
 
             // Act
             val result = repository.getElevations(points)
@@ -152,18 +156,11 @@ class ElevationRepositoryImplTest {
                 )
 
             // Only first point is cached
-            val cachedEntity =
-                ElevationEntity(
-                    gridLat = 46.8,
-                    gridLon = 8.2,
-                    latitude = 46.8,
-                    longitude = 8.2,
-                    elevation = 500.0,
-                    source = "open-elevation",
-                    fetchedAt = System.currentTimeMillis(),
-                )
-            coEvery { elevationDao.getElevation(46.8, 8.2) } returns cachedEntity
-            coEvery { elevationDao.getElevation(46.9, 8.3) } returns null
+            coEvery {
+                elevationDao.getElevationsInBounds(any(), any(), any(), any())
+            } returns listOf(
+                createElevationEntity(46.8, 8.2, 500.0),
+            )
 
             // API returns missing point
             val apiResults =
@@ -191,18 +188,11 @@ class ElevationRepositoryImplTest {
                     GeoPoint(46.9, 8.3),
                 )
 
-            val cachedEntity =
-                ElevationEntity(
-                    gridLat = 46.8,
-                    gridLon = 8.2,
-                    latitude = 46.8,
-                    longitude = 8.2,
-                    elevation = 500.0,
-                    source = "open-elevation",
-                    fetchedAt = System.currentTimeMillis(),
-                )
-            coEvery { elevationDao.getElevation(46.8, 8.2) } returns cachedEntity
-            coEvery { elevationDao.getElevation(46.9, 8.3) } returns null
+            coEvery {
+                elevationDao.getElevationsInBounds(any(), any(), any(), any())
+            } returns listOf(
+                createElevationEntity(46.8, 8.2, 500.0),
+            )
             coEvery { elevationApi.getElevations(any()) } returns Result.failure(Exception("Network error"))
 
             // Act
