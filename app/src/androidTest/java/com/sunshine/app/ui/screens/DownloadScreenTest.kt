@@ -7,8 +7,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sunshine.app.data.connectivity.ConnectivityObserver
+import com.sunshine.app.domain.model.BoundingBox
 import com.sunshine.app.domain.model.DownloadableRegion
-import com.sunshine.app.domain.model.GeoPoint
 import com.sunshine.app.domain.repository.DownloadProgress
 import com.sunshine.app.domain.repository.DownloadState
 import com.sunshine.app.domain.repository.RegionProvider
@@ -43,8 +43,7 @@ class DownloadScreenTest {
                 id = "swiss_alps",
                 name = "Swiss Alps",
                 description = "Central Switzerland",
-                center = GeoPoint(46.8182, 8.2275),
-                radiusKm = 50.0,
+                bounds = BoundingBox(north = 47.3, south = 46.3, east = 8.7, west = 7.7),
                 minZoom = 8,
                 maxZoom = 15,
             ),
@@ -52,8 +51,7 @@ class DownloadScreenTest {
                 id = "zurich",
                 name = "Zurich Area",
                 description = "Zurich and surroundings",
-                center = GeoPoint(47.3769, 8.5417),
-                radiusKm = 30.0,
+                bounds = BoundingBox(north = 47.6, south = 47.1, east = 8.8, west = 8.2),
                 minZoom = 10,
                 maxZoom = 16,
             ),
@@ -240,11 +238,12 @@ class DownloadScreenTest {
             listOf(
                 DownloadProgress(
                     regionId = "swiss_alps",
+                    regionName = "Swiss Alps",
                     status = DownloadState.COMPLETED,
                     progress = 100,
                     downloadedTiles = 1000,
                     totalTiles = 1000,
-                    bytesDownloaded = 50000000,
+                    sizeBytes = 50000000,
                 ),
             )
         every { downloadRepository.getDownloadProgress() } returns flowOf(downloadProgress)
@@ -271,11 +270,12 @@ class DownloadScreenTest {
             listOf(
                 DownloadProgress(
                     regionId = "swiss_alps",
+                    regionName = "Swiss Alps",
                     status = DownloadState.COMPLETED,
                     progress = 100,
                     downloadedTiles = 1000,
                     totalTiles = 1000,
-                    bytesDownloaded = 50000000,
+                    sizeBytes = 50000000,
                 ),
             )
         every { downloadRepository.getDownloadProgress() } returns flowOf(downloadProgress)
@@ -301,11 +301,12 @@ class DownloadScreenTest {
             listOf(
                 DownloadProgress(
                     regionId = "swiss_alps",
+                    regionName = "Swiss Alps",
                     status = DownloadState.DOWNLOADING,
                     progress = 50,
                     downloadedTiles = 500,
                     totalTiles = 1000,
-                    bytesDownloaded = 25000000,
+                    sizeBytes = 25000000,
                 ),
             )
         every { downloadRepository.getDownloadProgress() } returns flowOf(downloadProgress)
@@ -331,11 +332,12 @@ class DownloadScreenTest {
             listOf(
                 DownloadProgress(
                     regionId = "swiss_alps",
+                    regionName = "Swiss Alps",
                     status = DownloadState.DOWNLOADING,
                     progress = 50,
                     downloadedTiles = 500,
                     totalTiles = 1000,
-                    bytesDownloaded = 25000000,
+                    sizeBytes = 25000000,
                 ),
             )
         every { downloadRepository.getDownloadProgress() } returns flowOf(downloadProgress)
@@ -361,11 +363,12 @@ class DownloadScreenTest {
             listOf(
                 DownloadProgress(
                     regionId = "swiss_alps",
+                    regionName = "Swiss Alps",
                     status = DownloadState.FAILED,
                     progress = 25,
                     downloadedTiles = 250,
                     totalTiles = 1000,
-                    bytesDownloaded = 12500000,
+                    sizeBytes = 12500000,
                 ),
             )
         every { downloadRepository.getDownloadProgress() } returns flowOf(downloadProgress)

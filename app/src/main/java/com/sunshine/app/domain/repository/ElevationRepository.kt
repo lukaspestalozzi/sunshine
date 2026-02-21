@@ -3,6 +3,9 @@ package com.sunshine.app.domain.repository
 import com.sunshine.app.domain.model.BoundingBox
 import com.sunshine.app.domain.model.GeoPoint
 
+/** Exception thrown when offline mode blocks a network request */
+class OfflineModeException(message: String) : Exception(message)
+
 /**
  * Repository for elevation data.
  */

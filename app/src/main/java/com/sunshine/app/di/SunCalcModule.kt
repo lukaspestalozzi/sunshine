@@ -1,7 +1,7 @@
 package com.sunshine.app.di
 
+import com.sunshine.app.domain.service.SunCalculator
 import com.sunshine.app.suncalc.CommonsSunCalculator
-import com.sunshine.app.suncalc.SunCalculator
 import org.koin.dsl.module
 
 /**

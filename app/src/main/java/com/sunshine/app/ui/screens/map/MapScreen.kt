@@ -54,7 +54,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -73,7 +72,7 @@ fun MapScreen(
             val result =
                 snackbarHostState.showSnackbar(
                     message = errorMessage,
-                    actionLabel = "Dismiss",
+                    actionLabel = "OK",
                     duration = SnackbarDuration.Short,
                 )
             if (result == SnackbarResult.ActionPerformed || result == SnackbarResult.Dismissed) {
@@ -179,11 +178,11 @@ private fun SunPositionOverlay(
             // Visibility status (terrain-aware if available)
             val visibilityText =
                 when {
-                    visibility != null && visibility.isSunVisible -> "Sun: Visible"
+                    visibility != null && visibility.isSunVisible -> stringResource(R.string.sun_visible)
                     visibility != null && !visibility.isSunVisible && sunPosition.isAboveHorizon ->
-                        "Sun: Blocked by terrain"
-                    sunPosition.isAboveHorizon -> "Sun: Above horizon"
-                    else -> "Sun: Below horizon"
+                        stringResource(R.string.sun_blocked)
+                    sunPosition.isAboveHorizon -> stringResource(R.string.sun_above_horizon)
+                    else -> stringResource(R.string.sun_below_horizon)
                 }
             val visibilityColor =
                 when {
@@ -211,7 +210,7 @@ private fun SunPositionOverlay(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "Elevation data unavailable",
+                        text = stringResource(R.string.elevation_degraded),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error,
                     )
@@ -219,23 +218,23 @@ private fun SunPositionOverlay(
             }
 
             Text(
-                text = "Elevation: ${String.format(Locale.US, "%.1f", sunPosition.elevation)}°",
+                text = stringResource(R.string.elevation_format, sunPosition.elevation),
                 style = MaterialTheme.typography.labelSmall,
             )
             Text(
-                text = "Azimuth: ${String.format(Locale.US, "%.1f", sunPosition.azimuth)}°",
+                text = stringResource(R.string.azimuth_format, sunPosition.azimuth),
                 style = MaterialTheme.typography.labelSmall,
             )
 
             // Show horizon angle if visibility data is available
             visibility?.let {
                 Text(
-                    text = "Horizon: ${String.format(Locale.US, "%.1f", it.horizonAngle)}°",
+                    text = stringResource(R.string.horizon_format, it.horizonAngle),
                     style = MaterialTheme.typography.labelSmall,
                 )
                 if (!it.isSunVisible && it.degreesUntilVisible != null) {
                     Text(
-                        text = "${String.format(Locale.US, "%.1f", it.degreesUntilVisible)}° until visible",
+                        text = stringResource(R.string.degrees_until_visible, it.degreesUntilVisible),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.tertiary,
                     )
@@ -247,13 +246,19 @@ private fun SunPositionOverlay(
                 Spacer(modifier = Modifier.height(4.dp))
                 uiState.sunriseTime?.let { sunrise ->
                     Text(
-                        text = "Sunrise: ${sunrise.format(DateTimeFormatter.ofPattern("HH:mm"))}",
+                        text = stringResource(
+                            R.string.sunrise_format,
+                            sunrise.format(DateTimeFormatter.ofPattern("HH:mm")),
+                        ),
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
                 uiState.sunsetTime?.let { sunset ->
                     Text(
-                        text = "Sunset: ${sunset.format(DateTimeFormatter.ofPattern("HH:mm"))}",
+                        text = stringResource(
+                            R.string.sunset_format,
+                            sunset.format(DateTimeFormatter.ofPattern("HH:mm")),
+                        ),
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
@@ -262,14 +267,14 @@ private fun SunPositionOverlay(
             // Loading indicators
             if (uiState.isLoadingVisibility) {
                 Text(
-                    text = "Loading terrain...",
+                    text = stringResource(R.string.loading_terrain),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline,
                 )
             }
             if (uiState.isLoadingGrid) {
                 Text(
-                    text = "Updating overlay...",
+                    text = stringResource(R.string.updating_overlay),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline,
                 )
@@ -317,7 +322,7 @@ private fun TimeControlPanel(
             ) {
                 Icon(
                     imageVector = Icons.Default.DateRange,
-                    contentDescription = "Select date",
+                    contentDescription = stringResource(R.string.select_date),
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
@@ -328,7 +333,7 @@ private fun TimeControlPanel(
                 IconButton(onClick = onResetToNow) {
                     Icon(
                         imageVector = Icons.Default.Refresh,
-                        contentDescription = "Reset to now",
+                        contentDescription = stringResource(R.string.reset_to_now),
                     )
                 }
             }
@@ -344,7 +349,7 @@ private fun TimeControlPanel(
                 // -1 hour button
                 IconButton(onClick = { onAdjustTime(-1) }) {
                     Text(
-                        text = "-1h",
+                        text = stringResource(R.string.minus_one_hour),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -363,7 +368,7 @@ private fun TimeControlPanel(
                 // +1 hour button
                 IconButton(onClick = { onAdjustTime(1) }) {
                     Text(
-                        text = "+1h",
+                        text = stringResource(R.string.plus_one_hour),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -382,11 +387,11 @@ private fun TimeControlPanel(
             )
 
             Row {
-                Text("00:00", style = MaterialTheme.typography.labelSmall)
+                Text(stringResource(R.string.time_start), style = MaterialTheme.typography.labelSmall)
                 Spacer(modifier = Modifier.weight(1f))
-                Text("12:00", style = MaterialTheme.typography.labelSmall)
+                Text(stringResource(R.string.time_midday), style = MaterialTheme.typography.labelSmall)
                 Spacer(modifier = Modifier.weight(1f))
-                Text("23:59", style = MaterialTheme.typography.labelSmall)
+                Text(stringResource(R.string.time_end), style = MaterialTheme.typography.labelSmall)
             }
         }
     }
@@ -426,12 +431,12 @@ private fun DatePickerDialogContent(
                     }
                 },
             ) {
-                Text("OK")
+                Text(stringResource(R.string.ok))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         },
     ) {

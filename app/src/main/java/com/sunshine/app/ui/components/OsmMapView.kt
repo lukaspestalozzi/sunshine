@@ -17,12 +17,18 @@ import org.osmdroid.events.ZoomEvent
 import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
 import org.osmdroid.util.GeoPoint as OsmGeoPoint
 import org.osmdroid.util.MapTileIndex
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Rect
 import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.Polygon
+import org.osmdroid.views.Projection
+import org.osmdroid.views.overlay.Overlay
 
 private const val MIN_ZOOM = 0
 private const val MAX_ZOOM = 17
 private const val TILE_SIZE = 256
+private const val COORDINATE_TOLERANCE = 0.00001
+private const val ZOOM_TOLERANCE = 0.01
 
 /**
  * The tile source name used for osmdroid's tile provider and cache directories.
@@ -30,9 +36,9 @@ private const val TILE_SIZE = 256
  */
 const val OPEN_TOPO_MAP_SOURCE_NAME = "OpenTopoMap"
 
-// Colors for visibility overlay
-private const val SUNLIT_COLOR = 0x40FFEB3B // Semi-transparent yellow
-private const val SHADED_COLOR = 0x404A5568 // Semi-transparent gray-blue
+// Colors for visibility overlay - match Color.kt OverlaySunlit/OverlayShaded
+private const val SUNLIT_COLOR = 0x40FFEB3B // Semi-transparent yellow (OverlaySunlit)
+private const val SHADED_COLOR = 0x406B7A8F // Semi-transparent gray-blue (OverlayShaded)
 
 /**
  * OpenTopoMap tile source for hiking/outdoor use.
@@ -115,15 +121,17 @@ fun OsmMapView(
     }
 
     // Update map position when center/zoom changes from ViewModel
+    // Use tolerance to avoid feedback loops from floating-point drift
     LaunchedEffect(center, zoomLevel) {
         val currentCenter = mapView.mapCenter
-        if (currentCenter.latitude != center.latitude ||
-            currentCenter.longitude != center.longitude
-        ) {
+        val latDiff = kotlin.math.abs(currentCenter.latitude - center.latitude)
+        val lonDiff = kotlin.math.abs(currentCenter.longitude - center.longitude)
+        if (latDiff > COORDINATE_TOLERANCE || lonDiff > COORDINATE_TOLERANCE) {
             mapView.controller.setCenter(OsmGeoPoint(center.latitude, center.longitude))
         }
 
-        if (mapView.zoomLevelDouble != zoomLevel) {
+        val zoomDiff = kotlin.math.abs(mapView.zoomLevelDouble - zoomLevel)
+        if (zoomDiff > ZOOM_TOLERANCE) {
             mapView.controller.setZoom(zoomLevel)
         }
     }
@@ -141,62 +149,52 @@ fun OsmMapView(
 
 /**
  * Update the visibility overlay on the map.
- * Clears existing overlay polygons and creates new ones based on the grid.
+ * Uses a single custom overlay that draws all grid cells in one pass for performance.
  */
 private fun updateVisibilityOverlay(
     mapView: MapView,
     grid: VisibilityGrid?,
 ) {
-    // Remove existing visibility overlays (keep the first overlay which is the tile layer)
-    val overlaysToRemove = mapView.overlays.filterIsInstance<VisibilityPolygon>()
-    mapView.overlays.removeAll(overlaysToRemove)
+    // Remove existing visibility overlay
+    val existing = mapView.overlays.filterIsInstance<VisibilityGridOverlay>()
+    mapView.overlays.removeAll(existing)
 
-    if (grid == null) {
-        mapView.invalidate()
-        return
-    }
-
-    // Create polygons for each grid cell
-    val resolution = grid.resolution
-    val halfRes = resolution / 2
-
-    for ((point, isVisible) in grid.points) {
-        val polygon = createGridCellPolygon(point, halfRes, isVisible)
-        mapView.overlays.add(polygon)
+    if (grid != null) {
+        mapView.overlays.add(VisibilityGridOverlay(grid))
     }
 
     mapView.invalidate()
 }
 
 /**
- * Create a polygon for a single grid cell.
+ * Single overlay that draws all visibility grid cells in one draw() call.
+ * Much more performant than creating individual Polygon objects per cell.
  */
-private fun createGridCellPolygon(
-    center: GeoPoint,
-    halfSize: Double,
-    isVisible: Boolean,
-): VisibilityPolygon {
-    val polygon = VisibilityPolygon()
+private class VisibilityGridOverlay(
+    private val grid: VisibilityGrid,
+) : Overlay() {
+    private val sunlitPaint = Paint().apply {
+        color = SUNLIT_COLOR
+        style = Paint.Style.FILL
+    }
+    private val shadedPaint = Paint().apply {
+        color = SHADED_COLOR
+        style = Paint.Style.FILL
+    }
 
-    // Create rectangle corners (last point closes polygon)
-    val points =
-        listOf(
-            OsmGeoPoint(center.latitude - halfSize, center.longitude - halfSize),
-            OsmGeoPoint(center.latitude - halfSize, center.longitude + halfSize),
-            OsmGeoPoint(center.latitude + halfSize, center.longitude + halfSize),
-            OsmGeoPoint(center.latitude + halfSize, center.longitude - halfSize),
-            OsmGeoPoint(center.latitude - halfSize, center.longitude - halfSize),
-        )
+    override fun draw(canvas: Canvas, projection: Projection) {
+        val halfRes = grid.resolution / 2
+        val screenRect = Rect()
 
-    polygon.points = points
-    polygon.fillPaint.color = if (isVisible) SUNLIT_COLOR else SHADED_COLOR
-    polygon.outlinePaint.color = Color.TRANSPARENT
-    polygon.outlinePaint.strokeWidth = 0f
+        for ((point, isVisible) in grid.points) {
+            val topLeft = OsmGeoPoint(point.latitude + halfRes, point.longitude - halfRes)
+            val bottomRight = OsmGeoPoint(point.latitude - halfRes, point.longitude + halfRes)
 
-    return polygon
+            val tlPixel = projection.toPixels(topLeft, null)
+            val brPixel = projection.toPixels(bottomRight, null)
+
+            screenRect.set(tlPixel.x, tlPixel.y, brPixel.x, brPixel.y)
+            canvas.drawRect(screenRect, if (isVisible) sunlitPaint else shadedPaint)
+        }
+    }
 }
-
-/**
- * Custom polygon class to identify visibility overlays for removal.
- */
-private class VisibilityPolygon : Polygon()

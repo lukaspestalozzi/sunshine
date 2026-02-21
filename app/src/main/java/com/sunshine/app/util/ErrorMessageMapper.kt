@@ -1,6 +1,6 @@
 package com.sunshine.app.util
 
-import com.sunshine.app.data.repository.ElevationRepositoryImpl
+import com.sunshine.app.domain.repository.OfflineModeException
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.ServerResponseException
 import io.ktor.http.HttpStatusCode
@@ -22,7 +22,7 @@ object ErrorMessageMapper {
             is SocketTimeoutException ->
                 "Server is slow to respond. Please try again."
 
-            is ElevationRepositoryImpl.OfflineModeException ->
+            is OfflineModeException ->
                 "Offline mode is enabled. Data not available for this location."
 
             is ClientRequestException -> handleClientException(throwable)

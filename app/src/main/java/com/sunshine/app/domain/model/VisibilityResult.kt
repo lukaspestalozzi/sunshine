@@ -79,6 +79,11 @@ data class VisibilityResult(
 }
 
 /**
+ * Integer grid index to avoid floating-point equality issues in map keys.
+ */
+data class GridIndex(val row: Int, val col: Int)
+
+/**
  * Grid of visibility results for rendering as overlay.
  */
 data class VisibilityGrid(
@@ -86,23 +91,25 @@ data class VisibilityGrid(
     val bounds: BoundingBox,
     /** Grid resolution in degrees */
     val resolution: Double,
-    /** Map of grid points to visibility status */
+    /** Map of grid points to visibility status (keyed by GeoPoint for rendering) */
     val points: Map<GeoPoint, Boolean>,
 ) {
+    /** Internal index-based lookup for reliable point matching */
+    private val indexedPoints: Map<GridIndex, Boolean> by lazy {
+        points.entries.associate { (point, visible) ->
+            toGridIndex(point) to visible
+        }
+    }
+
     /**
      * Get visibility at the nearest grid point.
      */
-    fun getVisibilityAt(point: GeoPoint): Boolean? {
-        // Find nearest grid point
-        val nearestLat = roundToGrid(point.latitude)
-        val nearestLon = roundToGrid(point.longitude)
-        val nearestPoint = GeoPoint(nearestLat, nearestLon)
-        return points[nearestPoint]
-    }
+    fun getVisibilityAt(point: GeoPoint): Boolean? = indexedPoints[toGridIndex(point)]
 
-    private fun roundToGrid(value: Double): Double {
-        val factor = 1.0 / resolution
-        return kotlin.math.round(value * factor) / factor
+    private fun toGridIndex(point: GeoPoint): GridIndex {
+        val row = kotlin.math.round((point.latitude - bounds.south) / resolution).toInt()
+        val col = kotlin.math.round((point.longitude - bounds.west) / resolution).toInt()
+        return GridIndex(row, col)
     }
 
     companion object {

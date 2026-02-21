@@ -1,6 +1,6 @@
 package com.sunshine.app.util
 
-import com.sunshine.app.data.repository.ElevationRepositoryImpl
+import com.sunshine.app.domain.repository.OfflineModeException
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.ServerResponseException
 import io.ktor.client.statement.HttpResponse
@@ -34,7 +34,7 @@ class ErrorMessageMapperTest {
 
     @Test
     fun `maps OfflineModeException to offline message`() {
-        val exception = ElevationRepositoryImpl.OfflineModeException("Not cached")
+        val exception = OfflineModeException("Not cached")
 
         val message = ErrorMessageMapper.toUserMessage(exception)
 

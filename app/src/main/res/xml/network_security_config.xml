@@ -1,12 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Allow cleartext for OSM tile servers (some use HTTP) -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">tile.openstreetmap.org</domain>
-        <domain includeSubdomains="true">tile.opentopomap.org</domain>
-    </domain-config>
-
-    <!-- Default: require HTTPS -->
+    <!-- Require HTTPS for all traffic -->
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />

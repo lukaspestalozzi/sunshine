@@ -33,7 +33,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -48,6 +49,10 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+    }
+
+    ksp {
+        arg("room.schemaLocation", "$projectDir/schemas")
     }
 
     buildFeatures {
@@ -106,6 +111,9 @@ dependencies {
 
     // Sun Calculation
     implementation(libs.commons.suncalc)
+
+    // Logging
+    implementation(libs.timber)
 
     // Testing
     testImplementation(libs.junit)

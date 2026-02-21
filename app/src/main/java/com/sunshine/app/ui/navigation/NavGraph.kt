@@ -35,8 +35,12 @@ fun SunshineNavHost(
     ) {
         composable(Screen.Map.route) {
             MapScreen(
-                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
-                onNavigateToDownload = { navController.navigate(Screen.Download.route) },
+                onNavigateToSettings = {
+                    navController.navigate(Screen.Settings.route) { launchSingleTop = true }
+                },
+                onNavigateToDownload = {
+                    navController.navigate(Screen.Download.route) { launchSingleTop = true }
+                },
             )
         }
 

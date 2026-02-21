@@ -13,8 +13,11 @@ import com.sunshine.app.domain.model.DownloadableRegion
 import com.sunshine.app.domain.repository.DownloadProgress
 import com.sunshine.app.domain.repository.DownloadState
 import com.sunshine.app.domain.repository.TileDownloadRepository
+import java.io.File
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import org.osmdroid.config.Configuration
+import timber.log.Timber
 
 /**
  * Implementation of TileDownloadRepository using WorkManager for background downloads.
@@ -96,7 +99,21 @@ class TileDownloadRepositoryImpl(
 
     override suspend fun deleteDownload(regionId: String) {
         cancelDownload(regionId)
+        deleteTileFiles()
         downloadedRegionDao.deleteRegion(regionId)
+    }
+
+    private fun deleteTileFiles() {
+        try {
+            val cacheDir = Configuration.getInstance().osmdroidTileCache
+            val tileDir = File(cacheDir, TileDownloadWorker.TILE_SOURCE_NAME)
+            if (tileDir.exists()) {
+                val deleted = tileDir.deleteRecursively()
+                Timber.d("Deleted tile cache directory: %s (success=%s)", tileDir, deleted)
+            }
+        } catch (e: SecurityException) {
+            Timber.w(e, "Failed to delete tile files")
+        }
     }
 
     override suspend fun isRegionDownloaded(regionId: String): Boolean {

@@ -14,7 +14,7 @@ import com.sunshine.app.data.local.database.entities.ElevationEntity
         DownloadedRegionEntity::class,
     ],
     version = 2,
-    exportSchema = false,
+    exportSchema = true,
 )
 abstract class SunshineDatabase : RoomDatabase() {
     abstract fun elevationDao(): ElevationDao

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -37,6 +38,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -107,7 +111,7 @@ private fun DownloadTopBar(onNavigateBack: () -> Unit) {
             IconButton(onClick = onNavigateBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
+                    contentDescription = stringResource(R.string.back),
                     tint = MaterialTheme.colorScheme.onPrimary,
                 )
             }
@@ -214,7 +218,7 @@ private fun StorageInfo(
             )
             Spacer(modifier = Modifier.width(ICON_SPACING))
             Text(
-                text = "Storage used: ${formatSize(totalUsed)}",
+                text = stringResource(R.string.storage_used, formatSize(totalUsed)),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -314,7 +318,7 @@ private fun RegionDetails(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = "Est. size: ${region.formatEstimatedSize()}",
+            text = stringResource(R.string.est_size, region.formatEstimatedSize()),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -340,13 +344,36 @@ private fun RegionActions(
     onCancel: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
+
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = { Text(stringResource(R.string.delete_confirm_title)) },
+            text = { Text(stringResource(R.string.delete_confirm_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirmation = false
+                    onDelete()
+                }) {
+                    Text(stringResource(R.string.delete_label))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.End,
     ) {
         when {
             regionWithStatus.isDownloaded -> {
-                DeleteButton(onClick = onDelete)
+                DeleteButton(onClick = { showDeleteConfirmation = true })
             }
             regionWithStatus.isDownloading -> {
                 TextButton(onClick = onCancel) {
@@ -369,7 +396,7 @@ private fun DeleteButton(onClick: () -> Unit) {
             modifier = Modifier.size(SMALL_ICON_SIZE),
         )
         Spacer(modifier = Modifier.width(4.dp))
-        Text("Delete")
+        Text(stringResource(R.string.delete_label))
     }
 }
 
@@ -388,7 +415,7 @@ private fun DownloadButton(
             modifier = Modifier.size(SMALL_ICON_SIZE),
         )
         Spacer(modifier = Modifier.width(4.dp))
-        Text("Download")
+        Text(stringResource(R.string.download_label))
     }
 }
 

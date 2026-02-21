@@ -12,6 +12,34 @@
     <string name="map_error">Failed to load map</string>
     <string name="time_slider_label">Time</string>
     <string name="date_picker_label">Date</string>
+    <string name="sun_visible">Sun: Visible</string>
+    <string name="sun_blocked">Sun: Blocked by terrain</string>
+    <string name="sun_above_horizon">Sun: Above horizon</string>
+    <string name="sun_below_horizon">Sun: Below horizon</string>
+    <string name="elevation_degraded">Elevation data unavailable</string>
+    <string name="elevation_format">Elevation: %1$.1f°</string>
+    <string name="azimuth_format">Azimuth: %1$.1f°</string>
+    <string name="horizon_format">Horizon: %1$.1f°</string>
+    <string name="degrees_until_visible">%1$.1f° until visible</string>
+    <string name="sunrise_format">Sunrise: %1$s</string>
+    <string name="sunset_format">Sunset: %1$s</string>
+    <string name="loading_terrain">Loading terrain…</string>
+    <string name="updating_overlay">Updating overlay…</string>
+    <string name="select_date">Select date</string>
+    <string name="reset_to_now">Reset to now</string>
+    <string name="minus_one_hour">-1h</string>
+    <string name="plus_one_hour">+1h</string>
+    <string name="time_start">00:00</string>
+    <string name="time_midday">12:00</string>
+    <string name="time_end">23:59</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="storage_used">Storage used: %1$s</string>
+    <string name="delete_label">Delete</string>
+    <string name="download_label">Download</string>
+    <string name="est_size">Est. size: %1$s</string>
+    <string name="back">Back</string>
+    <string name="delete_confirm_title">Delete downloaded tiles?</string>
+    <string name="delete_confirm_message">This will remove all offline tiles for this region. You will need to re-download them to use offline.</string>
 
     <!-- Settings Screen -->
     <string name="settings_title">Settings</string>

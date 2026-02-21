@@ -3,13 +3,18 @@ package com.sunshine.app.data.remote.elevation
 import com.sunshine.app.domain.model.GeoPoint
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import java.io.IOException
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import timber.log.Timber
 
 /**
  * Client for Open-Elevation API.
@@ -64,7 +69,8 @@ class ElevationApi(
 
     /**
      * Retry an operation with exponential backoff.
-     * Retries up to MAX_RETRIES times with increasing delays.
+     * Only retries on transient failures (IOException, 429, 5xx).
+     * Non-retryable errors (4xx client errors) fail immediately.
      */
     @Suppress("TooGenericExceptionCaught") // Need to catch all exceptions for retry logic
     private suspend fun <T> retryWithBackoff(operation: suspend () -> T): Result<T> {
@@ -73,14 +79,26 @@ class ElevationApi(
         repeat(MAX_RETRIES) { attempt ->
             try {
                 return Result.success(operation())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: ClientRequestException) {
+                // Only retry on 429 Too Many Requests; other 4xx are non-retryable
+                if (e.response.status == HttpStatusCode.TooManyRequests && attempt < MAX_RETRIES - 1) {
+                    lastException = e
+                    val delayMs = INITIAL_DELAY_MS * (1 shl attempt)
+                    Timber.d("Rate limited, retrying in ${delayMs}ms (attempt ${attempt + 1})")
+                    delay(delayMs)
+                } else {
+                    return Result.failure(e)
+                }
             } catch (e: Exception) {
                 lastException = e
-
-                // Don't retry on last attempt
-                if (attempt < MAX_RETRIES - 1) {
-                    val delayMs = INITIAL_DELAY_MS * (1 shl attempt) // Exponential backoff
-                    delay(delayMs)
+                if (!isRetryable(e) || attempt >= MAX_RETRIES - 1) {
+                    return Result.failure(e)
                 }
+                val delayMs = INITIAL_DELAY_MS * (1 shl attempt)
+                Timber.d("Transient failure, retrying in ${delayMs}ms (attempt ${attempt + 1})")
+                delay(delayMs)
             }
         }
 
@@ -88,6 +106,9 @@ class ElevationApi(
             lastException ?: IllegalStateException("Retry failed without exception"),
         )
     }
+
+    private fun isRetryable(e: Exception): Boolean =
+        e is IOException || e is io.ktor.client.plugins.ServerResponseException
 
     companion object {
         const val BASE_URL = "https://api.open-elevation.com/api/v1/lookup"

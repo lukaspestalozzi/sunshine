@@ -8,7 +8,6 @@ import com.sunshine.app.data.local.database.DownloadedRegionDao
 import com.sunshine.app.data.local.database.entities.DownloadStatus
 import com.sunshine.app.data.local.database.entities.DownloadedRegionEntity
 import com.sunshine.app.domain.model.BoundingBox
-import com.sunshine.app.ui.components.OPEN_TOPO_MAP_SOURCE_NAME
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -18,6 +17,7 @@ import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import org.osmdroid.config.Configuration
+import timber.log.Timber
 
 /**
  * WorkManager worker that downloads map tiles for a specific region.
@@ -141,12 +141,25 @@ class TileDownloadWorker(
     ): Boolean {
         var downloadedCount = 0L
         var totalBytes = 0L
+        var failedCount = 0L
 
         for (zoom in minZoom..maxZoom) {
             val result = downloadZoomLevel(regionId, bounds, zoom, downloadedCount, totalBytes, totalTiles)
             if (result == null) return false
             downloadedCount = result.first
             totalBytes = result.second
+            failedCount += result.third
+        }
+
+        if (failedCount > 0) {
+            Timber.w("Download $regionId: $failedCount/$totalTiles tiles failed")
+        }
+
+        // Fail if more than 10% of tiles could not be downloaded
+        val failureRate = if (totalTiles > 0) failedCount.toDouble() / totalTiles else 0.0
+        if (failureRate > MAX_FAILURE_RATE) {
+            Timber.e("Download $regionId: failure rate %.1f%% exceeds threshold", failureRate * PERCENT)
+            return false
         }
 
         finalizeDownloadProgress(regionId, downloadedCount, totalBytes)
@@ -161,9 +174,10 @@ class TileDownloadWorker(
         startCount: Long,
         startBytes: Long,
         totalTiles: Long,
-    ): Pair<Long, Long>? {
+    ): Triple<Long, Long, Long>? {
         var downloadedCount = startCount
         var totalBytes = startBytes
+        var failedCount = 0L
         val tileRange = calculateTileRange(bounds, zoom)
 
         for (x in tileRange.minX..tileRange.maxX) {
@@ -185,10 +199,12 @@ class TileDownloadWorker(
                     if (downloadedCount % PROGRESS_UPDATE_INTERVAL == 0L) {
                         updateDownloadProgress(regionId, downloadedCount, totalBytes, totalTiles)
                     }
+                } else {
+                    failedCount++
                 }
             }
         }
-        return Pair(downloadedCount, totalBytes)
+        return Triple(downloadedCount, totalBytes, failedCount)
     }
 
     private fun calculateTileRange(
@@ -235,7 +251,6 @@ class TileDownloadWorker(
         )
     }
 
-    @Suppress("SwallowedException")
     private fun downloadSingleTile(
         tileUrl: String,
         zoom: Int,
@@ -254,9 +269,11 @@ class TileDownloadWorker(
                 saveTileToCache(zoom, x, y, bytes)
                 bytes.size.toLong()
             } else {
+                Timber.d("Tile download failed: HTTP %d for %s", connection.responseCode, tileUrl)
                 0L
             }
         } catch (e: IOException) {
+            Timber.d(e, "Tile download failed: %s", tileUrl)
             0L
         }
 
@@ -354,12 +371,13 @@ class TileDownloadWorker(
         const val KEY_STATUS = "status"
         const val KEY_ERROR = "error"
 
-        /** Delegates to the shared constant defined alongside the tile source in OsmMapView */
-        const val TILE_SOURCE_NAME = OPEN_TOPO_MAP_SOURCE_NAME
+        const val TILE_SOURCE_NAME = "OpenTopoMap"
 
         private const val PROGRESS_UPDATE_INTERVAL = 50L
         private const val PROGRESS_MULTIPLIER = 100
         private const val CONNECTION_TIMEOUT = 10_000
         private const val READ_TIMEOUT = 10_000
+        private const val MAX_FAILURE_RATE = 0.1
+        private const val PERCENT = 100.0
     }
 }

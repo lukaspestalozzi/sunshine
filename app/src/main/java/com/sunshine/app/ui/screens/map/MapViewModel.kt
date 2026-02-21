@@ -5,13 +5,14 @@ import androidx.lifecycle.viewModelScope
 import com.sunshine.app.domain.model.GeoPoint
 import com.sunshine.app.domain.model.VisibilityGrid
 import com.sunshine.app.domain.usecase.CalculateSunVisibilityUseCase
-import com.sunshine.app.suncalc.SunCalculator
+import com.sunshine.app.domain.service.SunCalculator
 import com.sunshine.app.util.ErrorMessageMapper
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZoneOffset
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 class MapViewModel(
     private val sunCalculator: SunCalculator,
@@ -27,6 +29,7 @@ class MapViewModel(
     private val _uiState = MutableStateFlow(MapUiState())
     val uiState: StateFlow<MapUiState> = _uiState.asStateFlow()
 
+    private var sunPositionJob: Job? = null
     private var visibilityJob: Job? = null
     private var gridJob: Job? = null
 
@@ -84,36 +87,41 @@ class MapViewModel(
 
     @Suppress("TooGenericExceptionCaught") // Calculator may throw various exceptions
     private fun updateSunPosition() {
-        viewModelScope.launch {
-            val state = _uiState.value
-            val utcDateTime =
-                localToUtc(
-                    LocalDateTime.of(state.selectedDate, state.selectedTime),
-                )
-
-            try {
-                val sunPosition =
-                    sunCalculator.calculateSunPosition(
-                        location = state.mapCenter,
-                        dateTime = utcDateTime,
+        sunPositionJob?.cancel()
+        sunPositionJob =
+            viewModelScope.launch {
+                val state = _uiState.value
+                val utcDateTime =
+                    localToUtc(
+                        LocalDateTime.of(state.selectedDate, state.selectedTime),
                     )
 
-                val (sunrise, sunset) = fetchSunriseSunset(state)
-                _uiState.update {
-                    it.copy(
-                        sunPosition = sunPosition,
-                        sunriseTime = sunrise,
-                        sunsetTime = sunset,
-                        error = null,
-                    )
+                try {
+                    val sunPosition =
+                        sunCalculator.calculateSunPosition(
+                            location = state.mapCenter,
+                            dateTime = utcDateTime,
+                        )
+
+                    val (sunrise, sunset) = fetchSunriseSunset(state)
+                    _uiState.update {
+                        it.copy(
+                            sunPosition = sunPosition,
+                            sunriseTime = sunrise,
+                            sunsetTime = sunset,
+                            error = null,
+                        )
+                    }
+
+                    updateVisibility(state.mapCenter, utcDateTime)
+                    scheduleGridUpdate()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Timber.w(e, "Failed to update sun position")
+                    _uiState.update { it.copy(error = ErrorMessageMapper.toUserMessage(e)) }
                 }
-
-                updateVisibility(state.mapCenter, utcDateTime)
-                scheduleGridUpdate()
-            } catch (e: Exception) {
-                _uiState.update { it.copy(error = ErrorMessageMapper.toUserMessage(e)) }
             }
-        }
     }
 
     /**
@@ -129,7 +137,7 @@ class MapViewModel(
         )
     }
 
-    @Suppress("TooGenericExceptionCaught", "SwallowedException")
+    @Suppress("TooGenericExceptionCaught")
     private fun updateVisibility(
         location: GeoPoint,
         dateTime: LocalDateTime,
@@ -152,9 +160,10 @@ class MapViewModel(
                             isLoadingVisibility = false,
                         )
                     }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
-                    // Visibility calculation failure is not critical
-                    // We still have basic sun position
+                    Timber.w(e, "Visibility calculation failed")
                     _uiState.update { it.copy(isLoadingVisibility = false) }
                 }
             }
@@ -172,7 +181,7 @@ class MapViewModel(
             }
     }
 
-    @Suppress("TooGenericExceptionCaught", "SwallowedException", "LongMethod")
+    @Suppress("TooGenericExceptionCaught", "LongMethod")
     private suspend fun updateVisibilityGrid() {
         val state = _uiState.value
 
@@ -207,8 +216,10 @@ class MapViewModel(
                     isLoadingGrid = false,
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            // Grid calculation failure is not critical
+            Timber.w(e, "Grid calculation failed")
             _uiState.update {
                 it.copy(
                     visibilityGrid = null,

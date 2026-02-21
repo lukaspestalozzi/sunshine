@@ -6,6 +6,7 @@ import com.sunshine.app.data.remote.elevation.ElevationApi
 import com.sunshine.app.domain.model.BoundingBox
 import com.sunshine.app.domain.model.GeoPoint
 import com.sunshine.app.domain.repository.ElevationRepository
+import com.sunshine.app.domain.repository.OfflineModeException
 import com.sunshine.app.domain.repository.SettingsRepository
 import kotlin.math.floor
 import kotlinx.coroutines.flow.first
@@ -54,9 +55,6 @@ class ElevationRepositoryImpl(
             }
     }
 
-    /** Exception thrown when offline mode blocks a network request */
-    class OfflineModeException(message: String) : Exception(message)
-
     override suspend fun getElevations(points: List<GeoPoint>): Result<Map<GeoPoint, Double>> {
         if (points.isEmpty()) {
             return Result.success(emptyMap())
@@ -70,10 +68,23 @@ class ElevationRepositoryImpl(
         val cached = mutableMapOf<GeoPoint, Double>()
         val missing = mutableListOf<GeoPoint>()
 
+        // Batch query: compute bounds of all points and fetch in a single query
+        val lats = points.map { toGridCoordinate(it.latitude) }
+        val lons = points.map { toGridCoordinate(it.longitude) }
+        val cachedEntities = elevationDao.getElevationsInBounds(
+            north = lats.max(),
+            south = lats.min(),
+            east = lons.max(),
+            west = lons.min(),
+        )
+
+        // Build lookup map from cached entities
+        val cacheMap = cachedEntities.associateBy { it.gridLat to it.gridLon }
+
         for (point in points) {
             val gridLat = toGridCoordinate(point.latitude)
             val gridLon = toGridCoordinate(point.longitude)
-            val cachedValue = elevationDao.getElevation(gridLat, gridLon)
+            val cachedValue = cacheMap[gridLat to gridLon]
 
             if (cachedValue != null) {
                 cached[point] = cachedValue.elevation
@@ -126,12 +137,20 @@ class ElevationRepositoryImpl(
         // Generate grid points
         val gridPoints = generateGridPoints(bounds, resolution)
 
-        // Check cache for each point
+        // Batch query: fetch all cached elevations in the bounding box at once
+        val cachedEntities = elevationDao.getElevationsInBounds(
+            north = bounds.north,
+            south = bounds.south,
+            east = bounds.east,
+            west = bounds.west,
+        )
+        val cacheMap = cachedEntities.associateBy { it.gridLat to it.gridLon }
+
         for (point in gridPoints) {
             val gridLat = toGridCoordinate(point.latitude)
             val gridLon = toGridCoordinate(point.longitude)
 
-            val cached = elevationDao.getElevation(gridLat, gridLon)
+            val cached = cacheMap[gridLat to gridLon]
             if (cached != null) {
                 result[point] = cached.elevation
             } else {
@@ -239,6 +258,15 @@ class ElevationRepositoryImpl(
         return latCount * lonCount
     }
 
+    /**
+     * Evict cached elevation entries older than [maxAgeMs].
+     * Should be called periodically (e.g., on app startup or from WorkManager).
+     */
+    suspend fun evictStaleCache(maxAgeMs: Long = CACHE_MAX_AGE_MS) {
+        val cutoff = System.currentTimeMillis() - maxAgeMs
+        elevationDao.deleteOlderThan(cutoff)
+    }
+
     companion object {
         const val SOURCE_OPEN_ELEVATION = "open-elevation"
 
@@ -247,6 +275,9 @@ class ElevationRepositoryImpl(
 
         /** Threshold for considering data offline-available */
         const val OFFLINE_THRESHOLD = 0.8
+
+        /** Cache entries older than 30 days are evicted */
+        private const val CACHE_MAX_AGE_MS = 30L * 24 * 60 * 60 * 1000
 
         /**
          * Convert coordinate to grid-aligned coordinate.

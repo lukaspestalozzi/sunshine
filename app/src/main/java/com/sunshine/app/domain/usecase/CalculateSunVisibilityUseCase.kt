@@ -8,7 +8,7 @@ import com.sunshine.app.domain.model.TerrainProfile
 import com.sunshine.app.domain.model.VisibilityGrid
 import com.sunshine.app.domain.model.VisibilityResult
 import com.sunshine.app.domain.repository.ElevationRepository
-import com.sunshine.app.suncalc.SunCalculator
+import com.sunshine.app.domain.service.SunCalculator
 import java.time.LocalDateTime
 import kotlin.math.abs
 import kotlin.math.cos
@@ -17,6 +17,8 @@ import kotlin.math.tan
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 /**
  * Use case for calculating sun visibility at a point or grid of points.
@@ -97,17 +99,20 @@ class CalculateSunVisibilityUseCase(
             // Generate grid points
             val gridPoints = generateGridPoints(bounds, resolution)
 
-            // Calculate visibility in parallel for better performance
+            // Calculate visibility in parallel with bounded concurrency
+            val semaphore = Semaphore(MAX_CONCURRENT_CALCULATIONS)
             val results =
                 coroutineScope {
                     gridPoints.map { point ->
                         async {
-                            val visibility =
-                                calculateVisibility(point, dateTime)
-                                    .getOrNull()
-                                    ?.isSunVisible
-                                    ?: false
-                            point to visibility
+                            semaphore.withPermit {
+                                val visibility =
+                                    calculateVisibility(point, dateTime)
+                                        .getOrNull()
+                                        ?.isSunVisible
+                                        ?: false
+                                point to visibility
+                            }
                         }
                     }.awaitAll()
                 }
@@ -122,7 +127,7 @@ class CalculateSunVisibilityUseCase(
         }
 
     /**
-     * Generate grid points for a bounding box.
+     * Generate grid points for a bounding box, capped at [MAX_GRID_POINTS].
      */
     private fun generateGridPoints(
         bounds: BoundingBox,
@@ -130,9 +135,9 @@ class CalculateSunVisibilityUseCase(
     ): List<GeoPoint> {
         val points = mutableListOf<GeoPoint>()
         var lat = bounds.south
-        while (lat <= bounds.north) {
+        while (lat <= bounds.north && points.size < MAX_GRID_POINTS) {
             var lon = bounds.west
-            while (lon <= bounds.east) {
+            while (lon <= bounds.east && points.size < MAX_GRID_POINTS) {
                 points.add(GeoPoint(lat, lon))
                 lon += resolution
             }
@@ -275,6 +280,12 @@ class CalculateSunVisibilityUseCase(
                 20000.0,
                 50000.0,
             )
+
+        /** Max concurrent visibility calculations to prevent resource exhaustion */
+        private const val MAX_CONCURRENT_CALCULATIONS = 8
+
+        /** Maximum grid points to prevent runaway calculations */
+        private const val MAX_GRID_POINTS = 500
 
         /** Refine if elevation difference between consecutive points exceeds this (meters) */
         const val REFINEMENT_ELEVATION_THRESHOLD = 200.0

@@ -45,6 +45,9 @@ coroutinesTest = "1.9.0"
 # Sun Calculation
 commonsSuncalc = "3.11"
 
+# Logging
+timber = "5.0.1"
+
 # Code Quality
 ktlint = "12.1.2"
 detekt = "1.23.7"
@@ -99,6 +102,9 @@ ktor-client-core = { group = "io.ktor", name = "ktor-client-core", version.ref =
 ktor-client-android = { group = "io.ktor", name = "ktor-client-android", version.ref = "ktor" }
 ktor-client-content-negotiation = { group = "io.ktor", name = "ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
+
+# Logging
+timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }
