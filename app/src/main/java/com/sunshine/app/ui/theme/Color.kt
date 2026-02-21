@@ -28,5 +28,5 @@ val SunshineError = Color(0xFFB3261E)
 val SunshineOnError = Color(0xFFFFFFFF)
 
 // Map overlay colors
-val OverlaySunlit = Color(0x40FFEB3B)
-val OverlayShaded = Color(0x406B7A8F)
+val OverlaySunlit = Color(0x8CFFEB3B)
+val OverlayShaded = Color(0x8C6B7A8F)

@@ -37,8 +37,8 @@ private const val ZOOM_TOLERANCE = 0.01
 const val OPEN_TOPO_MAP_SOURCE_NAME = "OpenTopoMap"
 
 // Colors for visibility overlay - match Color.kt OverlaySunlit/OverlayShaded
-private const val SUNLIT_COLOR = 0x40FFEB3B // Semi-transparent yellow (OverlaySunlit)
-private const val SHADED_COLOR = 0x406B7A8F // Semi-transparent gray-blue (OverlayShaded)
+private const val SUNLIT_COLOR = 0x8CFFEB3B.toInt() // 55% alpha yellow (OverlaySunlit)
+private const val SHADED_COLOR = 0x8C6B7A8F.toInt() // 55% alpha gray-blue (OverlayShaded)
 
 /**
  * OpenTopoMap tile source for hiking/outdoor use.

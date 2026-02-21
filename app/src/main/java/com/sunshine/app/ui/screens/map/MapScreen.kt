@@ -1,5 +1,6 @@
 package com.sunshine.app.ui.screens.map
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -45,6 +46,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.sunshine.app.R
@@ -131,6 +135,9 @@ fun MapScreen(
                     visibilityGrid = uiState.visibilityGrid,
                     modifier = Modifier.fillMaxSize(),
                 )
+
+                // Crosshair dot at map center
+                CrosshairDot(modifier = Modifier.align(Alignment.Center))
 
                 // Sun position indicator at edge of map
                 uiState.sunPosition?.let { sunPosition ->
@@ -263,6 +270,27 @@ private fun SunPositionOverlay(
                     )
                 }
             }
+
+            // Observer elevation and coordinates
+            Spacer(modifier = Modifier.height(4.dp))
+            visibility?.observerElevation?.let { elevation ->
+                Text(
+                    text = stringResource(R.string.altitude_format, elevation),
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+            val lat = uiState.mapCenter.latitude
+            val lon = uiState.mapCenter.longitude
+            Text(
+                text = stringResource(
+                    R.string.coordinates_format,
+                    kotlin.math.abs(lat),
+                    if (lat >= 0) "N" else "S",
+                    kotlin.math.abs(lon),
+                    if (lon >= 0) "E" else "W",
+                ),
+                style = MaterialTheme.typography.labelSmall,
+            )
 
             // Loading indicators
             if (uiState.isLoadingVisibility) {
@@ -441,5 +469,29 @@ private fun DatePickerDialogContent(
         },
     ) {
         DatePicker(state = datePickerState)
+    }
+}
+
+private const val CROSSHAIR_RADIUS = 6f
+private const val CROSSHAIR_STROKE_WIDTH = 2f
+private const val CROSSHAIR_FILL_COLOR = 0x66000000
+
+@Composable
+private fun CrosshairDot(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(12.dp)) {
+        val center = Offset(size.width / 2, size.height / 2)
+        val radius = CROSSHAIR_RADIUS * density
+        val strokeWidth = CROSSHAIR_STROKE_WIDTH * density
+        drawCircle(
+            color = Color(CROSSHAIR_FILL_COLOR),
+            radius = radius,
+            center = center,
+        )
+        drawCircle(
+            color = Color.White,
+            radius = radius,
+            center = center,
+            style = Stroke(width = strokeWidth),
+        )
     }
 }

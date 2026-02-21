@@ -23,6 +23,8 @@
     <string name="degrees_until_visible">%1$.1f° until visible</string>
     <string name="sunrise_format">Sunrise: %1$s</string>
     <string name="sunset_format">Sunset: %1$s</string>
+    <string name="altitude_format">Alt: %1$.0fm</string>
+    <string name="coordinates_format">%1$.4f° %2$s, %3$.4f° %4$s</string>
     <string name="loading_terrain">Loading terrain…</string>
     <string name="updating_overlay">Updating overlay…</string>
     <string name="select_date">Select date</string>

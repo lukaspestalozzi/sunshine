@@ -73,8 +73,24 @@ class CalculateSunVisibilityUseCase(
         val apparentElevation =
             sunPosition.elevation + atmosphericRefraction(sunPosition.elevation)
 
-        return if (apparentElevation > horizonAngle) {
-            VisibilityResult.visible(location, sunPosition, horizonAngle, isElevationDegraded)
+        return buildVisibilityResult(
+            location, sunPosition, horizonAngle, apparentElevation,
+            isElevationDegraded, observerElevation,
+        )
+    }
+
+    private fun buildVisibilityResult(
+        location: GeoPoint,
+        sunPosition: SunPosition,
+        horizonAngle: Double,
+        apparentElevation: Double,
+        isElevationDegraded: Boolean,
+        observerElevation: Double,
+    ): VisibilityResult =
+        if (apparentElevation > horizonAngle) {
+            VisibilityResult.visible(
+                location, sunPosition, horizonAngle, isElevationDegraded, observerElevation,
+            )
         } else {
             VisibilityResult.blocked(
                 location = location,
@@ -82,9 +98,9 @@ class CalculateSunVisibilityUseCase(
                 horizonAngle = horizonAngle,
                 degreesUntilVisible = horizonAngle - apparentElevation,
                 isElevationDegraded = isElevationDegraded,
+                observerElevation = observerElevation,
             )
         }
-    }
 
     /**
      * Calculate visibility grid for rendering as map overlay.

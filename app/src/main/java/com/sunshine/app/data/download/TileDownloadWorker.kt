@@ -52,7 +52,7 @@ class TileDownloadWorker(
         val hasValidZoom = minZoom >= 0 && maxZoom >= 0
 
         return if (hasValidStrings && hasValidCoordinates && hasValidZoom) {
-            DownloadParams(regionId!!, name!!, north, south, east, west, minZoom, maxZoom)
+            DownloadParams(regionId, name, north, south, east, west, minZoom, maxZoom)
         } else {
             null
         }

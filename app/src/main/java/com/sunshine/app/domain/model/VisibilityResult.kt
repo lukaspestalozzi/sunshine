@@ -20,6 +20,8 @@ data class VisibilityResult(
     val nextSunTime: LocalTime?,
     /** True when elevation data was unavailable and results may be inaccurate */
     val isElevationDegraded: Boolean = false,
+    /** Observer's ground elevation in meters (null when sun is below horizon) */
+    val observerElevation: Double? = null,
 ) {
     companion object {
         /**
@@ -30,6 +32,7 @@ data class VisibilityResult(
             sunPosition: SunPosition,
             horizonAngle: Double,
             isElevationDegraded: Boolean = false,
+            observerElevation: Double? = null,
         ) = VisibilityResult(
             location = location,
             isSunVisible = true,
@@ -38,6 +41,7 @@ data class VisibilityResult(
             degreesUntilVisible = null,
             nextSunTime = null,
             isElevationDegraded = isElevationDegraded,
+            observerElevation = observerElevation,
         )
 
         /**
@@ -50,6 +54,7 @@ data class VisibilityResult(
             degreesUntilVisible: Double,
             nextSunTime: LocalTime? = null,
             isElevationDegraded: Boolean = false,
+            observerElevation: Double? = null,
         ) = VisibilityResult(
             location = location,
             isSunVisible = false,
@@ -58,6 +63,7 @@ data class VisibilityResult(
             degreesUntilVisible = degreesUntilVisible,
             nextSunTime = nextSunTime,
             isElevationDegraded = isElevationDegraded,
+            observerElevation = observerElevation,
         )
 
         /**
