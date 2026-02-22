@@ -181,7 +181,13 @@ class CalculateSunVisibilityUseCase(
             }
 
             val start = LocalDateTime.of(date, sunriseUtc)
-            val end = LocalDateTime.of(date, sunsetUtc)
+            // If sunset is before sunrise in UTC (e.g. western time zones crossing midnight),
+            // the sunset falls on the next calendar day.
+            val end = if (sunsetUtc.isBefore(sunriseUtc)) {
+                LocalDateTime.of(date.plusDays(1), sunsetUtc)
+            } else {
+                LocalDateTime.of(date, sunsetUtc)
+            }
 
             // Build list of time steps to scan
             val timeSteps = mutableListOf<LocalDateTime>()
