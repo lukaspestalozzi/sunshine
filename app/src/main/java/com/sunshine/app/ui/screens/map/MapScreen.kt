@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
@@ -95,6 +96,17 @@ fun MapScreen(
                         titleContentColor = MaterialTheme.colorScheme.onPrimary,
                     ),
                 actions = {
+                    IconButton(onClick = viewModel::onToggleHeatmap) {
+                        Icon(
+                            imageVector = Icons.Default.Layers,
+                            contentDescription = stringResource(R.string.toggle_heatmap),
+                            tint = if (uiState.isHeatmapMode) {
+                                MaterialTheme.colorScheme.secondary
+                            } else {
+                                MaterialTheme.colorScheme.onPrimary
+                            },
+                        )
+                    }
                     IconButton(onClick = onNavigateToDownload) {
                         Icon(
                             imageVector = Icons.Default.Download,
@@ -132,7 +144,8 @@ fun MapScreen(
                     zoomLevel = uiState.zoomLevel,
                     onMapMoved = viewModel::onMapCenterChanged,
                     onZoomChanged = viewModel::onZoomChanged,
-                    visibilityGrid = uiState.visibilityGrid,
+                    visibilityGrid = if (uiState.showGridOverlay) uiState.visibilityGrid else null,
+                    sunExposureGrid = if (uiState.showHeatmapOverlay) uiState.sunExposureGrid else null,
                     modifier = Modifier.fillMaxSize(),
                 )
 
@@ -339,8 +352,70 @@ private fun SunPositionOverlay(
                     color = MaterialTheme.colorScheme.outline,
                 )
             }
+            if (uiState.isLoadingHeatmap) {
+                Text(
+                    text = stringResource(R.string.loading_heatmap),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+            }
+            if (uiState.showHeatmapOverlay) {
+                val maxHours = uiState.sunExposureGrid?.maxExposure ?: 0.0
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = stringResource(R.string.heatmap_legend_low),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                    HeatmapGradientBar(modifier = Modifier.weight(1f).padding(horizontal = 4.dp))
+                    Text(
+                        text = stringResource(R.string.heatmap_legend_high, maxHours),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun HeatmapGradientBar(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.height(8.dp)) {
+        val steps = size.width.toInt().coerceAtLeast(1)
+        val stepWidth = size.width / steps
+        for (i in 0 until steps) {
+            val fraction = i.toFloat() / steps
+            val color = heatmapFractionToColor(fraction)
+            drawRect(
+                color = color,
+                topLeft = Offset(i * stepWidth, 0f),
+                size = androidx.compose.ui.geometry.Size(stepWidth + 1f, size.height),
+            )
+        }
+    }
+}
+
+@Suppress("MagicNumber") // Color interpolation fractions
+private fun heatmapFractionToColor(fraction: Float): Color {
+    val (r, g, b) = when {
+        fraction < 0.25f -> {
+            val t = fraction / 0.25f
+            Triple(0f, t, 1f)
+        }
+        fraction < 0.50f -> {
+            val t = (fraction - 0.25f) / 0.25f
+            Triple(0f, 1f, 1f - t)
+        }
+        fraction < 0.75f -> {
+            val t = (fraction - 0.50f) / 0.25f
+            Triple(t, 1f, 0f)
+        }
+        else -> {
+            val t = (fraction - 0.75f) / 0.25f
+            Triple(1f, 1f - t, 0f)
+        }
+    }
+    return Color(red = r, green = g, blue = b, alpha = 0.8f)
 }
 
 @Composable

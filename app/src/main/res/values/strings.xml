@@ -30,6 +30,10 @@
     <string name="coordinates_format">%1$.4f° %2$s, %3$.4f° %4$s</string>
     <string name="loading_terrain">Loading terrain…</string>
     <string name="updating_overlay">Updating overlay…</string>
+    <string name="toggle_heatmap">Sun exposure heatmap</string>
+    <string name="loading_heatmap">Calculating heatmap\u2026</string>
+    <string name="heatmap_legend_low">0h</string>
+    <string name="heatmap_legend_high">%1$.1fh</string>
     <string name="select_date">Select date</string>
     <string name="reset_to_now">Reset to now</string>
     <string name="minus_one_hour">-1h</string>

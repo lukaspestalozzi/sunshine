@@ -621,6 +621,99 @@ class CalculateSunVisibilityUseCaseTest {
         coEvery { elevationRepository.getElevations(any()) } returns Result.success(emptyMap())
     }
 
+    // ---- Sun exposure grid (heatmap) tests ----
+
+    @Test
+    fun `exposure grid returns positive hours for sunlit flat terrain`() =
+        runBlocking {
+            setupFlatTerrain()
+            setupDaytimeSunArc()
+            coEvery { sunCalculator.calculateSunrise(any(), any()) } returns LocalTime.of(4, 30)
+            coEvery { sunCalculator.calculateSunset(any(), any()) } returns LocalTime.of(19, 30)
+
+            val result = useCase.calculateSunExposureGrid(
+                bounds = smallBounds,
+                date = terrainTestDate,
+                resolution = 0.01,
+                timeStepMinutes = 60,
+            )
+
+            assertTrue("Result should be success", result.isSuccess)
+            val grid = result.getOrNull()!!
+            assertTrue("Grid should have points", grid.points.isNotEmpty())
+            assertTrue(
+                "All points should have positive exposure",
+                grid.points.values.all { it > 0.0 },
+            )
+            assertTrue(
+                "Max exposure should be reasonable (< 16h)",
+                grid.maxExposure <= 16.0,
+            )
+        }
+
+    @Test
+    fun `exposure grid returns zero hours when sun does not rise`() =
+        runBlocking {
+            coEvery { sunCalculator.calculateSunrise(any(), any()) } returns null
+            coEvery { sunCalculator.calculateSunset(any(), any()) } returns null
+
+            val result = useCase.calculateSunExposureGrid(
+                bounds = smallBounds,
+                date = terrainTestDate,
+                resolution = 0.01,
+            )
+
+            assertTrue("Result should be success", result.isSuccess)
+            val grid = result.getOrNull()!!
+            assertTrue(
+                "All points should have 0 exposure when sun doesn't rise",
+                grid.points.values.all { it == 0.0 },
+            )
+        }
+
+    @Test
+    fun `exposure grid returns reduced hours with blocking terrain`() =
+        runBlocking {
+            setupHighTerrain()
+            setupParabolicSunArc(LocalTime.of(4, 30), LocalTime.of(19, 30))
+            coEvery { sunCalculator.calculateSunrise(any(), any()) } returns LocalTime.of(4, 30)
+            coEvery { sunCalculator.calculateSunset(any(), any()) } returns LocalTime.of(19, 30)
+
+            val result = useCase.calculateSunExposureGrid(
+                bounds = smallBounds,
+                date = terrainTestDate,
+                resolution = 0.01,
+                timeStepMinutes = 60,
+            )
+
+            assertTrue("Result should be success", result.isSuccess)
+            val grid = result.getOrNull()!!
+            // With high terrain, exposure should be significantly reduced vs 15h potential
+            assertTrue(
+                "Max exposure (${grid.maxExposure}) should be less than total daylight (15h)",
+                grid.maxExposure < 15.0,
+            )
+        }
+
+    @Test
+    fun `exposure grid date matches input date`() =
+        runBlocking {
+            setupFlatTerrain()
+            setupDaytimeSunArc()
+            coEvery { sunCalculator.calculateSunrise(any(), any()) } returns LocalTime.of(6, 0)
+            coEvery { sunCalculator.calculateSunset(any(), any()) } returns LocalTime.of(18, 0)
+
+            val date = LocalDate.of(2024, 12, 21)
+            val result = useCase.calculateSunExposureGrid(
+                bounds = smallBounds,
+                date = date,
+                resolution = 0.01,
+            )
+
+            val grid = result.getOrNull()!!
+            assertEquals("Grid date should match input", date, grid.date)
+        }
+
     companion object {
         private val smallBounds =
             BoundingBox(

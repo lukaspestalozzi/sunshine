@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
+@Suppress("TooManyFunctions") // Heatmap mode adds scheduling/update methods alongside existing ones
 class MapViewModel(
     private val sunCalculator: SunCalculator,
     private val visibilityUseCase: CalculateSunVisibilityUseCase,
@@ -33,6 +34,7 @@ class MapViewModel(
     private var visibilityJob: Job? = null
     private var gridJob: Job? = null
     private var terrainTimesJob: Job? = null
+    private var heatmapJob: Job? = null
 
     init {
         updateSunPosition()
@@ -58,6 +60,9 @@ class MapViewModel(
         _uiState.update { it.copy(zoomLevel = clampedZoom) }
         // Trigger grid update when zoom changes (affects resolution)
         scheduleGridUpdate()
+        if (_uiState.value.isHeatmapMode) {
+            scheduleHeatmapUpdate()
+        }
     }
 
     fun onResetToNow() {
@@ -84,6 +89,21 @@ class MapViewModel(
 
     fun onErrorDismissed() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    fun onToggleHeatmap() {
+        val newMode = !_uiState.value.isHeatmapMode
+        _uiState.update {
+            it.copy(
+                isHeatmapMode = newMode,
+                sunExposureGrid = if (newMode) it.sunExposureGrid else null,
+            )
+        }
+        if (newMode) {
+            scheduleHeatmapUpdate()
+        } else {
+            heatmapJob?.cancel()
+        }
     }
 
     @Suppress("TooGenericExceptionCaught") // Calculator may throw various exceptions
@@ -117,6 +137,9 @@ class MapViewModel(
                     updateVisibility(state.mapCenter, utcDateTime)
                     scheduleGridUpdate()
                     scheduleTerrainTimesUpdate()
+                    if (_uiState.value.isHeatmapMode) {
+                        scheduleHeatmapUpdate()
+                    }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -274,6 +297,57 @@ class MapViewModel(
         }
     }
 
+    private fun scheduleHeatmapUpdate() {
+        heatmapJob?.cancel()
+        heatmapJob =
+            viewModelScope.launch {
+                delay(HEATMAP_DEBOUNCE_MS)
+                updateHeatmap()
+            }
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun updateHeatmap() {
+        val state = _uiState.value
+        if (!state.isHeatmapMode) return
+
+        if (state.zoomLevel < MIN_ZOOM_FOR_GRID) {
+            _uiState.update { it.copy(sunExposureGrid = null) }
+            return
+        }
+
+        val bounds = state.getVisibleBounds()
+        val resolution = calculateHeatmapResolution(state.zoomLevel)
+
+        _uiState.update { it.copy(isLoadingHeatmap = true) }
+
+        try {
+            val grid =
+                visibilityUseCase.calculateSunExposureGrid(
+                    bounds = bounds,
+                    date = state.selectedDate,
+                    resolution = resolution,
+                ).getOrNull()
+
+            _uiState.update {
+                it.copy(
+                    sunExposureGrid = grid,
+                    isLoadingHeatmap = false,
+                )
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.w(e, "Heatmap calculation failed")
+            _uiState.update {
+                it.copy(
+                    sunExposureGrid = null,
+                    isLoadingHeatmap = false,
+                )
+            }
+        }
+    }
+
     companion object {
         /**
          * Convert a local-timezone [LocalDateTime] to its UTC equivalent.
@@ -303,6 +377,14 @@ class MapViewModel(
         // Debounce delay for terrain sunshine times (longer since it's expensive)
         private const val TERRAIN_TIMES_DEBOUNCE_MS = 1000L
 
+        // Debounce delay for heatmap (expensive: scans full day per grid point)
+        private const val HEATMAP_DEBOUNCE_MS = 1000L
+
+        // Heatmap resolution: coarser than real-time grid because each point scans all day
+        private const val HEATMAP_RESOLUTION_HIGH = 0.001
+        private const val HEATMAP_RESOLUTION_MEDIUM = 0.002
+        private const val HEATMAP_RESOLUTION_LOW = 0.004
+
         // Minimum zoom level to show grid (avoid too many points)
         private const val MIN_ZOOM_FOR_GRID = 12.0
 
@@ -319,14 +401,22 @@ class MapViewModel(
          * Higher zoom = finer resolution, but limit max points.
          */
         private fun calculateGridResolution(zoomLevel: Double): Double =
-            // At zoom 12: ~0.005 (roughly 500m)
-            // At zoom 15: ~0.001 (roughly 100m)
-            // At zoom 18: ~0.0002 (roughly 20m)
             when {
                 zoomLevel >= ZOOM_LEVEL_HIGH -> RESOLUTION_HIGH
                 zoomLevel >= ZOOM_LEVEL_MEDIUM -> RESOLUTION_MEDIUM
                 zoomLevel >= ZOOM_LEVEL_LOW -> RESOLUTION_LOW
                 else -> VisibilityGrid.DEFAULT_RESOLUTION
+            }
+
+        /**
+         * Heatmap resolution is coarser than real-time grid because
+         * each point scans visibility across the entire day.
+         */
+        private fun calculateHeatmapResolution(zoomLevel: Double): Double =
+            when {
+                zoomLevel >= ZOOM_LEVEL_HIGH -> HEATMAP_RESOLUTION_HIGH
+                zoomLevel >= ZOOM_LEVEL_MEDIUM -> HEATMAP_RESOLUTION_MEDIUM
+                else -> HEATMAP_RESOLUTION_LOW
             }
     }
 }

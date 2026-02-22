@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import com.sunshine.app.domain.model.GeoPoint
+import com.sunshine.app.domain.model.SunExposureGrid
 import com.sunshine.app.domain.model.VisibilityGrid
 import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent
@@ -77,6 +78,7 @@ fun OsmMapView(
     onZoomChanged: (Double) -> Unit,
     modifier: Modifier = Modifier,
     visibilityGrid: VisibilityGrid? = null,
+    sunExposureGrid: SunExposureGrid? = null,
 ) {
     val context = LocalContext.current
     val mapView =
@@ -141,6 +143,11 @@ fun OsmMapView(
         updateVisibilityOverlay(mapView, visibilityGrid)
     }
 
+    // Update sun exposure heatmap overlay
+    LaunchedEffect(sunExposureGrid) {
+        updateSunExposureOverlay(mapView, sunExposureGrid)
+    }
+
     AndroidView(
         factory = { mapView },
         modifier = modifier,
@@ -198,3 +205,80 @@ private class VisibilityGridOverlay(
         }
     }
 }
+
+/**
+ * Update the sun exposure heatmap overlay on the map.
+ */
+private fun updateSunExposureOverlay(
+    mapView: MapView,
+    grid: SunExposureGrid?,
+) {
+    val existing = mapView.overlays.filterIsInstance<SunExposureOverlay>()
+    mapView.overlays.removeAll(existing)
+
+    if (grid != null) {
+        mapView.overlays.add(SunExposureOverlay(grid))
+    }
+
+    mapView.invalidate()
+}
+
+/**
+ * Overlay that draws sun exposure hours as a color gradient heatmap.
+ * Colors range from blue (0 hours) through green/yellow to red (max hours).
+ */
+private class SunExposureOverlay(
+    private val grid: SunExposureGrid,
+) : Overlay() {
+    private val cellPaint = Paint().apply {
+        style = Paint.Style.FILL
+    }
+
+    override fun draw(canvas: Canvas, projection: Projection) {
+        val halfRes = grid.resolution / 2
+        val screenRect = Rect()
+        val maxHours = grid.maxExposure.coerceAtLeast(1.0)
+
+        for ((point, hours) in grid.points) {
+            val topLeft = OsmGeoPoint(point.latitude + halfRes, point.longitude - halfRes)
+            val bottomRight = OsmGeoPoint(point.latitude - halfRes, point.longitude + halfRes)
+
+            val tlPixel = projection.toPixels(topLeft, null)
+            val brPixel = projection.toPixels(bottomRight, null)
+
+            screenRect.set(tlPixel.x, tlPixel.y, brPixel.x, brPixel.y)
+            cellPaint.color = hoursToColor(hours, maxHours)
+            canvas.drawRect(screenRect, cellPaint)
+        }
+    }
+}
+
+/**
+ * Map exposure hours to a gradient color with fixed alpha.
+ * 0h → blue, 25% → cyan, 50% → green, 75% → yellow, max → red.
+ */
+@Suppress("MagicNumber") // Color interpolation constants
+private fun hoursToColor(hours: Double, maxHours: Double): Int {
+    val fraction = (hours / maxHours).coerceIn(0.0, 1.0)
+    val (r, g, b) = when {
+        fraction < 0.25 -> {
+            val t = fraction / 0.25
+            Triple(0, (t * 255).toInt(), 255)
+        }
+        fraction < 0.50 -> {
+            val t = (fraction - 0.25) / 0.25
+            Triple(0, 255, (255 * (1 - t)).toInt())
+        }
+        fraction < 0.75 -> {
+            val t = (fraction - 0.50) / 0.25
+            Triple((t * 255).toInt(), 255, 0)
+        }
+        else -> {
+            val t = (fraction - 0.75) / 0.25
+            Triple(255, (255 * (1 - t)).toInt(), 0)
+        }
+    }
+    return Color.argb(HEATMAP_ALPHA, r, g, b)
+}
+
+private const val HEATMAP_ALPHA = 153 // ~60% alpha
