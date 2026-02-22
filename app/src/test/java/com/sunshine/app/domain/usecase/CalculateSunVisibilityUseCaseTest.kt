@@ -587,8 +587,11 @@ class CalculateSunVisibilityUseCaseTest {
 
     private fun setupHighTerrain() {
         coEvery { elevationRepository.getElevation(any()) } returns Result.success(500.0)
+        // Terrain at 530m (30m above observer) creates a ~17° horizon angle at the closest
+        // sample point (100m), which the parabolic sun arc (peak 60°) clears after ~1.5 hours.
+        // Using 5000m would create an ~89° horizon that the 60° sun arc can never reach.
         coEvery { elevationRepository.getElevations(any()) } answers {
-            Result.success(firstArg<List<GeoPoint>>().associateWith { 5000.0 })
+            Result.success(firstArg<List<GeoPoint>>().associateWith { 530.0 })
         }
     }
 
