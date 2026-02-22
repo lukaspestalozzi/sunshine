@@ -638,6 +638,25 @@ class MapViewModelTest {
             )
         }
 
+    @Test
+    fun `heatmap failure clears grid and loading state`() =
+        runTest {
+            coEvery { visibilityUseCase.calculateSunExposureGrid(any(), any(), any(), any()) } returns
+                Result.failure(RuntimeException("Elevation API unavailable"))
+
+            viewModel = MapViewModel(sunCalculator, visibilityUseCase)
+            advanceUntilIdle()
+
+            viewModel.onZoomChanged(14.0)
+            advanceUntilIdle()
+
+            viewModel.onToggleHeatmap()
+            advanceUntilIdle()
+
+            assertNull("Exposure grid should be null on failure", viewModel.uiState.value.sunExposureGrid)
+            assertFalse("Loading should be cleared on failure", viewModel.uiState.value.isLoadingHeatmap)
+        }
+
     /**
      * Runs [block] with the JVM default timezone temporarily set to [zoneId],
      * restoring the previous timezone even if the block throws.

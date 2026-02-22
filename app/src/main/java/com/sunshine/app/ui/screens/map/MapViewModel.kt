@@ -336,7 +336,7 @@ class MapViewModel(
                     bounds = bounds,
                     date = state.selectedDate,
                     resolution = resolution,
-                ).getOrNull()
+                ).getOrThrow()
 
             _uiState.update {
                 it.copy(
