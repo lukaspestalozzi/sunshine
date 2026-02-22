@@ -2,6 +2,7 @@ package com.sunshine.app.domain.usecase
 
 import com.sunshine.app.domain.model.BoundingBox
 import com.sunshine.app.domain.model.GeoPoint
+import com.sunshine.app.domain.model.SunExposureGrid
 import com.sunshine.app.domain.model.SunPosition
 import com.sunshine.app.domain.model.TerrainPoint
 import com.sunshine.app.domain.model.TerrainProfile
@@ -146,17 +147,88 @@ class CalculateSunVisibilityUseCase(
         }
 
     /**
-     * Generate grid points for a bounding box, capped at [MAX_GRID_POINTS].
+     * Calculate sun exposure hours for each point in a grid over an entire day.
+     * Scans from astronomical sunrise to sunset in fixed time steps, accumulating
+     * the number of minutes the sun is terrain-visible at each grid point.
+     *
+     * @param bounds Area to compute
+     * @param date The day to evaluate (UTC)
+     * @param resolution Grid spacing in degrees
+     * @param timeStepMinutes Time granularity for scanning
+     * @return Grid mapping each point to total hours of sun exposure
+     */
+    @Suppress("LongMethod")
+    suspend fun calculateSunExposureGrid(
+        bounds: BoundingBox,
+        date: LocalDate,
+        resolution: Double = VisibilityGrid.DEFAULT_RESOLUTION,
+        timeStepMinutes: Int = SunExposureGrid.DEFAULT_TIME_STEP_MINUTES,
+    ): Result<SunExposureGrid> =
+        runCatching {
+            val center = bounds.center
+            val sunriseUtc = sunCalculator.calculateSunrise(center, date)
+            val sunsetUtc = sunCalculator.calculateSunset(center, date)
+
+            val gridPoints = generateGridPoints(bounds, resolution, MAX_HEATMAP_GRID_POINTS)
+
+            if (sunriseUtc == null || sunsetUtc == null || gridPoints.isEmpty()) {
+                return@runCatching SunExposureGrid(
+                    bounds = bounds,
+                    resolution = resolution,
+                    date = date,
+                    points = gridPoints.associateWith { 0.0 },
+                )
+            }
+
+            val start = LocalDateTime.of(date, sunriseUtc)
+            val end = LocalDateTime.of(date, sunsetUtc)
+
+            // Build list of time steps to scan
+            val timeSteps = mutableListOf<LocalDateTime>()
+            var current = start
+            while (!current.isAfter(end)) {
+                timeSteps.add(current)
+                current = current.plusMinutes(timeStepMinutes.toLong())
+            }
+
+            // For each grid point, count visible time steps in parallel
+            val semaphore = Semaphore(MAX_CONCURRENT_CALCULATIONS)
+            val results =
+                coroutineScope {
+                    gridPoints.map { point ->
+                        async {
+                            semaphore.withPermit {
+                                val visibleSteps = timeSteps.count { time ->
+                                    isTerrainVisible(point, time)
+                                }
+                                val hours = visibleSteps * timeStepMinutes / MINUTES_PER_HOUR
+                                point to hours
+                            }
+                        }
+                    }.awaitAll()
+                }
+
+            SunExposureGrid(
+                bounds = bounds,
+                resolution = resolution,
+                date = date,
+                points = results.toMap(),
+            )
+        }
+
+    /**
+     * Generate grid points for a bounding box, capped at [maxPoints].
      */
     private fun generateGridPoints(
         bounds: BoundingBox,
         resolution: Double,
+        maxPoints: Int = MAX_GRID_POINTS,
     ): List<GeoPoint> {
         val points = mutableListOf<GeoPoint>()
         var lat = bounds.south
-        while (lat <= bounds.north && points.size < MAX_GRID_POINTS) {
+        while (lat <= bounds.north && points.size < maxPoints) {
             var lon = bounds.west
-            while (lon <= bounds.east && points.size < MAX_GRID_POINTS) {
+            while (lon <= bounds.east && points.size < maxPoints) {
                 points.add(GeoPoint(lat, lon))
                 lon += resolution
             }
@@ -417,6 +489,12 @@ class CalculateSunVisibilityUseCase(
 
         /** Maximum grid points to prevent runaway calculations */
         private const val MAX_GRID_POINTS = 500
+
+        /** Maximum grid points for heatmap (fewer because each point scans the whole day) */
+        private const val MAX_HEATMAP_GRID_POINTS = 200
+
+        /** Minutes per hour for converting step count to hours */
+        private const val MINUTES_PER_HOUR = 60.0
 
         /** Scan step in minutes for terrain sunrise/sunset search */
         const val SCAN_STEP_MINUTES = 15L

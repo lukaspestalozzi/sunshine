@@ -2,6 +2,7 @@ package com.sunshine.app.ui.screens.map
 
 import com.sunshine.app.domain.model.BoundingBox
 import com.sunshine.app.domain.model.GeoPoint
+import com.sunshine.app.domain.model.SunExposureGrid
 import com.sunshine.app.domain.model.SunPosition
 import com.sunshine.app.domain.model.VisibilityGrid
 import com.sunshine.app.domain.model.VisibilityResult
@@ -27,6 +28,9 @@ data class MapUiState(
     val isLoadingVisibility: Boolean = false,
     val isLoadingGrid: Boolean = false,
     val isLoadingTerrainTimes: Boolean = false,
+    val isHeatmapMode: Boolean = false,
+    val sunExposureGrid: SunExposureGrid? = null,
+    val isLoadingHeatmap: Boolean = false,
     val error: String? = null,
 ) {
     /** Whether terrain-aware visibility is available */
@@ -35,8 +39,12 @@ data class MapUiState(
     /** Whether sun is visible considering terrain */
     val isSunVisibleWithTerrain: Boolean get() = visibility?.isSunVisible ?: sunPosition?.isAboveHorizon ?: false
 
-    /** Whether grid overlay should be shown */
-    val showGridOverlay: Boolean get() = visibilityGrid != null && sunPosition?.isAboveHorizon == true
+    /** Whether grid overlay should be shown (disabled when heatmap is active) */
+    val showGridOverlay: Boolean
+        get() = !isHeatmapMode && visibilityGrid != null && sunPosition?.isAboveHorizon == true
+
+    /** Whether heatmap overlay should be shown */
+    val showHeatmapOverlay: Boolean get() = isHeatmapMode && sunExposureGrid != null
 
     /** Whether elevation data was unavailable (results may be inaccurate) */
     val isElevationDegraded: Boolean get() = visibility?.isElevationDegraded ?: false

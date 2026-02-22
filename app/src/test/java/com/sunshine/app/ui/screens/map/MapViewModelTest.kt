@@ -3,6 +3,7 @@ package com.sunshine.app.ui.screens.map
 import app.cash.turbine.test
 import com.sunshine.app.domain.model.BoundingBox
 import com.sunshine.app.domain.model.GeoPoint
+import com.sunshine.app.domain.model.SunExposureGrid
 import com.sunshine.app.domain.model.SunPosition
 import com.sunshine.app.domain.model.VisibilityGrid
 import com.sunshine.app.domain.model.VisibilityResult
@@ -76,6 +77,15 @@ class MapViewModelTest {
             )
         coEvery { visibilityUseCase.calculateTerrainSunriseSunset(any(), any()) } returns
             Result.success(Pair(LocalTime.of(7, 0), LocalTime.of(20, 0)))
+        coEvery { visibilityUseCase.calculateSunExposureGrid(any(), any(), any(), any()) } returns
+            Result.success(
+                SunExposureGrid(
+                    bounds = BoundingBox(north = 47.0, south = 46.0, east = 9.0, west = 8.0),
+                    resolution = 0.01,
+                    date = LocalDate.of(2024, 6, 21),
+                    points = mapOf(GeoPoint.DEFAULT to 8.0),
+                ),
+            )
     }
 
     @After
@@ -575,6 +585,57 @@ class MapViewModelTest {
                     viewModel.uiState.value.sunsetTime,
                 )
             }
+        }
+
+    // ---- Heatmap tests ----
+
+    @Test
+    fun `onToggleHeatmap enables heatmap mode`() =
+        runTest {
+            viewModel = MapViewModel(sunCalculator, visibilityUseCase)
+            advanceUntilIdle()
+
+            assertFalse("Heatmap should be off initially", viewModel.uiState.value.isHeatmapMode)
+
+            viewModel.onToggleHeatmap()
+            advanceUntilIdle()
+
+            assertTrue("Heatmap should be on after toggle", viewModel.uiState.value.isHeatmapMode)
+        }
+
+    @Test
+    fun `onToggleHeatmap disables heatmap mode and clears grid`() =
+        runTest {
+            viewModel = MapViewModel(sunCalculator, visibilityUseCase)
+            advanceUntilIdle()
+
+            // Enable then disable
+            viewModel.onToggleHeatmap()
+            advanceUntilIdle()
+            viewModel.onToggleHeatmap()
+            advanceUntilIdle()
+
+            assertFalse("Heatmap should be off after double toggle", viewModel.uiState.value.isHeatmapMode)
+            assertNull("Exposure grid should be cleared", viewModel.uiState.value.sunExposureGrid)
+        }
+
+    @Test
+    fun `heatmap calculation is triggered when mode is enabled at sufficient zoom`() =
+        runTest {
+            viewModel = MapViewModel(sunCalculator, visibilityUseCase)
+            advanceUntilIdle()
+
+            // Set zoom above minimum threshold
+            viewModel.onZoomChanged(14.0)
+            advanceUntilIdle()
+
+            viewModel.onToggleHeatmap()
+            advanceUntilIdle()
+
+            assertNotNull(
+                "Sun exposure grid should be calculated",
+                viewModel.uiState.value.sunExposureGrid,
+            )
         }
 
     /**
