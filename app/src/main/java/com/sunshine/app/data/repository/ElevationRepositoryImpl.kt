@@ -71,12 +71,13 @@ class ElevationRepositoryImpl(
         // Batch query: compute bounds of all points and fetch in a single query
         val lats = points.map { toGridCoordinate(it.latitude) }
         val lons = points.map { toGridCoordinate(it.longitude) }
-        val cachedEntities = elevationDao.getElevationsInBounds(
-            north = lats.max(),
-            south = lats.min(),
-            east = lons.max(),
-            west = lons.min(),
-        )
+        val cachedEntities =
+            elevationDao.getElevationsInBounds(
+                north = lats.max(),
+                south = lats.min(),
+                east = lons.max(),
+                west = lons.min(),
+            )
 
         // Build lookup map from cached entities
         val cacheMap = cachedEntities.associateBy { it.gridLat to it.gridLon }
@@ -138,12 +139,13 @@ class ElevationRepositoryImpl(
         val gridPoints = generateGridPoints(bounds, resolution)
 
         // Batch query: fetch all cached elevations in the bounding box at once
-        val cachedEntities = elevationDao.getElevationsInBounds(
-            north = bounds.north,
-            south = bounds.south,
-            east = bounds.east,
-            west = bounds.west,
-        )
+        val cachedEntities =
+            elevationDao.getElevationsInBounds(
+                north = bounds.north,
+                south = bounds.south,
+                east = bounds.east,
+                west = bounds.west,
+            )
         val cacheMap = cachedEntities.associateBy { it.gridLat to it.gridLon }
 
         for (point in gridPoints) {

@@ -72,43 +72,40 @@ class ElevationApi(
      * Only retries on transient failures (IOException, 429, 5xx).
      * Non-retryable errors (4xx client errors) fail immediately.
      */
-    @Suppress("TooGenericExceptionCaught") // Need to catch all exceptions for retry logic
+    @Suppress("TooGenericExceptionCaught", "ReturnCount") // Retry logic needs multiple exit paths
     private suspend fun <T> retryWithBackoff(operation: suspend () -> T): Result<T> {
         var lastException: Exception? = null
-
         repeat(MAX_RETRIES) { attempt ->
             try {
                 return Result.success(operation())
             } catch (e: CancellationException) {
                 throw e
             } catch (e: ClientRequestException) {
-                // Only retry on 429 Too Many Requests; other 4xx are non-retryable
                 if (e.response.status == HttpStatusCode.TooManyRequests && attempt < MAX_RETRIES - 1) {
                     lastException = e
-                    val delayMs = INITIAL_DELAY_MS * (1 shl attempt)
-                    Timber.d("Rate limited, retrying in ${delayMs}ms (attempt ${attempt + 1})")
-                    delay(delayMs)
+                    retryDelay(attempt, "Rate limited")
                 } else {
                     return Result.failure(e)
                 }
             } catch (e: Exception) {
                 lastException = e
-                if (!isRetryable(e) || attempt >= MAX_RETRIES - 1) {
-                    return Result.failure(e)
-                }
-                val delayMs = INITIAL_DELAY_MS * (1 shl attempt)
-                Timber.d("Transient failure, retrying in ${delayMs}ms (attempt ${attempt + 1})")
-                delay(delayMs)
+                if (!isRetryable(e) || attempt >= MAX_RETRIES - 1) return Result.failure(e)
+                retryDelay(attempt, "Transient failure")
             }
         }
-
-        return Result.failure(
-            lastException ?: IllegalStateException("Retry failed without exception"),
-        )
+        return Result.failure(lastException ?: IllegalStateException("Retry failed without exception"))
     }
 
-    private fun isRetryable(e: Exception): Boolean =
-        e is IOException || e is io.ktor.client.plugins.ServerResponseException
+    private suspend fun retryDelay(
+        attempt: Int,
+        reason: String,
+    ) {
+        val delayMs = INITIAL_DELAY_MS * (1 shl attempt)
+        Timber.d("$reason, retrying in ${delayMs}ms (attempt ${attempt + 1})")
+        delay(delayMs)
+    }
+
+    private fun isRetryable(e: Exception): Boolean = e is IOException || e is io.ktor.client.plugins.ServerResponseException
 
     companion object {
         const val BASE_URL = "https://api.open-elevation.com/api/v1/lookup"

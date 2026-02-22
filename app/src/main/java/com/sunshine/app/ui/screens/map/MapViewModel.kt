@@ -4,8 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sunshine.app.domain.model.GeoPoint
 import com.sunshine.app.domain.model.VisibilityGrid
-import com.sunshine.app.domain.usecase.CalculateSunVisibilityUseCase
 import com.sunshine.app.domain.service.SunCalculator
+import com.sunshine.app.domain.usecase.CalculateSunVisibilityUseCase
 import com.sunshine.app.util.ErrorMessageMapper
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -22,7 +22,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
-@Suppress("TooManyFunctions") // 18 functions (threshold 15): orchestrates sun, grid, terrain, and heatmap
+@Suppress("TooManyFunctions") // 20 functions (threshold 15): orchestrates sun, grid, terrain, and heatmap
 class MapViewModel(
     private val sunCalculator: SunCalculator,
     private val visibilityUseCase: CalculateSunVisibilityUseCase,
@@ -124,31 +124,9 @@ class MapViewModel(
         sunPositionJob =
             viewModelScope.launch {
                 val state = _uiState.value
-                val utcDateTime =
-                    localToUtc(
-                        LocalDateTime.of(state.selectedDate, state.selectedTime),
-                    )
-
+                val utcDateTime = localToUtc(LocalDateTime.of(state.selectedDate, state.selectedTime))
                 try {
-                    val sunPosition =
-                        sunCalculator.calculateSunPosition(
-                            location = state.mapCenter,
-                            dateTime = utcDateTime,
-                        )
-
-                    val (sunrise, sunset) = fetchSunriseSunset(state)
-                    _uiState.update {
-                        it.copy(
-                            sunPosition = sunPosition,
-                            sunriseTime = sunrise,
-                            sunsetTime = sunset,
-                            error = null,
-                        )
-                    }
-
-                    updateVisibility(state.mapCenter, utcDateTime)
-                    scheduleGridUpdate()
-                    scheduleTerrainTimesUpdate()
+                    applySunPositionUpdate(state, utcDateTime)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -156,6 +134,25 @@ class MapViewModel(
                     _uiState.update { it.copy(error = ErrorMessageMapper.toUserMessage(e)) }
                 }
             }
+    }
+
+    private suspend fun applySunPositionUpdate(
+        state: MapUiState,
+        utcDateTime: LocalDateTime,
+    ) {
+        val sunPosition = sunCalculator.calculateSunPosition(state.mapCenter, utcDateTime)
+        val (sunrise, sunset) = fetchSunriseSunset(state)
+        _uiState.update {
+            it.copy(
+                sunPosition = sunPosition,
+                sunriseTime = sunrise,
+                sunsetTime = sunset,
+                error = null,
+            )
+        }
+        updateVisibility(state.mapCenter, utcDateTime)
+        scheduleGridUpdate()
+        scheduleTerrainTimesUpdate()
     }
 
     /**
@@ -281,9 +278,10 @@ class MapViewModel(
         }
         _uiState.update { it.copy(isLoadingTerrainTimes = true) }
         try {
-            val (firstUtc, lastUtc) = visibilityUseCase
-                .calculateTerrainSunriseSunset(state.mapCenter, state.selectedDate)
-                .getOrElse { Pair(null, null) }
+            val (firstUtc, lastUtc) =
+                visibilityUseCase
+                    .calculateTerrainSunriseSunset(state.mapCenter, state.selectedDate)
+                    .getOrElse { Pair(null, null) }
             applyTerrainTimes(
                 first = firstUtc?.let { utcTimeToLocal(it, state.selectedDate) },
                 last = lastUtc?.let { utcTimeToLocal(it, state.selectedDate) },
@@ -296,7 +294,10 @@ class MapViewModel(
         }
     }
 
-    private fun applyTerrainTimes(first: LocalTime?, last: LocalTime?) {
+    private fun applyTerrainTimes(
+        first: LocalTime?,
+        last: LocalTime?,
+    ) {
         _uiState.update {
             it.copy(
                 firstSunshineTime = first,
@@ -319,43 +320,28 @@ class MapViewModel(
     private suspend fun updateHeatmap() {
         val state = _uiState.value
         if (!state.isHeatmapMode) return
-
         if (state.zoomLevel < MIN_ZOOM_FOR_GRID) {
             _uiState.update { it.copy(sunExposureGrid = null) }
             return
         }
-
-        val bounds = state.getVisibleBounds()
-        val resolution = calculateHeatmapResolution(state.zoomLevel)
-
         _uiState.update { it.copy(isLoadingHeatmap = true) }
-
         try {
-            val grid =
-                visibilityUseCase.calculateSunExposureGrid(
-                    bounds = bounds,
-                    date = state.selectedDate,
-                    resolution = resolution,
-                ).getOrThrow()
-
-            _uiState.update {
-                it.copy(
-                    sunExposureGrid = grid,
-                    isLoadingHeatmap = false,
-                )
-            }
+            val grid = fetchHeatmapGrid(state)
+            _uiState.update { it.copy(sunExposureGrid = grid, isLoadingHeatmap = false) }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Timber.w(e, "Heatmap calculation failed")
-            _uiState.update {
-                it.copy(
-                    sunExposureGrid = null,
-                    isLoadingHeatmap = false,
-                )
-            }
+            _uiState.update { it.copy(sunExposureGrid = null, isLoadingHeatmap = false) }
         }
     }
+
+    private suspend fun fetchHeatmapGrid(state: MapUiState) =
+        visibilityUseCase.calculateSunExposureGrid(
+            bounds = state.getVisibleBounds(),
+            date = state.selectedDate,
+            resolution = calculateHeatmapResolution(state.zoomLevel),
+        ).getOrThrow()
 
     companion object {
         /**

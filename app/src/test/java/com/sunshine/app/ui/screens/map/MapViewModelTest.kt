@@ -46,19 +46,22 @@ class MapViewModelTest {
     @Before
     fun setup() {
         originalTimeZone = TimeZone.getDefault()
-        // Use UTC for deterministic ViewModel tests; timezone conversion is tested separately
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
         Dispatchers.setMain(testDispatcher)
         sunCalculator = mockk()
         visibilityUseCase = mockk()
+        setupDefaultSunCalculatorMocks()
+        setupDefaultVisibilityMocks()
+    }
 
-        // Default mock responses
+    private fun setupDefaultSunCalculatorMocks() {
         coEvery { sunCalculator.calculateSunPosition(any(), any()) } returns
             SunPosition(azimuth = 180.0, elevation = 45.0)
-        coEvery { sunCalculator.calculateSunrise(any(), any()) } returns
-            LocalTime.of(6, 30)
-        coEvery { sunCalculator.calculateSunset(any(), any()) } returns
-            LocalTime.of(20, 30)
+        coEvery { sunCalculator.calculateSunrise(any(), any()) } returns LocalTime.of(6, 30)
+        coEvery { sunCalculator.calculateSunset(any(), any()) } returns LocalTime.of(20, 30)
+    }
+
+    private fun setupDefaultVisibilityMocks() {
         coEvery { visibilityUseCase.calculateVisibility(any(), any()) } returns
             Result.success(
                 VisibilityResult.visible(
