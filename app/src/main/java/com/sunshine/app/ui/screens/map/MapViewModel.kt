@@ -22,7 +22,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
-@Suppress("TooManyFunctions") // Heatmap mode adds scheduling/update methods alongside existing ones
+@Suppress("TooManyFunctions") // 18 functions (threshold 15): orchestrates sun, grid, terrain, and heatmap
 class MapViewModel(
     private val sunCalculator: SunCalculator,
     private val visibilityUseCase: CalculateSunVisibilityUseCase,
