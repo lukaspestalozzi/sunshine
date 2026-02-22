@@ -577,7 +577,10 @@ class CalculateSunVisibilityUseCaseTest {
             assertNull("Last sunshine should be null", last)
         }
 
-    private fun setupTerrainTimeMocks(sunrise: LocalTime, sunset: LocalTime) {
+    private fun setupTerrainTimeMocks(
+        sunrise: LocalTime,
+        sunset: LocalTime,
+    ) {
         coEvery { sunCalculator.calculateSunrise(any(), any()) } returns sunrise
         coEvery { sunCalculator.calculateSunset(any(), any()) } returns sunset
     }
@@ -601,9 +604,10 @@ class CalculateSunVisibilityUseCaseTest {
     private fun setupParabolicSunArc(sunrise: LocalTime, sunset: LocalTime) {
         coEvery { sunCalculator.calculateSunPosition(any(), any()) } answers {
             val dt = secondArg<LocalDateTime>()
-            val minSinceRise = java.time.Duration.between(
-                LocalDateTime.of(terrainTestDate, sunrise), dt,
-            ).toMinutes().toDouble()
+            val minSinceRise =
+                java.time.Duration.between(
+                    LocalDateTime.of(terrainTestDate, sunrise), dt,
+                ).toMinutes().toDouble()
             val halfDay = java.time.Duration.between(sunrise, sunset).toMinutes().toDouble() / 2.0
             val fraction = minSinceRise / halfDay
             val elevation = if (fraction in 0.0..2.0) 60.0 * fraction * (2.0 - fraction) else -10.0
@@ -631,12 +635,13 @@ class CalculateSunVisibilityUseCaseTest {
             coEvery { sunCalculator.calculateSunrise(any(), any()) } returns LocalTime.of(4, 30)
             coEvery { sunCalculator.calculateSunset(any(), any()) } returns LocalTime.of(19, 30)
 
-            val result = useCase.calculateSunExposureGrid(
-                bounds = smallBounds,
-                date = terrainTestDate,
-                resolution = 0.01,
-                timeStepMinutes = 60,
-            )
+            val result =
+                useCase.calculateSunExposureGrid(
+                    bounds = smallBounds,
+                    date = terrainTestDate,
+                    resolution = 0.01,
+                    timeStepMinutes = 60,
+                )
 
             assertTrue("Result should be success", result.isSuccess)
             val grid = result.getOrNull()!!
@@ -657,11 +662,12 @@ class CalculateSunVisibilityUseCaseTest {
             coEvery { sunCalculator.calculateSunrise(any(), any()) } returns null
             coEvery { sunCalculator.calculateSunset(any(), any()) } returns null
 
-            val result = useCase.calculateSunExposureGrid(
-                bounds = smallBounds,
-                date = terrainTestDate,
-                resolution = 0.01,
-            )
+            val result =
+                useCase.calculateSunExposureGrid(
+                    bounds = smallBounds,
+                    date = terrainTestDate,
+                    resolution = 0.01,
+                )
 
             assertTrue("Result should be success", result.isSuccess)
             val grid = result.getOrNull()!!
@@ -679,12 +685,13 @@ class CalculateSunVisibilityUseCaseTest {
             coEvery { sunCalculator.calculateSunrise(any(), any()) } returns LocalTime.of(4, 30)
             coEvery { sunCalculator.calculateSunset(any(), any()) } returns LocalTime.of(19, 30)
 
-            val result = useCase.calculateSunExposureGrid(
-                bounds = smallBounds,
-                date = terrainTestDate,
-                resolution = 0.01,
-                timeStepMinutes = 60,
-            )
+            val result =
+                useCase.calculateSunExposureGrid(
+                    bounds = smallBounds,
+                    date = terrainTestDate,
+                    resolution = 0.01,
+                    timeStepMinutes = 60,
+                )
 
             assertTrue("Result should be success", result.isSuccess)
             val grid = result.getOrNull()!!
@@ -704,11 +711,12 @@ class CalculateSunVisibilityUseCaseTest {
             coEvery { sunCalculator.calculateSunset(any(), any()) } returns LocalTime.of(18, 0)
 
             val date = LocalDate.of(2024, 12, 21)
-            val result = useCase.calculateSunExposureGrid(
-                bounds = smallBounds,
-                date = date,
-                resolution = 0.01,
-            )
+            val result =
+                useCase.calculateSunExposureGrid(
+                    bounds = smallBounds,
+                    date = date,
+                    resolution = 0.01,
+                )
 
             val grid = result.getOrNull()!!
             assertEquals("Grid date should match input", date, grid.date)
@@ -726,12 +734,13 @@ class CalculateSunVisibilityUseCaseTest {
             }
             coEvery { elevationRepository.getElevations(any()) } returns Result.success(emptyMap())
 
-            val result = useCase.calculateSunExposureGrid(
-                bounds = smallBounds,
-                date = terrainTestDate,
-                resolution = 0.01,
-                timeStepMinutes = 60,
-            )
+            val result =
+                useCase.calculateSunExposureGrid(
+                    bounds = smallBounds,
+                    date = terrainTestDate,
+                    resolution = 0.01,
+                    timeStepMinutes = 60,
+                )
 
             assertTrue("Result should be success", result.isSuccess)
             val grid = result.getOrNull()!!

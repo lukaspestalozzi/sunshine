@@ -1,0 +1,179 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 2,
+    "identityHash": "48b4ba9973e713bebcdb092cac12f0b0",
+    "entities": [
+      {
+        "tableName": "elevation_cache",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `gridLat` REAL NOT NULL, `gridLon` REAL NOT NULL, `latitude` REAL NOT NULL, `longitude` REAL NOT NULL, `elevation` REAL NOT NULL, `source` TEXT NOT NULL, `fetchedAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "gridLat",
+            "columnName": "gridLat",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "gridLon",
+            "columnName": "gridLon",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "latitude",
+            "columnName": "latitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "longitude",
+            "columnName": "longitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "elevation",
+            "columnName": "elevation",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fetchedAt",
+            "columnName": "fetchedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_elevation_cache_gridLat_gridLon",
+            "unique": true,
+            "columnNames": [
+              "gridLat",
+              "gridLon"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_elevation_cache_gridLat_gridLon` ON `${TABLE_NAME}` (`gridLat`, `gridLon`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "downloaded_regions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`regionId` TEXT NOT NULL, `name` TEXT NOT NULL, `north` REAL NOT NULL, `south` REAL NOT NULL, `east` REAL NOT NULL, `west` REAL NOT NULL, `minZoom` INTEGER NOT NULL, `maxZoom` INTEGER NOT NULL, `totalTiles` INTEGER NOT NULL, `downloadedTiles` INTEGER NOT NULL, `sizeBytes` INTEGER NOT NULL, `downloadedAt` INTEGER NOT NULL, `status` TEXT NOT NULL, PRIMARY KEY(`regionId`))",
+        "fields": [
+          {
+            "fieldPath": "regionId",
+            "columnName": "regionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "north",
+            "columnName": "north",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "south",
+            "columnName": "south",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "east",
+            "columnName": "east",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "west",
+            "columnName": "west",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "minZoom",
+            "columnName": "minZoom",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "maxZoom",
+            "columnName": "maxZoom",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalTiles",
+            "columnName": "totalTiles",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "downloadedTiles",
+            "columnName": "downloadedTiles",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sizeBytes",
+            "columnName": "sizeBytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "downloadedAt",
+            "columnName": "downloadedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "regionId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '48b4ba9973e713bebcdb092cac12f0b0')"
+    ]
+  }
+}

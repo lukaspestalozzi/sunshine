@@ -32,6 +32,7 @@ import kotlinx.coroutines.sync.withPermit
  * - Batch elevation fetching for terrain profiles
  * - Parallel grid calculations using coroutines
  */
+@Suppress("TooManyFunctions") // 15 functions: visibility, grid, exposure, terrain, and projection logic
 class CalculateSunVisibilityUseCase(
     private val sunCalculator: SunCalculator,
     private val elevationRepository: ElevationRepository,
@@ -78,8 +79,12 @@ class CalculateSunVisibilityUseCase(
             sunPosition.elevation + atmosphericRefraction(sunPosition.elevation)
 
         return buildVisibilityResult(
-            location, sunPosition, horizonAngle, apparentElevation,
-            isElevationDegraded, observerElevation,
+            location = location,
+            sunPosition = sunPosition,
+            horizonAngle = horizonAngle,
+            apparentElevation = apparentElevation,
+            isElevationDegraded = isElevationDegraded,
+            observerElevation = observerElevation,
         )
     }
 
@@ -93,7 +98,11 @@ class CalculateSunVisibilityUseCase(
     ): VisibilityResult =
         if (apparentElevation > horizonAngle) {
             VisibilityResult.visible(
-                location, sunPosition, horizonAngle, isElevationDegraded, observerElevation,
+                location = location,
+                sunPosition = sunPosition,
+                horizonAngle = horizonAngle,
+                isElevationDegraded = isElevationDegraded,
+                observerElevation = observerElevation,
             )
         } else {
             VisibilityResult.blocked(
@@ -183,11 +192,12 @@ class CalculateSunVisibilityUseCase(
             val start = LocalDateTime.of(date, sunriseUtc)
             // If sunset is before sunrise in UTC (e.g. western time zones crossing midnight),
             // the sunset falls on the next calendar day.
-            val end = if (sunsetUtc.isBefore(sunriseUtc)) {
-                LocalDateTime.of(date.plusDays(1), sunsetUtc)
-            } else {
-                LocalDateTime.of(date, sunsetUtc)
-            }
+            val end =
+                if (sunsetUtc.isBefore(sunriseUtc)) {
+                    LocalDateTime.of(date.plusDays(1), sunsetUtc)
+                } else {
+                    LocalDateTime.of(date, sunsetUtc)
+                }
 
             // Build list of time steps to scan
             val timeSteps = mutableListOf<LocalDateTime>()
@@ -204,9 +214,10 @@ class CalculateSunVisibilityUseCase(
                     gridPoints.map { point ->
                         async {
                             semaphore.withPermit {
-                                val visibleSteps = timeSteps.count { time ->
-                                    isTerrainVisible(point, time)
-                                }
+                                val visibleSteps =
+                                    timeSteps.count { time ->
+                                        isTerrainVisible(point, time)
+                                    }
                                 val hours = visibleSteps * timeStepMinutes / MINUTES_PER_HOUR
                                 point to hours
                             }
@@ -367,10 +378,12 @@ class CalculateSunVisibilityUseCase(
         date: LocalDate,
     ): Result<Pair<LocalTime?, LocalTime?>> =
         runCatching {
-            val sunriseUtc = sunCalculator.calculateSunrise(location, date)
-                ?: return@runCatching Pair(null, null)
-            val sunsetUtc = sunCalculator.calculateSunset(location, date)
-                ?: return@runCatching Pair(null, null)
+            val sunriseUtc =
+                sunCalculator.calculateSunrise(location, date)
+                    ?: return@runCatching Pair(null, null)
+            val sunsetUtc =
+                sunCalculator.calculateSunset(location, date)
+                    ?: return@runCatching Pair(null, null)
 
             val sunriseDateTime = LocalDateTime.of(date, sunriseUtc)
             val sunsetDateTime = LocalDateTime.of(date, sunsetUtc)

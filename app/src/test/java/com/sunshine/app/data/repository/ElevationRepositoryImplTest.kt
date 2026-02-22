@@ -131,10 +131,11 @@ class ElevationRepositoryImplTest {
             val points = listOf(GeoPoint(46.8, 8.2), GeoPoint(46.9, 8.3))
             coEvery {
                 elevationDao.getElevationsInBounds(any(), any(), any(), any())
-            } returns listOf(
-                createElevationEntity(46.8, 8.2, 500.0),
-                createElevationEntity(46.9, 8.3, 600.0),
-            )
+            } returns
+                listOf(
+                    createElevationEntity(46.8, 8.2, 500.0),
+                    createElevationEntity(46.9, 8.3, 600.0),
+                )
 
             // Act
             val result = repository.getElevations(points)
@@ -158,9 +159,10 @@ class ElevationRepositoryImplTest {
             // Only first point is cached
             coEvery {
                 elevationDao.getElevationsInBounds(any(), any(), any(), any())
-            } returns listOf(
-                createElevationEntity(46.8, 8.2, 500.0),
-            )
+            } returns
+                listOf(
+                    createElevationEntity(46.8, 8.2, 500.0),
+                )
 
             // API returns missing point
             val apiResults =
@@ -190,9 +192,10 @@ class ElevationRepositoryImplTest {
 
             coEvery {
                 elevationDao.getElevationsInBounds(any(), any(), any(), any())
-            } returns listOf(
-                createElevationEntity(46.8, 8.2, 500.0),
-            )
+            } returns
+                listOf(
+                    createElevationEntity(46.8, 8.2, 500.0),
+                )
             coEvery { elevationApi.getElevations(any()) } returns Result.failure(Exception("Network error"))
 
             // Act

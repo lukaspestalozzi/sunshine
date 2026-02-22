@@ -131,7 +131,7 @@ class TileDownloadWorker(
         }
     }
 
-    @Suppress("NestedBlockDepth", "LoopWithTooManyJumpStatements")
+    @Suppress("NestedBlockDepth", "LoopWithTooManyJumpStatements", "ReturnCount")
     private suspend fun downloadAllTiles(
         regionId: String,
         bounds: BoundingBox,
@@ -179,20 +179,13 @@ class TileDownloadWorker(
         var totalBytes = startBytes
         var failedCount = 0L
         val tileRange = calculateTileRange(bounds, zoom)
-
         for (x in tileRange.minX..tileRange.maxX) {
             for (y in tileRange.minY..tileRange.maxY) {
                 if (isStopped) {
                     downloadedRegionDao.updateStatus(regionId, DownloadStatus.PAUSED.name)
                     return null
                 }
-                val downloaded =
-                    downloadSingleTile(
-                        tileUrl = getTileUrl(zoom, x.toInt(), y.toInt()),
-                        zoom = zoom,
-                        x = x.toInt(),
-                        y = y.toInt(),
-                    )
+                val downloaded = downloadSingleTile(getTileUrl(zoom, x.toInt(), y.toInt()), zoom, x.toInt(), y.toInt())
                 if (downloaded > 0) {
                     downloadedCount++
                     totalBytes += downloaded

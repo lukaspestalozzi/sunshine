@@ -102,11 +102,12 @@ fun MapScreen(
                         Icon(
                             imageVector = Icons.Default.Layers,
                             contentDescription = stringResource(R.string.toggle_heatmap),
-                            tint = if (uiState.isHeatmapMode) {
-                                MaterialTheme.colorScheme.secondary
-                            } else {
-                                MaterialTheme.colorScheme.onPrimary
-                            },
+                            tint =
+                                if (uiState.isHeatmapMode) {
+                                    MaterialTheme.colorScheme.secondary
+                                } else {
+                                    MaterialTheme.colorScheme.onPrimary
+                                },
                         )
                     }
                     IconButton(onClick = onNavigateToDownload) {
@@ -268,19 +269,21 @@ private fun SunPositionOverlay(
                 Spacer(modifier = Modifier.height(4.dp))
                 uiState.sunriseTime?.let { sunrise ->
                     Text(
-                        text = stringResource(
-                            R.string.sunrise_format,
-                            sunrise.format(DateTimeFormatter.ofPattern("HH:mm")),
-                        ),
+                        text =
+                            stringResource(
+                                R.string.sunrise_format,
+                                sunrise.format(DateTimeFormatter.ofPattern("HH:mm")),
+                            ),
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
                 uiState.sunsetTime?.let { sunset ->
                     Text(
-                        text = stringResource(
-                            R.string.sunset_format,
-                            sunset.format(DateTimeFormatter.ofPattern("HH:mm")),
-                        ),
+                        text =
+                            stringResource(
+                                R.string.sunset_format,
+                                sunset.format(DateTimeFormatter.ofPattern("HH:mm")),
+                            ),
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
@@ -291,20 +294,22 @@ private fun SunPositionOverlay(
                 Spacer(modifier = Modifier.height(4.dp))
                 uiState.firstSunshineTime?.let { first ->
                     Text(
-                        text = stringResource(
-                            R.string.first_sunshine_format,
-                            first.format(DateTimeFormatter.ofPattern("HH:mm")),
-                        ),
+                        text =
+                            stringResource(
+                                R.string.first_sunshine_format,
+                                first.format(DateTimeFormatter.ofPattern("HH:mm")),
+                            ),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
                 uiState.lastSunshineTime?.let { last ->
                     Text(
-                        text = stringResource(
-                            R.string.last_sunshine_format,
-                            last.format(DateTimeFormatter.ofPattern("HH:mm")),
-                        ),
+                        text =
+                            stringResource(
+                                R.string.last_sunshine_format,
+                                last.format(DateTimeFormatter.ofPattern("HH:mm")),
+                            ),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -329,13 +334,14 @@ private fun SunPositionOverlay(
             val lat = uiState.mapCenter.latitude
             val lon = uiState.mapCenter.longitude
             Text(
-                text = stringResource(
-                    R.string.coordinates_format,
-                    kotlin.math.abs(lat),
-                    if (lat >= 0) "N" else "S",
-                    kotlin.math.abs(lon),
-                    if (lon >= 0) "E" else "W",
-                ),
+                text =
+                    stringResource(
+                        R.string.coordinates_format,
+                        kotlin.math.abs(lat),
+                        if (lat >= 0) "N" else "S",
+                        kotlin.math.abs(lon),
+                        if (lon >= 0) "E" else "W",
+                    ),
                 style = MaterialTheme.typography.labelSmall,
             )
 

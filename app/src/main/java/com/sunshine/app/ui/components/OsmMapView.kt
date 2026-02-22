@@ -1,6 +1,9 @@
 package com.sunshine.app.ui.components
 
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Rect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -20,9 +23,6 @@ import org.osmdroid.events.ZoomEvent
 import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
 import org.osmdroid.util.GeoPoint as OsmGeoPoint
 import org.osmdroid.util.MapTileIndex
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Rect
 import org.osmdroid.views.MapView
 import org.osmdroid.views.Projection
 import org.osmdroid.views.overlay.Overlay
@@ -182,16 +182,21 @@ private fun updateVisibilityOverlay(
 private class VisibilityGridOverlay(
     private val grid: VisibilityGrid,
 ) : Overlay() {
-    private val sunlitPaint = Paint().apply {
-        color = SUNLIT_COLOR
-        style = Paint.Style.FILL
-    }
-    private val shadedPaint = Paint().apply {
-        color = SHADED_COLOR
-        style = Paint.Style.FILL
-    }
+    private val sunlitPaint =
+        Paint().apply {
+            color = SUNLIT_COLOR
+            style = Paint.Style.FILL
+        }
+    private val shadedPaint =
+        Paint().apply {
+            color = SHADED_COLOR
+            style = Paint.Style.FILL
+        }
 
-    override fun draw(canvas: Canvas, projection: Projection) {
+    override fun draw(
+        canvas: Canvas,
+        projection: Projection,
+    ) {
         val halfRes = grid.resolution / 2
         val screenRect = Rect()
 
@@ -232,11 +237,15 @@ private fun updateSunExposureOverlay(
 private class SunExposureOverlay(
     private val grid: SunExposureGrid,
 ) : Overlay() {
-    private val cellPaint = Paint().apply {
-        style = Paint.Style.FILL
-    }
+    private val cellPaint =
+        Paint().apply {
+            style = Paint.Style.FILL
+        }
 
-    override fun draw(canvas: Canvas, projection: Projection) {
+    override fun draw(
+        canvas: Canvas,
+        projection: Projection,
+    ) {
         val halfRes = grid.resolution / 2
         val screenRect = Rect()
         val maxHours = grid.maxExposure.coerceAtLeast(1.0)
