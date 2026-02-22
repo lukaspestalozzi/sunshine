@@ -577,6 +577,26 @@ class CalculateSunVisibilityUseCaseTest {
             assertNull("Last sunshine should be null", last)
         }
 
+    @Test
+    fun `returns null pair when sun never clears terrain`() =
+        runBlocking {
+            // Sun rises and sets astronomically, but terrain is so steep
+            // that the sun arc (peak 60°) never exceeds the ~89° horizon
+            // created by 5000m terrain at 100m distance.
+            val sunriseUtc = LocalTime.of(4, 30)
+            val sunsetUtc = LocalTime.of(19, 30)
+            setupTerrainTimeMocks(sunriseUtc, sunsetUtc)
+            setupImpassableTerrain()
+            setupParabolicSunArc(sunriseUtc, sunsetUtc)
+
+            val result = useCase.calculateTerrainSunriseSunset(testLocation, terrainTestDate)
+
+            assertTrue("Result should be success", result.isSuccess)
+            val (first, last) = result.getOrNull()!!
+            assertNull("First sunshine should be null when sun never clears terrain", first)
+            assertNull("Last sunshine should be null when sun never clears terrain", last)
+        }
+
     private fun setupTerrainTimeMocks(
         sunrise: LocalTime,
         sunset: LocalTime,
@@ -592,6 +612,15 @@ class CalculateSunVisibilityUseCaseTest {
         // Using 5000m would create an ~89° horizon that the 60° sun arc can never reach.
         coEvery { elevationRepository.getElevations(any()) } answers {
             Result.success(firstArg<List<GeoPoint>>().associateWith { 530.0 })
+        }
+    }
+
+    private fun setupImpassableTerrain() {
+        coEvery { elevationRepository.getElevation(any()) } returns Result.success(500.0)
+        // Terrain at 5000m with observer at 500m creates atan2(4500, 100) ≈ 89° horizon
+        // at the closest sample point. No realistic sun arc (peak 60°) can clear this.
+        coEvery { elevationRepository.getElevations(any()) } answers {
+            Result.success(firstArg<List<GeoPoint>>().associateWith { 5000.0 })
         }
     }
 
