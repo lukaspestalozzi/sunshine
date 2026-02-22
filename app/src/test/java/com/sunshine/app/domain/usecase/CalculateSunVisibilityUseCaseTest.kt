@@ -714,6 +714,33 @@ class CalculateSunVisibilityUseCaseTest {
             assertEquals("Grid date should match input", date, grid.date)
         }
 
+    @Test
+    fun `exposure grid handles sunset before sunrise in UTC`() =
+        runBlocking {
+            setupFlatTerrain()
+            // Simulate western location where sunrise UTC is late and sunset crosses midnight
+            coEvery { sunCalculator.calculateSunrise(any(), any()) } returns LocalTime.of(23, 0)
+            coEvery { sunCalculator.calculateSunset(any(), any()) } returns LocalTime.of(1, 0)
+            coEvery { sunCalculator.calculateSunPosition(any(), any()) } answers {
+                SunPosition(azimuth = 180.0, elevation = 30.0)
+            }
+            coEvery { elevationRepository.getElevations(any()) } returns Result.success(emptyMap())
+
+            val result = useCase.calculateSunExposureGrid(
+                bounds = smallBounds,
+                date = terrainTestDate,
+                resolution = 0.01,
+                timeStepMinutes = 60,
+            )
+
+            assertTrue("Result should be success", result.isSuccess)
+            val grid = result.getOrNull()!!
+            assertTrue(
+                "All points should have positive exposure when sunset crosses midnight",
+                grid.points.values.all { it > 0.0 },
+            )
+        }
+
     companion object {
         private val smallBounds =
             BoundingBox(
