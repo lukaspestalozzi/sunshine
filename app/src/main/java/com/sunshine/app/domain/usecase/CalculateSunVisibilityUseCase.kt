@@ -9,7 +9,10 @@ import com.sunshine.app.domain.model.VisibilityGrid
 import com.sunshine.app.domain.model.VisibilityResult
 import com.sunshine.app.domain.repository.ElevationRepository
 import com.sunshine.app.domain.service.SunCalculator
+import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.temporal.ChronoUnit
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
@@ -272,6 +275,118 @@ class CalculateSunVisibilityUseCase(
         )
     }
 
+    /**
+     * Calculate terrain-aware first and last sunshine times for a location and date.
+     * Scans between astronomical sunrise/sunset to find when the sun first clears
+     * and last disappears behind surrounding terrain.
+     *
+     * @param location The observer's location
+     * @param date The date (used to query astronomical sunrise/sunset in UTC)
+     * @return Pair of (firstSunshine, lastSunshine) as UTC [LocalTime], or null if not applicable
+     */
+    suspend fun calculateTerrainSunriseSunset(
+        location: GeoPoint,
+        date: LocalDate,
+    ): Result<Pair<LocalTime?, LocalTime?>> =
+        runCatching {
+            val sunriseUtc = sunCalculator.calculateSunrise(location, date)
+                ?: return@runCatching Pair(null, null)
+            val sunsetUtc = sunCalculator.calculateSunset(location, date)
+                ?: return@runCatching Pair(null, null)
+
+            val sunriseDateTime = LocalDateTime.of(date, sunriseUtc)
+            val sunsetDateTime = LocalDateTime.of(date, sunsetUtc)
+
+            val firstSunshine = findFirstVisible(location, sunriseDateTime, sunsetDateTime)
+            val lastSunshine = findLastVisible(location, sunriseDateTime, sunsetDateTime)
+
+            Pair(firstSunshine?.toLocalTime(), lastSunshine?.toLocalTime())
+        }
+
+    /**
+     * Scan forward from [start] to [end] to find the first time the sun is terrain-visible.
+     * Refines with binary search once a transition is found.
+     */
+    private suspend fun findFirstVisible(
+        location: GeoPoint,
+        start: LocalDateTime,
+        end: LocalDateTime,
+    ): LocalDateTime? {
+        var current = start
+        while (!current.isAfter(end)) {
+            val visible = isTerrainVisible(location, current)
+            if (visible) {
+                // Binary search between (current - step) and current
+                val searchStart = if (current == start) start else current.minusMinutes(SCAN_STEP_MINUTES)
+                return binarySearchTransition(location, searchStart, current, searchForFirst = true)
+            }
+            current = current.plusMinutes(SCAN_STEP_MINUTES)
+        }
+        return null
+    }
+
+    /**
+     * Scan backward from [end] to [start] to find the last time the sun is terrain-visible.
+     * Refines with binary search once a transition is found.
+     */
+    private suspend fun findLastVisible(
+        location: GeoPoint,
+        start: LocalDateTime,
+        end: LocalDateTime,
+    ): LocalDateTime? {
+        var current = end
+        while (!current.isBefore(start)) {
+            val visible = isTerrainVisible(location, current)
+            if (visible) {
+                // Binary search between current and (current + step)
+                val searchEnd = if (current == end) end else current.plusMinutes(SCAN_STEP_MINUTES)
+                return binarySearchTransition(location, current, searchEnd, searchForFirst = false)
+            }
+            current = current.minusMinutes(SCAN_STEP_MINUTES)
+        }
+        return null
+    }
+
+    /**
+     * Binary search to find the transition point to ~1 minute accuracy.
+     *
+     * @param searchForFirst If true, finds the earliest visible time (low=blocked, high=visible).
+     *                       If false, finds the latest visible time (low=visible, high=blocked).
+     */
+    private suspend fun binarySearchTransition(
+        location: GeoPoint,
+        low: LocalDateTime,
+        high: LocalDateTime,
+        searchForFirst: Boolean,
+    ): LocalDateTime {
+        var lo = low
+        var hi = high
+        while (ChronoUnit.MINUTES.between(lo, hi) > 1) {
+            val midSeconds = ChronoUnit.SECONDS.between(lo, hi) / 2
+            val mid = lo.plusSeconds(midSeconds)
+            val visible = isTerrainVisible(location, mid)
+            if (searchForFirst) {
+                if (visible) hi = mid else lo = mid
+            } else {
+                if (visible) lo = mid else hi = mid
+            }
+        }
+        return if (searchForFirst) hi else lo
+    }
+
+    /**
+     * Quick check whether the sun is terrain-visible at a given time.
+     * Returns false if the sun is below the horizon or blocked by terrain.
+     */
+    private suspend fun isTerrainVisible(
+        location: GeoPoint,
+        dateTime: LocalDateTime,
+    ): Boolean =
+        calculateVisibility(location, dateTime)
+            .getOrNull()
+            ?.isSunVisible
+            ?: false
+
     @Suppress("MagicNumber") // Terrain sampling distances are domain constants
     companion object {
         /** Default observer height above ground if elevation lookup fails */
@@ -302,6 +417,9 @@ class CalculateSunVisibilityUseCase(
 
         /** Maximum grid points to prevent runaway calculations */
         private const val MAX_GRID_POINTS = 500
+
+        /** Scan step in minutes for terrain sunrise/sunset search */
+        const val SCAN_STEP_MINUTES = 15L
 
         /** Refine if elevation difference between consecutive points exceeds this (meters) */
         const val REFINEMENT_ELEVATION_THRESHOLD = 200.0

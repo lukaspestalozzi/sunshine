@@ -7,12 +7,15 @@ import com.sunshine.app.domain.repository.ElevationRepository
 import com.sunshine.app.suncalc.SunCalculator
 import io.mockk.coEvery
 import io.mockk.mockk
+import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.Month
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -519,6 +522,95 @@ class CalculateSunVisibilityUseCaseTest {
             )
         }
 
+    // ---- Terrain sunrise/sunset tests ----
+
+    @Test
+    fun `terrain sunrise equals astronomical sunrise on flat terrain`() =
+        runBlocking {
+            val sunriseUtc = LocalTime.of(4, 30)
+            setupTerrainTimeMocks(sunriseUtc, LocalTime.of(19, 30))
+            setupFlatTerrain()
+            setupDaytimeSunArc()
+
+            val result = useCase.calculateTerrainSunriseSunset(testLocation, terrainTestDate)
+
+            assertTrue("Result should be success", result.isSuccess)
+            val (first, last) = result.getOrNull()!!
+            assertNotNull("First sunshine should not be null", first)
+            assertNotNull("Last sunshine should not be null", last)
+            assertTrue(
+                "First sunshine ($first) should be within 15 min of sunrise ($sunriseUtc)",
+                java.time.Duration.between(sunriseUtc, first).abs().toMinutes() <= 15,
+            )
+        }
+
+    @Test
+    fun `terrain sunrise is later than astronomical sunrise with high terrain`() =
+        runBlocking {
+            val sunriseUtc = LocalTime.of(4, 30)
+            setupTerrainTimeMocks(sunriseUtc, LocalTime.of(19, 30))
+            setupHighTerrain()
+            setupParabolicSunArc(sunriseUtc, LocalTime.of(19, 30))
+
+            val result = useCase.calculateTerrainSunriseSunset(testLocation, terrainTestDate)
+
+            assertTrue("Result should be success", result.isSuccess)
+            val (first, _) = result.getOrNull()!!
+            assertNotNull("First sunshine should not be null", first)
+            assertTrue(
+                "First sunshine ($first) should be after astronomical sunrise ($sunriseUtc)",
+                first!!.isAfter(sunriseUtc),
+            )
+        }
+
+    @Test
+    fun `returns null pair when sun does not rise`() =
+        runBlocking {
+            coEvery { sunCalculator.calculateSunrise(any(), any()) } returns null
+            coEvery { sunCalculator.calculateSunset(any(), any()) } returns null
+
+            val result = useCase.calculateTerrainSunriseSunset(testLocation, terrainTestDate)
+
+            assertTrue("Result should be success", result.isSuccess)
+            val (first, last) = result.getOrNull()!!
+            assertNull("First sunshine should be null", first)
+            assertNull("Last sunshine should be null", last)
+        }
+
+    private fun setupTerrainTimeMocks(sunrise: LocalTime, sunset: LocalTime) {
+        coEvery { sunCalculator.calculateSunrise(any(), any()) } returns sunrise
+        coEvery { sunCalculator.calculateSunset(any(), any()) } returns sunset
+    }
+
+    private fun setupHighTerrain() {
+        coEvery { elevationRepository.getElevation(any()) } returns Result.success(500.0)
+        coEvery { elevationRepository.getElevations(any()) } answers {
+            Result.success(firstArg<List<GeoPoint>>().associateWith { 5000.0 })
+        }
+    }
+
+    private fun setupDaytimeSunArc() {
+        coEvery { sunCalculator.calculateSunPosition(any(), any()) } answers {
+            val hour = secondArg<LocalDateTime>().let { it.hour + it.minute / 60.0 }
+            val elevation = if (hour in 4.5..19.5) 30.0 else -10.0
+            SunPosition(azimuth = 180.0, elevation = elevation)
+        }
+    }
+
+    @Suppress("MagicNumber") // Parabolic sun arc constants for test fixture
+    private fun setupParabolicSunArc(sunrise: LocalTime, sunset: LocalTime) {
+        coEvery { sunCalculator.calculateSunPosition(any(), any()) } answers {
+            val dt = secondArg<LocalDateTime>()
+            val minSinceRise = java.time.Duration.between(
+                LocalDateTime.of(terrainTestDate, sunrise), dt,
+            ).toMinutes().toDouble()
+            val halfDay = java.time.Duration.between(sunrise, sunset).toMinutes().toDouble() / 2.0
+            val fraction = minSinceRise / halfDay
+            val elevation = if (fraction in 0.0..2.0) 60.0 * fraction * (2.0 - fraction) else -10.0
+            SunPosition(azimuth = 180.0, elevation = elevation)
+        }
+    }
+
     private fun setupSunAboveHorizon() {
         val sunAbove = SunPosition(azimuth = 180.0, elevation = 60.0)
         coEvery { sunCalculator.calculateSunPosition(any(), any()) } returns sunAbove
@@ -537,5 +629,6 @@ class CalculateSunVisibilityUseCaseTest {
                 east = 8.02,
                 west = 8.0,
             )
+        private val terrainTestDate = LocalDate.of(2024, 6, 21)
     }
 }
