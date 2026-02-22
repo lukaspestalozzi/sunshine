@@ -43,6 +43,9 @@ class MapViewModel(
     fun onDateSelected(date: LocalDate) {
         _uiState.update { it.copy(selectedDate = date) }
         updateSunPosition()
+        if (_uiState.value.isHeatmapMode) {
+            scheduleHeatmapUpdate()
+        }
     }
 
     fun onTimeSelected(time: LocalTime) {
@@ -53,6 +56,9 @@ class MapViewModel(
     fun onMapCenterChanged(center: GeoPoint) {
         _uiState.update { it.copy(mapCenter = center) }
         updateSunPosition()
+        if (_uiState.value.isHeatmapMode) {
+            scheduleHeatmapUpdate()
+        }
     }
 
     fun onZoomChanged(zoom: Double) {
@@ -73,6 +79,9 @@ class MapViewModel(
             )
         }
         updateSunPosition()
+        if (_uiState.value.isHeatmapMode) {
+            scheduleHeatmapUpdate()
+        }
     }
 
     fun onAdjustTime(hours: Int) {
@@ -85,6 +94,9 @@ class MapViewModel(
             )
         }
         updateSunPosition()
+        if (_uiState.value.isHeatmapMode) {
+            scheduleHeatmapUpdate()
+        }
     }
 
     fun onErrorDismissed() {
@@ -137,9 +149,6 @@ class MapViewModel(
                     updateVisibility(state.mapCenter, utcDateTime)
                     scheduleGridUpdate()
                     scheduleTerrainTimesUpdate()
-                    if (_uiState.value.isHeatmapMode) {
-                        scheduleHeatmapUpdate()
-                    }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
