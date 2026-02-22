@@ -12,6 +12,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.sunshine.app.domain.model.GeoPoint
 import com.sunshine.app.domain.model.SunExposureGrid
 import com.sunshine.app.domain.model.VisibilityGrid
+import com.sunshine.app.ui.util.HEATMAP_ALPHA_FRACTION
+import com.sunshine.app.ui.util.heatmapGradient
 import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent
 import org.osmdroid.events.ZoomEvent
@@ -254,31 +256,16 @@ private class SunExposureOverlay(
 }
 
 /**
- * Map exposure hours to a gradient color with fixed alpha.
- * 0h → blue, 25% → cyan, 50% → green, 75% → yellow, max → red.
+ * Map exposure hours to a gradient color using the shared heatmap color scale.
  */
-@Suppress("MagicNumber") // Color interpolation constants
+@Suppress("MagicNumber") // 255 is the standard 8-bit color max
 private fun hoursToColor(hours: Double, maxHours: Double): Int {
-    val fraction = (hours / maxHours).coerceIn(0.0, 1.0)
-    val (r, g, b) = when {
-        fraction < 0.25 -> {
-            val t = fraction / 0.25
-            Triple(0, (t * 255).toInt(), 255)
-        }
-        fraction < 0.50 -> {
-            val t = (fraction - 0.25) / 0.25
-            Triple(0, 255, (255 * (1 - t)).toInt())
-        }
-        fraction < 0.75 -> {
-            val t = (fraction - 0.50) / 0.25
-            Triple((t * 255).toInt(), 255, 0)
-        }
-        else -> {
-            val t = (fraction - 0.75) / 0.25
-            Triple(255, (255 * (1 - t)).toInt(), 0)
-        }
-    }
-    return Color.argb(HEATMAP_ALPHA, r, g, b)
+    val fraction = hours / maxHours
+    val (r, g, b) = heatmapGradient(fraction)
+    return Color.argb(
+        (HEATMAP_ALPHA_FRACTION * 255).toInt(),
+        (r * 255).toInt(),
+        (g * 255).toInt(),
+        (b * 255).toInt(),
+    )
 }
-
-private const val HEATMAP_ALPHA = 153 // ~60% alpha

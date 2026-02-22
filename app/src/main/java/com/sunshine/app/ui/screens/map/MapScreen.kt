@@ -55,6 +55,8 @@ import androidx.compose.ui.unit.dp
 import com.sunshine.app.R
 import com.sunshine.app.ui.components.OsmMapView
 import com.sunshine.app.ui.components.SunPositionIndicator
+import com.sunshine.app.ui.util.HEATMAP_ALPHA_FRACTION
+import com.sunshine.app.ui.util.heatmapGradient
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -395,27 +397,9 @@ private fun HeatmapGradientBar(modifier: Modifier = Modifier) {
     }
 }
 
-@Suppress("MagicNumber") // Color interpolation fractions
 private fun heatmapFractionToColor(fraction: Float): Color {
-    val (r, g, b) = when {
-        fraction < 0.25f -> {
-            val t = fraction / 0.25f
-            Triple(0f, t, 1f)
-        }
-        fraction < 0.50f -> {
-            val t = (fraction - 0.25f) / 0.25f
-            Triple(0f, 1f, 1f - t)
-        }
-        fraction < 0.75f -> {
-            val t = (fraction - 0.50f) / 0.25f
-            Triple(t, 1f, 0f)
-        }
-        else -> {
-            val t = (fraction - 0.75f) / 0.25f
-            Triple(1f, 1f - t, 0f)
-        }
-    }
-    return Color(red = r, green = g, blue = b, alpha = 0.8f)
+    val (r, g, b) = heatmapGradient(fraction.toDouble())
+    return Color(red = r, green = g, blue = b, alpha = HEATMAP_ALPHA_FRACTION)
 }
 
 @Composable
