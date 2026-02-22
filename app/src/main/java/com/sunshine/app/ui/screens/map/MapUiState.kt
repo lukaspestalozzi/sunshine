@@ -22,8 +22,11 @@ data class MapUiState(
     val visibilityGrid: VisibilityGrid? = null,
     val sunriseTime: LocalTime? = null,
     val sunsetTime: LocalTime? = null,
+    val firstSunshineTime: LocalTime? = null,
+    val lastSunshineTime: LocalTime? = null,
     val isLoadingVisibility: Boolean = false,
     val isLoadingGrid: Boolean = false,
+    val isLoadingTerrainTimes: Boolean = false,
     val error: String? = null,
 ) {
     /** Whether terrain-aware visibility is available */

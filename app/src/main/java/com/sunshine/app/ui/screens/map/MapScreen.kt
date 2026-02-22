@@ -271,6 +271,38 @@ private fun SunPositionOverlay(
                 }
             }
 
+            // Terrain-aware first/last sunshine times
+            if (uiState.firstSunshineTime != null || uiState.lastSunshineTime != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                uiState.firstSunshineTime?.let { first ->
+                    Text(
+                        text = stringResource(
+                            R.string.first_sunshine_format,
+                            first.format(DateTimeFormatter.ofPattern("HH:mm")),
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                uiState.lastSunshineTime?.let { last ->
+                    Text(
+                        text = stringResource(
+                            R.string.last_sunshine_format,
+                            last.format(DateTimeFormatter.ofPattern("HH:mm")),
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            } else if (uiState.isLoadingTerrainTimes) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = stringResource(R.string.loading_sunshine_times),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+            }
+
             // Observer elevation and coordinates
             Spacer(modifier = Modifier.height(4.dp))
             visibility?.observerElevation?.let { elevation ->

@@ -74,6 +74,8 @@ class MapViewModelTest {
                     points = emptyMap(),
                 ),
             )
+        coEvery { visibilityUseCase.calculateTerrainSunriseSunset(any(), any()) } returns
+            Result.success(Pair(LocalTime.of(7, 0), LocalTime.of(20, 0)))
     }
 
     @After
@@ -475,6 +477,48 @@ class MapViewModelTest {
             assertEquals("UTC → UTC should be identity", local, utc)
         }
     }
+
+    @Test
+    fun `terrain sunshine times are computed after sun position update`() =
+        runTest {
+            coEvery {
+                visibilityUseCase.calculateTerrainSunriseSunset(any(), any())
+            } returns Result.success(Pair(LocalTime.of(7, 15), LocalTime.of(19, 45)))
+
+            viewModel = MapViewModel(sunCalculator, visibilityUseCase)
+            advanceUntilIdle()
+
+            assertEquals(
+                "First sunshine time should be set",
+                LocalTime.of(7, 15),
+                viewModel.uiState.value.firstSunshineTime,
+            )
+            assertEquals(
+                "Last sunshine time should be set",
+                LocalTime.of(19, 45),
+                viewModel.uiState.value.lastSunshineTime,
+            )
+        }
+
+    @Test
+    fun `terrain sunshine times are null when calculation fails`() =
+        runTest {
+            coEvery {
+                visibilityUseCase.calculateTerrainSunriseSunset(any(), any())
+            } returns Result.failure(RuntimeException("Calculation failed"))
+
+            viewModel = MapViewModel(sunCalculator, visibilityUseCase)
+            advanceUntilIdle()
+
+            assertNull(
+                "First sunshine time should be null on failure",
+                viewModel.uiState.value.firstSunshineTime,
+            )
+            assertNull(
+                "Last sunshine time should be null on failure",
+                viewModel.uiState.value.lastSunshineTime,
+            )
+        }
 
     @Test
     fun `sun calculator receives UTC datetime not local`() =

@@ -32,6 +32,7 @@ class MapViewModel(
     private var sunPositionJob: Job? = null
     private var visibilityJob: Job? = null
     private var gridJob: Job? = null
+    private var terrainTimesJob: Job? = null
 
     init {
         updateSunPosition()
@@ -115,6 +116,7 @@ class MapViewModel(
 
                     updateVisibility(state.mapCenter, utcDateTime)
                     scheduleGridUpdate()
+                    scheduleTerrainTimesUpdate()
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -229,6 +231,49 @@ class MapViewModel(
         }
     }
 
+    private fun scheduleTerrainTimesUpdate() {
+        terrainTimesJob?.cancel()
+        terrainTimesJob =
+            viewModelScope.launch {
+                delay(TERRAIN_TIMES_DEBOUNCE_MS)
+                updateTerrainTimes()
+            }
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun updateTerrainTimes() {
+        val state = _uiState.value
+        if (state.sunriseTime == null || state.sunsetTime == null) {
+            applyTerrainTimes(first = null, last = null)
+            return
+        }
+        _uiState.update { it.copy(isLoadingTerrainTimes = true) }
+        try {
+            val (firstUtc, lastUtc) = visibilityUseCase
+                .calculateTerrainSunriseSunset(state.mapCenter, state.selectedDate)
+                .getOrElse { Pair(null, null) }
+            applyTerrainTimes(
+                first = firstUtc?.let { utcTimeToLocal(it, state.selectedDate) },
+                last = lastUtc?.let { utcTimeToLocal(it, state.selectedDate) },
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.w(e, "Terrain sunshine times calculation failed")
+            applyTerrainTimes(first = null, last = null)
+        }
+    }
+
+    private fun applyTerrainTimes(first: LocalTime?, last: LocalTime?) {
+        _uiState.update {
+            it.copy(
+                firstSunshineTime = first,
+                lastSunshineTime = last,
+                isLoadingTerrainTimes = false,
+            )
+        }
+    }
+
     companion object {
         /**
          * Convert a local-timezone [LocalDateTime] to its UTC equivalent.
@@ -254,6 +299,9 @@ class MapViewModel(
 
         // Debounce delay for grid calculation
         private const val GRID_DEBOUNCE_MS = 500L
+
+        // Debounce delay for terrain sunshine times (longer since it's expensive)
+        private const val TERRAIN_TIMES_DEBOUNCE_MS = 1000L
 
         // Minimum zoom level to show grid (avoid too many points)
         private const val MIN_ZOOM_FOR_GRID = 12.0
