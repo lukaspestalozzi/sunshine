@@ -1,5 +1,7 @@
 package com.sunshine.app.ui.util
 
+import kotlin.math.pow
+
 /**
  * Shared heatmap color scale: blue (0%) → cyan → green → yellow → red (100%).
  * Used by both the map overlay (Android Canvas) and the Compose legend bar.
@@ -29,6 +31,22 @@ fun heatmapGradient(fraction: Double): Triple<Float, Float, Float> {
         }
     }
 }
+
+/**
+ * Gamma exponent for the heatmap color scale.
+ * Values > 1 compress the lower range and expand the upper range,
+ * giving more color differentiation where most data points fall (6-12h sun exposure).
+ * With gamma 3.0, the 8-10h range spans 44-86% of the gradient (vs 58-91% at gamma 2.0).
+ */
+@Suppress("MagicNumber")
+const val HEATMAP_GAMMA = 3.0
+
+/**
+ * Apply gamma correction to a linear fraction for the heatmap color scale.
+ * With gamma 3.0, the midpoint (50% of max) maps to 12.5% of the gradient,
+ * leaving 87.5% of the color spectrum for the upper half of the range.
+ */
+fun applyHeatmapGamma(linearFraction: Double): Double = linearFraction.coerceIn(0.0, 1.0).pow(HEATMAP_GAMMA)
 
 /** Alpha for heatmap overlays — 60% opacity for both the map overlay and the legend. */
 @Suppress("MagicNumber")

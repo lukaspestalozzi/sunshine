@@ -56,6 +56,7 @@ import com.sunshine.app.R
 import com.sunshine.app.ui.components.OsmMapView
 import com.sunshine.app.ui.components.SunPositionIndicator
 import com.sunshine.app.ui.util.HEATMAP_ALPHA_FRACTION
+import com.sunshine.app.ui.util.applyHeatmapGamma
 import com.sunshine.app.ui.util.heatmapGradient
 import java.time.Instant
 import java.time.LocalDate
@@ -404,7 +405,7 @@ private fun HeatmapGradientBar(modifier: Modifier = Modifier) {
 }
 
 private fun heatmapFractionToColor(fraction: Float): Color {
-    val (r, g, b) = heatmapGradient(fraction.toDouble())
+    val (r, g, b) = heatmapGradient(applyHeatmapGamma(fraction.toDouble()))
     return Color(red = r, green = g, blue = b, alpha = HEATMAP_ALPHA_FRACTION)
 }
 

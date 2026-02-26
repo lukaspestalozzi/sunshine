@@ -2,7 +2,9 @@ package com.sunshine.app.ui.screens.map
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.sunshine.app.domain.model.BoundingBox
 import com.sunshine.app.domain.model.GeoPoint
+import com.sunshine.app.domain.model.SunExposureGrid
 import com.sunshine.app.domain.model.VisibilityGrid
 import com.sunshine.app.domain.service.SunCalculator
 import com.sunshine.app.domain.usecase.CalculateSunVisibilityUseCase
@@ -35,6 +37,15 @@ class MapViewModel(
     private var gridJob: Job? = null
     private var terrainTimesJob: Job? = null
     private var heatmapJob: Job? = null
+
+    /** Accumulated heatmap points across pans, keyed by grid-snapped GeoPoint. */
+    private val heatmapCache = mutableMapOf<GeoPoint, Double>()
+
+    /** Date for which the cache was computed — cache is cleared when the date changes. */
+    private var heatmapCacheDate: LocalDate? = null
+
+    /** Resolution at which the cache was computed — cache is cleared when resolution changes. */
+    private var heatmapCacheResolution: Double? = null
 
     init {
         updateSunPosition()
@@ -115,7 +126,14 @@ class MapViewModel(
             scheduleHeatmapUpdate()
         } else {
             heatmapJob?.cancel()
+            clearHeatmapCache()
         }
+    }
+
+    private fun clearHeatmapCache() {
+        heatmapCache.clear()
+        heatmapCacheDate = null
+        heatmapCacheResolution = null
     }
 
     @Suppress("TooGenericExceptionCaught") // Calculator may throw various exceptions
@@ -324,10 +342,14 @@ class MapViewModel(
             _uiState.update { it.copy(sunExposureGrid = null) }
             return
         }
+
+        val resolution = calculateHeatmapResolution(state.zoomLevel)
+        invalidateCacheIfNeeded(state.selectedDate, resolution)
+
         _uiState.update { it.copy(isLoadingHeatmap = true) }
         try {
-            val grid = fetchHeatmapGrid(state)
-            _uiState.update { it.copy(sunExposureGrid = grid, isLoadingHeatmap = false) }
+            val mergedGrid = fetchAndMergeHeatmap(state, resolution)
+            _uiState.update { it.copy(sunExposureGrid = mergedGrid, isLoadingHeatmap = false) }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -336,12 +358,41 @@ class MapViewModel(
         }
     }
 
-    private suspend fun fetchHeatmapGrid(state: MapUiState) =
-        visibilityUseCase.calculateSunExposureGrid(
-            bounds = state.getVisibleBounds(),
+    private suspend fun fetchAndMergeHeatmap(
+        state: MapUiState,
+        resolution: Double,
+    ): SunExposureGrid {
+        val newGrid =
+            visibilityUseCase.calculateSunExposureGrid(
+                bounds = state.getVisibleBounds(),
+                date = state.selectedDate,
+                resolution = resolution,
+            ).getOrThrow()
+
+        heatmapCache.putAll(newGrid.points)
+        heatmapCacheDate = state.selectedDate
+        heatmapCacheResolution = resolution
+
+        val mergedBounds = BoundingBox.fromPoints(heatmapCache.keys) ?: return newGrid
+        return SunExposureGrid(
+            bounds = mergedBounds,
+            resolution = resolution,
             date = state.selectedDate,
-            resolution = calculateHeatmapResolution(state.zoomLevel),
-        ).getOrThrow()
+            points = heatmapCache.toMap(),
+        )
+    }
+
+    private fun invalidateCacheIfNeeded(
+        date: LocalDate,
+        resolution: Double,
+    ) {
+        if (heatmapCacheDate != null && heatmapCacheDate != date) {
+            clearHeatmapCache()
+        }
+        if (heatmapCacheResolution != null && heatmapCacheResolution != resolution) {
+            clearHeatmapCache()
+        }
+    }
 
     companion object {
         /**
@@ -375,10 +426,10 @@ class MapViewModel(
         // Debounce delay for heatmap (expensive: scans full day per grid point)
         private const val HEATMAP_DEBOUNCE_MS = 1000L
 
-        // Heatmap resolution: coarser than real-time grid because each point scans all day
-        private const val HEATMAP_RESOLUTION_HIGH = 0.001
-        private const val HEATMAP_RESOLUTION_MEDIUM = 0.002
-        private const val HEATMAP_RESOLUTION_LOW = 0.004
+        // Heatmap resolution: finer with caching since each point is only computed once
+        private const val HEATMAP_RESOLUTION_HIGH = 0.0005
+        private const val HEATMAP_RESOLUTION_MEDIUM = 0.001
+        private const val HEATMAP_RESOLUTION_LOW = 0.002
 
         // Minimum zoom level to show grid (avoid too many points)
         private const val MIN_ZOOM_FOR_GRID = 12.0

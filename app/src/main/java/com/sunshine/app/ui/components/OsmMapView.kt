@@ -16,6 +16,7 @@ import com.sunshine.app.domain.model.GeoPoint
 import com.sunshine.app.domain.model.SunExposureGrid
 import com.sunshine.app.domain.model.VisibilityGrid
 import com.sunshine.app.ui.util.HEATMAP_ALPHA_FRACTION
+import com.sunshine.app.ui.util.applyHeatmapGamma
 import com.sunshine.app.ui.util.heatmapGradient
 import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent
@@ -269,7 +270,7 @@ private class SunExposureOverlay(
  */
 @Suppress("MagicNumber") // 255 is the standard 8-bit color max
 private fun hoursToColor(hours: Double, maxHours: Double): Int {
-    val fraction = hours / maxHours
+    val fraction = applyHeatmapGamma(hours / maxHours)
     val (r, g, b) = heatmapGradient(fraction)
     return Color.argb(
         (HEATMAP_ALPHA_FRACTION * 255).toInt(),

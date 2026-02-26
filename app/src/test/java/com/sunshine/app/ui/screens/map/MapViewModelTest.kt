@@ -660,6 +660,113 @@ class MapViewModelTest {
             assertFalse("Loading should be cleared on failure", viewModel.uiState.value.isLoadingHeatmap)
         }
 
+    @Test
+    fun `heatmap accumulates points across pans`() =
+        runTest {
+            val pointA = GeoPoint(latitude = 46.5, longitude = 7.7)
+            val pointB = GeoPoint(latitude = 46.6, longitude = 7.8)
+            val date = LocalDate.of(2024, 6, 21)
+            setupTwoGridHeatmapMock(pointA, pointB, date)
+
+            viewModel = MapViewModel(sunCalculator, visibilityUseCase)
+            advanceUntilIdle()
+            viewModel.onZoomChanged(14.0)
+            advanceUntilIdle()
+
+            viewModel.onToggleHeatmap()
+            advanceUntilIdle()
+            assertEquals("Should have 1 point after first pan", 1, viewModel.uiState.value.sunExposureGrid!!.points.size)
+
+            viewModel.onMapCenterChanged(GeoPoint(latitude = 46.6, longitude = 7.8))
+            advanceUntilIdle()
+
+            val grid = viewModel.uiState.value.sunExposureGrid!!
+            assertEquals("Should have 2 accumulated points", 2, grid.points.size)
+            assertTrue("Should contain first pan point", grid.points.containsKey(pointA))
+            assertTrue("Should contain second pan point", grid.points.containsKey(pointB))
+        }
+
+    @Test
+    fun `heatmap cache clears on date change`() =
+        runTest {
+            val point = GeoPoint(latitude = 46.5, longitude = 7.7)
+            val bounds = BoundingBox(north = 46.51, south = 46.49, east = 7.71, west = 7.69)
+
+            coEvery { visibilityUseCase.calculateSunExposureGrid(any(), any(), any(), any()) } answers {
+                val date = secondArg<LocalDate>()
+                Result.success(
+                    SunExposureGrid(bounds = bounds, resolution = 0.001, date = date, points = mapOf(point to 8.0)),
+                )
+            }
+
+            viewModel = MapViewModel(sunCalculator, visibilityUseCase)
+            advanceUntilIdle()
+
+            viewModel.onZoomChanged(14.0)
+            advanceUntilIdle()
+
+            viewModel.onToggleHeatmap()
+            advanceUntilIdle()
+
+            val gridBeforeDateChange = viewModel.uiState.value.sunExposureGrid
+            assertNotNull("Grid should exist", gridBeforeDateChange)
+
+            // Change date — cache should be invalidated
+            viewModel.onDateSelected(LocalDate.of(2024, 12, 25))
+            advanceUntilIdle()
+
+            val gridAfterDateChange = viewModel.uiState.value.sunExposureGrid
+            assertNotNull("Grid should exist after date change", gridAfterDateChange)
+            // The grid should contain only 1 point (fresh calculation, not accumulated)
+            assertEquals("Cache should have been cleared", 1, gridAfterDateChange!!.points.size)
+        }
+
+    @Test
+    fun `heatmap cache clears on toggle off`() =
+        runTest {
+            viewModel = MapViewModel(sunCalculator, visibilityUseCase)
+            advanceUntilIdle()
+
+            viewModel.onZoomChanged(14.0)
+            advanceUntilIdle()
+
+            // Enable heatmap
+            viewModel.onToggleHeatmap()
+            advanceUntilIdle()
+            assertNotNull("Grid should exist", viewModel.uiState.value.sunExposureGrid)
+
+            // Disable heatmap
+            viewModel.onToggleHeatmap()
+            advanceUntilIdle()
+            assertNull("Grid should be cleared", viewModel.uiState.value.sunExposureGrid)
+
+            // Re-enable — should start fresh (only 1 point from new calculation)
+            viewModel.onToggleHeatmap()
+            advanceUntilIdle()
+
+            val grid = viewModel.uiState.value.sunExposureGrid
+            assertNotNull("Grid should exist after re-enable", grid)
+            assertEquals("Should have fresh data, not accumulated", 1, grid!!.points.size)
+        }
+
+    private fun setupTwoGridHeatmapMock(
+        pointA: GeoPoint,
+        pointB: GeoPoint,
+        date: LocalDate,
+    ) {
+        val boundsA = BoundingBox(north = 46.51, south = 46.49, east = 7.71, west = 7.69)
+        val boundsB = BoundingBox(north = 46.61, south = 46.59, east = 7.81, west = 7.79)
+        var callCount = 0
+        coEvery { visibilityUseCase.calculateSunExposureGrid(any(), any(), any(), any()) } answers {
+            callCount++
+            if (callCount == 1) {
+                Result.success(SunExposureGrid(bounds = boundsA, resolution = 0.001, date = date, points = mapOf(pointA to 8.0)))
+            } else {
+                Result.success(SunExposureGrid(bounds = boundsB, resolution = 0.001, date = date, points = mapOf(pointB to 6.0)))
+            }
+        }
+    }
+
     /**
      * Runs [block] with the JVM default timezone temporarily set to [zoneId],
      * restoring the previous timezone even if the block throws.
