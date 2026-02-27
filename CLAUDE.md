@@ -27,7 +27,7 @@ Sunshine is an Android app that shows users where the sun actually shines at any
 | Min SDK | API 29 (Android 10) | - |
 | Target SDK | API 35 (Android 15) | - |
 | JVM Target | 17 | - |
-| Build | Gradle with Kotlin DSL | AGP 8.7.2 |
+| Build | Gradle with Kotlin DSL | AGP 8.13.2 |
 | Code Quality | ktlint 12.1.2, detekt 1.23.7 | - |
 
 Dependencies are managed via version catalog at `gradle/libs.versions.toml`.
