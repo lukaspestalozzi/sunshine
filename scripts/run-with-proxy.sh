@@ -56,7 +56,12 @@ run_gradle() {
     local proxy_args=""
 
     if [ -n "$PROXY_PID" ]; then
-        proxy_args="-Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=$PROXY_PORT -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=$PROXY_PORT"
+        # Override nonProxyHosts to route ALL traffic through the local auth proxy.
+        # JAVA_TOOL_OPTIONS may set nonProxyHosts to exclude *.google.com / *.googleapis.com,
+        # which prevents Gradle from reaching Google's Maven repo (dl.google.com) through the
+        # proxy. In this environment, direct access does not work for Java — all traffic must
+        # go through the proxy. The -D flags on the command line override JAVA_TOOL_OPTIONS.
+        proxy_args="-Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=$PROXY_PORT -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=$PROXY_PORT -Dhttp.nonProxyHosts=localhost|127.0.0.1"
         # Unset environment proxy vars so Gradle uses our local proxy
         unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy
     fi

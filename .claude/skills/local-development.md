@@ -264,6 +264,30 @@ Java's `HttpURLConnection` doesn't send proxy auth for HTTPS CONNECT requests. T
 2. Listens on `127.0.0.1:3128`
 3. Injects auth into CONNECT requests
 
+### Critical: `nonProxyHosts` Override
+
+`JAVA_TOOL_OPTIONS` in this environment includes `-Dhttp.nonProxyHosts=...*.google.com|*.googleapis.com`, which tells Java to bypass the proxy for Google domains. **This breaks Gradle builds** because:
+
+1. Google's Maven repo (`dl.google.com`) hosts Android Gradle Plugin (AGP) artifacts
+2. The `nonProxyHosts` exclusion makes Java try to reach `dl.google.com` directly
+3. In this environment, direct access doesn't work for Java (even though `curl` succeeds)
+4. Result: Gradle can't resolve AGP → `Plugin was not found` error for every build task
+
+**Fix:** `run-with-proxy.sh` overrides `nonProxyHosts` on the command line to route ALL traffic through the local auth proxy:
+```
+-Dhttp.nonProxyHosts=localhost|127.0.0.1
+```
+Command-line `-D` flags take precedence over `JAVA_TOOL_OPTIONS`.
+
+**If running Gradle manually** (not through the scripts), you MUST include this flag:
+```bash
+./gradlew \
+  -Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=3128 \
+  -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=3128 \
+  -Dhttp.nonProxyHosts="localhost|127.0.0.1" \
+  <task>
+```
+
 ### Usage
 
 The proxy is automatically started by `run-with-proxy.sh` and `verify-local.sh`.
@@ -274,9 +298,31 @@ python3 scripts/auth-proxy.py &
 sdkmanager --proxy=http --proxy_host=127.0.0.1 --proxy_port=3128 "platforms;android-35"
 ```
 
+### Proxy Port Conflicts
+
+The auth proxy binds to port 3128. If a previous proxy instance is still running (e.g., from a crashed build or manual start), new proxy starts will fail with `OSError: Address already in use`.
+
+**Fix:** Kill the stale process before retrying:
+```bash
+lsof -ti:3128 | xargs kill -9 2>/dev/null
+```
+
+This commonly happens when:
+- A previous `run-with-proxy.sh` or `verify-local.sh` was interrupted
+- You manually started `auth-proxy.py` and forgot to stop it
+- The `verify-local.sh` script fails at step 1 and then can't start the proxy for subsequent steps
+
 ---
 
 ## 7. Troubleshooting
+
+### "Plugin was not found" / AGP resolution failure
+
+```
+Plugin [id: 'com.android.application', version: 'X.Y.Z'] was not found
+```
+
+This means Gradle can't reach Google's Maven repo. Almost always a proxy issue — see **Section 6: Critical: `nonProxyHosts` Override**. Ensure you're using `run-with-proxy.sh` (which includes the fix) or passing `-Dhttp.nonProxyHosts="localhost|127.0.0.1"` manually.
 
 ### "SDK location not found"
 

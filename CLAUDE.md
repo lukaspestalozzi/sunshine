@@ -680,7 +680,7 @@ Use descriptive test names with backticks:
 2. Create `local.properties` in project root with `sdk.dir=/path/to/android-sdk`
 3. Required SDK components: `platforms;android-35`, `build-tools;35.0.0`
 
-**Proxy note**: Use `scripts/auth-proxy.py` for SDK downloads when behind an authenticated proxy.
+**Proxy note**: Use `scripts/auth-proxy.py` for SDK downloads when behind an authenticated proxy. **Important**: `JAVA_TOOL_OPTIONS` in this environment excludes `*.google.com` from proxy via `nonProxyHosts`, which breaks Gradle's ability to reach Google's Maven repo. Always use `run-with-proxy.sh` / `verify-local.sh` (which override this), or pass `-Dhttp.nonProxyHosts="localhost|127.0.0.1"` manually. See `.claude/skills/local-development.md` §6 for full details.
 
 ### Local Testing (before push)
 
