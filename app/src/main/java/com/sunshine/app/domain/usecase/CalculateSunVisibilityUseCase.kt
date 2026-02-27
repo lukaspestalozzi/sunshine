@@ -2,6 +2,8 @@ package com.sunshine.app.domain.usecase
 
 import com.sunshine.app.domain.model.BoundingBox
 import com.sunshine.app.domain.model.GeoPoint
+import com.sunshine.app.domain.model.HorizonEntry
+import com.sunshine.app.domain.model.HorizonProfile
 import com.sunshine.app.domain.model.SunExposureGrid
 import com.sunshine.app.domain.model.SunPosition
 import com.sunshine.app.domain.model.TerrainPoint
@@ -32,7 +34,7 @@ import kotlinx.coroutines.sync.withPermit
  * - Batch elevation fetching for terrain profiles
  * - Parallel grid calculations using coroutines
  */
-@Suppress("TooManyFunctions") // 15 functions: visibility, grid, exposure, terrain, and projection logic
+@Suppress("TooManyFunctions") // 16 functions: visibility, grid, exposure, terrain, projection, and horizon profile logic
 class CalculateSunVisibilityUseCase(
     private val sunCalculator: SunCalculator,
     private val elevationRepository: ElevationRepository,
@@ -76,7 +78,8 @@ class CalculateSunVisibilityUseCase(
 
         val horizonAngle = terrainProfile.calculateHorizonAngle()
         val apparentElevation =
-            sunPosition.elevation + atmosphericRefraction(sunPosition.elevation)
+            sunPosition.elevation + atmosphericRefraction(sunPosition.elevation) +
+                SUN_ANGULAR_SEMI_DIAMETER
 
         return buildVisibilityResult(
             location = location,
@@ -366,13 +369,14 @@ class CalculateSunVisibilityUseCase(
 
     /**
      * Calculate terrain-aware first and last sunshine times for a location and date.
-     * Scans between astronomical sunrise/sunset to find when the sun first clears
-     * and last disappears behind surrounding terrain.
+     * Pre-computes a horizon profile for the observer, then iterates through time
+     * comparing the sun's position against cached terrain horizon angles.
      *
      * @param location The observer's location
      * @param date The date (used to query astronomical sunrise/sunset in UTC)
      * @return Pair of (firstSunshine, lastSunshine) as UTC [LocalTime], or null if not applicable
      */
+    @Suppress("LongMethod") // 22 lines: cohesive sunrise/sunset pipeline
     suspend fun calculateTerrainSunriseSunset(
         location: GeoPoint,
         date: LocalDate,
@@ -388,63 +392,99 @@ class CalculateSunVisibilityUseCase(
             val sunriseDateTime = LocalDateTime.of(date, sunriseUtc)
             val sunsetDateTime = LocalDateTime.of(date, sunsetUtc)
 
-            val firstSunshine = findFirstVisible(location, sunriseDateTime, sunsetDateTime)
-            val lastSunshine = findLastVisible(location, sunriseDateTime, sunsetDateTime)
+            // Determine azimuth range from sun path at sunrise/sunset
+            val sunAtRise = sunCalculator.calculateSunPosition(location, sunriseDateTime)
+            val sunAtSet = sunCalculator.calculateSunPosition(location, sunsetDateTime)
 
-            Pair(firstSunshine?.toLocalTime(), lastSunshine?.toLocalTime())
+            // Pre-compute horizon profile once — all elevation data fetched upfront
+            val profile = computeHorizonProfile(location, sunAtRise.azimuth, sunAtSet.azimuth)
+
+            val first = findTransitionTime(profile, location, sunriseDateTime, sunsetDateTime, true)
+            val last = findTransitionTime(profile, location, sunriseDateTime, sunsetDateTime, false)
+
+            Pair(first?.toLocalTime(), last?.toLocalTime())
         }
 
     /**
-     * Scan forward from [start] to [end] to find the first time the sun is terrain-visible.
-     * Refines with binary search once a transition is found.
+     * Pre-compute a terrain horizon profile for an observer covering the given azimuth range.
+     * Fetches elevation data for all azimuths in one batch, computes horizon angle per azimuth.
      */
-    private suspend fun findFirstVisible(
+    private suspend fun computeHorizonProfile(
+        location: GeoPoint,
+        sunriseAzimuth: Double,
+        sunsetAzimuth: Double,
+    ): HorizonProfile {
+        val observerElevation =
+            elevationRepository.getElevation(location).getOrElse { DEFAULT_OBSERVER_ELEVATION }
+
+        // Generate azimuth sample points covering sunrise and sunset ranges with margin
+        val azimuths = generateProfileAzimuths(sunriseAzimuth, sunsetAzimuth)
+
+        // Collect all (azimuth, distance, geoPoint) triples for batch fetching
+        val allPoints =
+            azimuths.flatMap { az ->
+                SAMPLE_DISTANCES.map { dist -> Triple(az, dist, projectPoint(location, az, dist)) }
+            }
+
+        val geoPoints = allPoints.map { it.third }
+        val elevResult = elevationRepository.getElevations(geoPoints)
+        val elevations = elevResult.getOrElse { emptyMap() }
+
+        // Build horizon entries per azimuth
+        val entries =
+            azimuths.map { az ->
+                val terrainPoints =
+                    SAMPLE_DISTANCES.map { dist ->
+                        val gp = projectPoint(location, az, dist)
+                        TerrainPoint(dist, elevations[gp] ?: observerElevation)
+                    }
+                val profile = TerrainProfile(location, observerElevation, az, terrainPoints)
+                HorizonEntry(az, profile.calculateHorizonAngle())
+            }
+
+        return HorizonProfile(
+            observer = location,
+            observerElevation = observerElevation,
+            entries = entries,
+            isElevationDegraded = elevResult.isFailure,
+        )
+    }
+
+    /**
+     * Scan forward (or backward) through time to find the first (or last) moment
+     * the sun's upper limb clears the pre-computed terrain horizon.
+     * Uses 5-minute coarse scan then binary search to ~15-second precision.
+     * No elevation API calls — only sun position lookups against cached profile.
+     */
+    @Suppress("LongMethod") // 24 lines: coarse scan + binary search is one cohesive algorithm
+    private suspend fun findTransitionTime(
+        profile: HorizonProfile,
         location: GeoPoint,
         start: LocalDateTime,
         end: LocalDateTime,
+        searchForFirst: Boolean,
     ): LocalDateTime? {
-        var current = start
-        while (!current.isAfter(end)) {
-            val visible = isTerrainVisible(location, current)
-            if (visible) {
-                // Binary search between (current - step) and current
-                val searchStart = if (current == start) start else current.minusMinutes(SCAN_STEP_MINUTES)
-                return binarySearchTransition(location, searchStart, current, searchForFirst = true)
+        val step = PROFILE_SCAN_STEP_MINUTES
+        // Coarse scan to find a transition interval
+        val scanStart = if (searchForFirst) start else end
+        val scanEnd = if (searchForFirst) end else start
+        val delta = if (searchForFirst) step else -step
+
+        var current = scanStart
+        while (if (searchForFirst) !current.isAfter(scanEnd) else !current.isBefore(scanEnd)) {
+            if (isSunAboveProfile(profile, location, current)) {
+                val lo = if (searchForFirst) maxOf(current.minusMinutes(step), start) else current
+                val hi = if (searchForFirst) current else minOf(current.plusMinutes(step), end)
+                return binarySearchProfile(profile, location, lo, hi, searchForFirst)
             }
-            current = current.plusMinutes(SCAN_STEP_MINUTES)
+            current = current.plusMinutes(delta)
         }
         return null
     }
 
-    /**
-     * Scan backward from [end] to [start] to find the last time the sun is terrain-visible.
-     * Refines with binary search once a transition is found.
-     */
-    private suspend fun findLastVisible(
-        location: GeoPoint,
-        start: LocalDateTime,
-        end: LocalDateTime,
-    ): LocalDateTime? {
-        var current = end
-        while (!current.isBefore(start)) {
-            val visible = isTerrainVisible(location, current)
-            if (visible) {
-                // Binary search between current and (current + step)
-                val searchEnd = if (current == end) end else current.plusMinutes(SCAN_STEP_MINUTES)
-                return binarySearchTransition(location, current, searchEnd, searchForFirst = false)
-            }
-            current = current.minusMinutes(SCAN_STEP_MINUTES)
-        }
-        return null
-    }
-
-    /**
-     * Binary search to find the transition point to ~1 minute accuracy.
-     *
-     * @param searchForFirst If true, finds the earliest visible time (low=blocked, high=visible).
-     *                       If false, finds the latest visible time (low=visible, high=blocked).
-     */
-    private suspend fun binarySearchTransition(
+    /** Binary search against pre-computed horizon profile to ~15 second precision. */
+    private suspend fun binarySearchProfile(
+        profile: HorizonProfile,
         location: GeoPoint,
         low: LocalDateTime,
         high: LocalDateTime,
@@ -452,10 +492,9 @@ class CalculateSunVisibilityUseCase(
     ): LocalDateTime {
         var lo = low
         var hi = high
-        while (ChronoUnit.MINUTES.between(lo, hi) > 1) {
-            val midSeconds = ChronoUnit.SECONDS.between(lo, hi) / 2
-            val mid = lo.plusSeconds(midSeconds)
-            val visible = isTerrainVisible(location, mid)
+        while (ChronoUnit.SECONDS.between(lo, hi) > BINARY_SEARCH_PRECISION_SECONDS) {
+            val mid = lo.plusSeconds(ChronoUnit.SECONDS.between(lo, hi) / 2)
+            val visible = isSunAboveProfile(profile, location, mid)
             if (searchForFirst) {
                 if (visible) hi = mid else lo = mid
             } else {
@@ -463,6 +502,18 @@ class CalculateSunVisibilityUseCase(
             }
         }
         return if (searchForFirst) hi else lo
+    }
+
+    /** Check if the sun's upper limb is above the pre-computed terrain horizon. */
+    private suspend fun isSunAboveProfile(
+        profile: HorizonProfile,
+        location: GeoPoint,
+        dateTime: LocalDateTime,
+    ): Boolean {
+        val sun = sunCalculator.calculateSunPosition(location, dateTime)
+        if (sun.elevation < SUN_BELOW_HORIZON_THRESHOLD) return false
+        val apparent = sun.elevation + atmosphericRefraction(sun.elevation) + SUN_ANGULAR_SEMI_DIAMETER
+        return apparent > profile.getHorizonAngleAt(sun.azimuth)
     }
 
     /**
@@ -485,6 +536,15 @@ class CalculateSunVisibilityUseCase(
 
         /** Meters per degree of latitude (approximately) */
         const val METERS_PER_DEGREE_LAT = 111320.0
+
+        /** Sun's angular semi-diameter in degrees (~0.267°). Sunrise = upper limb clears terrain. */
+        const val SUN_ANGULAR_SEMI_DIAMETER = 0.267
+
+        /** Skip sun position checks when geometric elevation is deeply below horizon. */
+        private const val SUN_BELOW_HORIZON_THRESHOLD = -2.0
+
+        /** Full circle in degrees. */
+        private const val FULL_CIRCLE = 360.0
 
         /**
          * Sample distances for terrain profile (in meters).
@@ -515,8 +575,17 @@ class CalculateSunVisibilityUseCase(
         /** Minutes per hour for converting step count to hours */
         private const val MINUTES_PER_HOUR = 60.0
 
-        /** Scan step in minutes for terrain sunrise/sunset search */
-        const val SCAN_STEP_MINUTES = 15L
+        /** Coarse scan step for profile-based terrain sunrise/sunset search (minutes). */
+        const val PROFILE_SCAN_STEP_MINUTES = 5L
+
+        /** Binary search precision for terrain sunrise/sunset (seconds). */
+        const val BINARY_SEARCH_PRECISION_SECONDS = 15L
+
+        /** Azimuth margin around sunrise/sunset direction (degrees each side). */
+        private const val AZIMUTH_MARGIN = 15.0
+
+        /** Azimuth sampling step for horizon profile (degrees). */
+        private const val AZIMUTH_STEP = 1.0
 
         /** Refine if elevation difference between consecutive points exceeds this (meters) */
         const val REFINEMENT_ELEVATION_THRESHOLD = 200.0
@@ -526,6 +595,21 @@ class CalculateSunVisibilityUseCase(
 
         /** Minimum elevation diff to trigger refinement in large gaps (meters) */
         const val REFINEMENT_MIN_ELEVATION_DIFF = 50.0
+
+        /** Generate azimuth sample values covering sunrise and sunset ranges with margin. */
+        fun generateProfileAzimuths(
+            sunriseAzimuth: Double,
+            sunsetAzimuth: Double,
+        ): List<Double> =
+            buildList {
+                for (center in listOf(sunriseAzimuth, sunsetAzimuth)) {
+                    var az = center - AZIMUTH_MARGIN
+                    while (az <= center + AZIMUTH_MARGIN) {
+                        add(((az % FULL_CIRCLE) + FULL_CIRCLE) % FULL_CIRCLE)
+                        az += AZIMUTH_STEP
+                    }
+                }
+            }.distinct().sorted()
 
         /**
          * Atmospheric refraction correction in degrees (Meeus/Bennett formula).
