@@ -38,8 +38,9 @@ context: |
   - Requests to tile servers identify the app with a descriptive User-Agent.
 
   Quality bar
-  - ktlint and detekt with zero issues, Android lint clean. CI runs: OpenSpec validation, ktlint,
-    detekt, lint, unit tests, assemble.
+  - ktlint with zero issues, Android lint clean. detekt is deferred until detekt 2.0 is stable
+    (1.23.x does not support our Kotlin version). CI runs: OpenSpec validation, ktlint, Android
+    lint, unit tests, assemble.
   - Numeric behavior is covered by tests in core with concrete values and tolerances.
   - Small, focused classes; no speculative abstractions; no suppressed warnings without a written
     justification.
@@ -61,7 +62,7 @@ rules:
     - Numeric behavior (angles, times, distances, coordinates) is specified with concrete values and tolerances.
     - Specify the behavior when required data is missing or unavailable; never rely on an implicit default.
   design:
-    - List every open decision under "Open Questions" with a recommendation; they are resolved with the user before apply.
+    - Ask the user about every decision that changes the specs, the approach or the task breakdown while drafting; record the answer under Decisions with the alternatives considered. "Open Questions" holds only deferrable unknowns.
     - State a performance budget for any computation triggered by user interaction.
   tasks:
     - Every task ends with its verification step, the exact command or manual check plus the expected result.
