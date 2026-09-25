@@ -25,7 +25,8 @@ is `add-app-shell` (see `docs/roadmap.md`).
 1. `/opsx:explore` (optional): think an idea through.
 2. `/opsx:propose <change-name>`: creates `openspec/changes/<change-name>/` with proposal,
    spec deltas, design and tasks.
-3. The user reviews the change and answers the "Open Questions" in `design.md`.
+3. Decisions that shape the change are asked while proposing. The user reviews the whole change
+   before it is applied.
 4. `/opsx:apply`: implement the tasks in order; each task has its own verification step.
 5. `/opsx:verify`: check the implementation against the change.
 6. `/opsx:archive`: merge the spec deltas into `openspec/specs/`; update `docs/roadmap.md`.
@@ -38,10 +39,10 @@ Useful CLI: `openspec list`, `openspec show <name>`, `openspec validate --all --
 Valid once `add-app-shell` has created the Gradle modules:
 
 - `./scripts/verify-local.sh`: full CI simulation. Run before every push.
-- `./scripts/verify-local.sh --quick`: ktlint + detekt only.
+- `./scripts/verify-local.sh --quick`: ktlint only.
 - `./scripts/run-with-proxy.sh <gradle task>`: single Gradle task through the proxy helper.
 - CI (`.github/workflows/ci.yml`): `specs` job (OpenSpec validation) and `build` job (ktlint,
-  detekt, Android lint, unit tests, debug APK).
+  Android lint, unit tests, debug APK).
 - Web sessions: the SessionStart hook installs the SDK at `~/android-sdk` and writes
   `local.properties`.
 
@@ -50,5 +51,6 @@ Valid once `add-app-shell` has created the Gradle modules:
 - Conventional commits: `type(scope): description`. Types: feat, fix, refactor, test, docs,
   chore, style, ci.
 - Stage files individually (never `git add .`); review the diff before committing.
-- ktlint and detekt with zero issues; no suppressions without a written justification.
+- ktlint with zero issues and Android lint clean; no suppressions without a written
+  justification. detekt is deferred until detekt 2.0 is stable.
 - Numeric behavior is tested in `core` against reference values with explicit tolerances.
