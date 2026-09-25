@@ -1,0 +1,76 @@
+schema: spec-driven
+
+context: |
+  Product: "Sunshine" is an Android app that shows where and when the sun actually shines, taking
+  terrain occlusion (mountains, valleys) into account. Primary users: hikers planning trips in the
+  Alps. Core value: "Know exactly when and where the sun will shine, even in the mountains."
+
+  Hard constraints
+  - Offline-first: once a region is downloaded, every feature works without network.
+  - Trustworthy results: missing or unknown data (e.g. no elevation) is surfaced explicitly as
+    "unknown"; it is never silently replaced by a default (flat terrain, 0 m, "visible").
+  - Responsive: computations never block the UI thread; overlays cover the whole visible area
+    (no silent caps on the number of computed points).
+  - This is a from-scratch rewrite. The discarded first implementation (git history before the
+    rewrite) and docs/legacy-design.md are source material only; do not port code from them.
+    investigations/ holds verified reference values usable as test oracles.
+
+  Tech stack (decided)
+  - Kotlin, Jetpack Compose (Material 3), MVVM with StateFlow, Koin DI, Coroutines/Flow.
+  - Map: MapLibre Native Android showing OpenTopoMap raster tiles. osmdroid is archived; do not use.
+  - Sun position: commons-suncalc (see investigations/suncalc-library-evaluation.md).
+  - Elevation: DEM tiles from AWS Open Data "Terrain Tiles" (Terrarium PNG or Skadi HGT; the exact
+    format is decided in the elevation change), downloaded and decoded locally. No per-point
+    online elevation API.
+  - Dependency versions: latest stable at implementation time, managed in gradle/libs.versions.toml.
+
+  Modules
+  - core: pure Kotlin/JVM, no Android dependencies. Geo math, sun position, horizon, visibility and
+    grid computations. Unit-tested on the plain JVM against reference values.
+  - app: Android. UI, ViewModels, data sources (map tiles, DEM files, database), DI wiring.
+    Depends on core; core never depends on app.
+
+  Data sources and attribution (attribution must be visible in the app)
+  - Map tiles: OpenTopoMap ("Map data: © OpenStreetMap contributors, SRTM | Map style: © OpenTopoMap
+    (CC-BY-SA)").
+  - Elevation: AWS Terrain Tiles (Tilezen/joerd). For Europe the sources include EU-DEM (Copernicus),
+    Austria DGM (CC BY 3.0 AT) and SRTM (USGS); attribution per tilezen/joerd docs/attribution.md.
+  - Requests to tile servers identify the app with a descriptive User-Agent.
+
+  Quality bar
+  - ktlint and detekt with zero issues, Android lint clean. CI runs: OpenSpec validation, ktlint,
+    detekt, lint, unit tests, assemble.
+  - Numeric behavior is covered by tests in core with concrete values and tolerances.
+  - Small, focused classes; no speculative abstractions; no suppressed warnings without a written
+    justification.
+  - Conventional commits (feat, fix, refactor, test, docs, chore, style, ci); files are staged
+    individually, never with `git add .`.
+
+  Glossary
+  - Azimuth: compass direction, 0° = north, clockwise.
+  - Sun elevation: angle of the sun's centre above the astronomical horizon.
+  - Horizon angle: elevation angle of the terrain skyline seen from the observer in a given azimuth.
+  - DEM: digital elevation model (grid of terrain heights).
+  - Selected location: the point the user inspects (the map crosshair).
+
+rules:
+  proposal:
+    - Include a "Non-goals" section.
+    - Name the docs/roadmap.md entry this change implements, or state that it is off-roadmap and why.
+  specs:
+    - Numeric behavior (angles, times, distances, coordinates) is specified with concrete values and tolerances.
+    - Specify the behavior when required data is missing or unavailable; never rely on an implicit default.
+  design:
+    - List every open decision under "Open Questions" with a recommendation; they are resolved with the user before apply.
+    - State a performance budget for any computation triggered by user interaction.
+  tasks:
+    - Every task ends with its verification step, the exact command or manual check plus the expected result.
+    - Tests are written and run together with the code they cover, one at a time.
+
+operations:
+  apply:
+    guidance:
+      - Run ./scripts/verify-local.sh before pushing; report failures with the raw error, do not silently retry.
+  archive:
+    guidance:
+      - Run the verify workflow before archiving, and update the change's status in docs/roadmap.md.
