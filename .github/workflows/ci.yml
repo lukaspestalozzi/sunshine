@@ -7,6 +7,23 @@ on:
     branches: [ main, develop ]
 
 jobs:
+  specs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate OpenSpec specs and changes
+        env:
+          OPENSPEC_TELEMETRY: '0'
+        run: npx --yes @fission-ai/openspec@1.13.2 validate --all --strict --no-interactive
+
   build:
     runs-on: ubuntu-latest
 
@@ -14,7 +31,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Temporary gate: the Gradle modules are (re)created by the OpenSpec change add-app-shell,
+      # which removes this gate again.
+      - name: Detect Gradle modules
+        id: gradle
+        run: |
+          if [ -f app/build.gradle.kts ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No Gradle modules yet - Gradle steps skipped until add-app-shell is applied."
+          fi
+
       - name: Set up JDK 17
+        if: steps.gradle.outputs.present == 'true'
         uses: actions/setup-java@v4
         with:
           java-version: '17'
@@ -22,23 +52,27 @@ jobs:
           cache: gradle
 
       - name: Grant execute permission for gradlew
+        if: steps.gradle.outputs.present == 'true'
         run: chmod +x gradlew
 
       - name: Run ktlint
+        if: steps.gradle.outputs.present == 'true'
         run: ./gradlew ktlintCheck
 
       - name: Run detekt
+        if: steps.gradle.outputs.present == 'true'
         run: ./gradlew detekt
 
       - name: Run Android lint
+        if: steps.gradle.outputs.present == 'true'
         run: ./gradlew lintDebug
 
       - name: Run unit tests
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.gradle.outputs.present == 'true' }}
         run: ./gradlew testDebugUnitTest
 
       - name: Build debug APK
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.gradle.outputs.present == 'true' }}
         run: ./gradlew assembleDebug
 
       - name: Upload build reports
