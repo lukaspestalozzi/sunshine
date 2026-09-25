@@ -96,7 +96,7 @@ run_standalone_detekt() {
     log_info "Using standalone detekt..."
     local detekt
     detekt=$(setup_detekt)
-    local config="$PROJECT_DIR/app/config/detekt/detekt.yml"
+    local config="$PROJECT_DIR/config/detekt/detekt.yml"
 
     cd "$PROJECT_DIR"
     if [ -f "$config" ]; then
