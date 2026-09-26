@@ -39,6 +39,14 @@ class ElevationTilesTest {
         assertEquals(setOf(4095, 0), tiles.map { it.x }.toSet())
     }
 
+    // 179.9999° is 0.58 px (> half a pixel) west of the antimeridian: both samples are in the last column.
+    @Test
+    fun `samples just west of the antimeridian do not wrap`() {
+        val tiles = tilesFor(GeoPoint(46.6863, 179.9999), ZOOM, SIZE)
+
+        assertEquals(setOf(4095), tiles.map { it.x }.toSet())
+    }
+
     private companion object {
         const val ZOOM = 12
         const val SIZE = 512

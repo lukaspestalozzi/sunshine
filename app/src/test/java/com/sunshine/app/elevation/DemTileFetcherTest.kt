@@ -4,7 +4,11 @@ import com.sunshine.app.network.UserAgentInterceptor
 import com.sunshine.core.TileKey
 import java.io.File
 import java.io.IOException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import okhttp3.Interceptor
 import okhttp3.Protocol
@@ -14,6 +18,7 @@ import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 
@@ -64,6 +69,29 @@ class DemTileFetcherTest {
             assertNull(fetcher { if (it.request().isForcedCache()) respond(it, 504) else throw IOException("offline") }.fetch(KEY))
         }
 
+    @Test
+    fun `cancelling a fetch cancels its HTTP call`() =
+        runBlocking {
+            val requestStarted = CountDownLatch(1)
+            val callCanceled = CountDownLatch(1)
+            val fetcher =
+                fetcher { chain ->
+                    requestStarted.countDown()
+                    // A slow server: waits until the call is cancelled (at most 5 s).
+                    repeat(500) {
+                        if (chain.call().isCanceled()) callCanceled.countDown()
+                        Thread.sleep(10)
+                    }
+                    throw IOException("timed out")
+                }
+            val fetch = launch(Dispatchers.Default) { fetcher.fetch(KEY) }
+            assertTrue(requestStarted.await(5, TimeUnit.SECONDS))
+
+            fetch.cancel()
+
+            assertTrue(callCanceled.await(5, TimeUnit.SECONDS), "the HTTP call was not cancelled")
+        }
+
     // Stands in for the network behind the production client.
     private fun fetcher(network: (Interceptor.Chain) -> Response): DemTileFetcher {
         val client =
@@ -73,7 +101,7 @@ class DemTileFetcherTest {
                     requests += chain.request()
                     network(chain)
                 }.build()
-        return DemTileFetcher(client, Dispatchers.IO)
+        return DemTileFetcher(client)
     }
 
     private fun respond(

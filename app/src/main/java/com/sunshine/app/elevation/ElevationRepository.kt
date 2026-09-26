@@ -33,26 +33,33 @@ class ElevationRepository(
             override fun removeEldestEntry(eldest: MutableMap.MutableEntry<TileKey, HeightTile>) = size > MEMORY_TILES
         }
 
-    /** The elevation at [point], loading the tiles it needs. */
+    /**
+     * The elevation at [point], loading the tiles it needs that are not in memory. Tiles that load
+     * are kept even when a neighbour fails, so a retry fetches only the missing ones.
+     */
     suspend fun elevation(point: GeoPoint): Elevation {
-        cachedElevation(point)?.let { return it }
         val keys = keys(point)
+        if (keys.isEmpty()) return Elevation.Unknown
+        val inMemory = inMemory(keys)
         val loaded =
             coroutineScope {
-                keys.map { key -> async { load(key)?.let { key to it } } }.awaitAll()
+                (keys - inMemory.keys).map { key -> async { load(key)?.let { key to it } } }.awaitAll()
             }.filterNotNull().toMap()
-        if (loaded.size < keys.size) return Elevation.Unknown
         synchronized(tiles) { tiles.putAll(loaded) }
-        return known(point, loaded)
+        val available = inMemory + loaded
+        return if (available.size == keys.size) known(point, available) else Elevation.Unknown
     }
 
     /** The elevation at [point] if it can be answered from memory alone, else `null`. */
     fun cachedElevation(point: GeoPoint): Elevation? {
         val keys = keys(point)
         if (keys.isEmpty()) return Elevation.Unknown
-        val inMemory = synchronized(tiles) { keys.mapNotNull { key -> tiles[key]?.let { key to it } }.toMap() }
+        val inMemory = inMemory(keys)
         return if (inMemory.size == keys.size) known(point, inMemory) else null
     }
+
+    private fun inMemory(keys: Set<TileKey>): Map<TileKey, HeightTile> =
+        synchronized(tiles) { keys.mapNotNull { key -> tiles[key]?.let { key to it } }.toMap() }
 
     private suspend fun load(key: TileKey): HeightTile? {
         val pixels = fetch(key)?.let(decode) ?: return null

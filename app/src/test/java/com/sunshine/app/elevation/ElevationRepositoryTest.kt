@@ -55,6 +55,20 @@ class ElevationRepositoryTest {
         }
 
     @Test
+    fun `a loaded tile is kept when its neighbour fails, and only the missing tile is fetched again`() =
+        runTest {
+            var eastAvailable = false
+            val repository = repository(fetch = { key -> if (key.x == 2138 && !eastAvailable) null else TILE_BYTES })
+            assertEquals(Elevation.Unknown, repository.elevation(TILE_BORDER))
+            fetched.clear()
+
+            eastAvailable = true
+            assertEquals(Elevation.Known(568.0), repository.elevation(TILE_BORDER))
+
+            assertEquals(listOf(TileKey(12, 2138, 1445)), fetched)
+        }
+
+    @Test
     fun `the memory fast path answers only once the tiles are loaded`() =
         runTest {
             val repository = repository()
