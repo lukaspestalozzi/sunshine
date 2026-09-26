@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Sunshine</string>
+    <string name="map_attribution">© OpenStreetMap contributors, SRTM | Map style: © OpenTopoMap (CC-BY-SA)</string>
+    <string name="map_offline_notice">You are offline. Map tiles may be missing.</string>
 </resources>
