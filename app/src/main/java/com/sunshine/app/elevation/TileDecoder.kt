@@ -6,8 +6,8 @@ import android.graphics.BitmapFactory
 /**
  * ARGB pixels (row-major) of an encoded [size] × [size] tile image, or `null` if it cannot be
  * decoded or has other dimensions. Mapterhorn tiles are lossless WebP without alpha or colour
- * profile, so the pixels should be the encoded values (design D5; bit-exactness is still to be
- * confirmed on a device, task 5.2).
+ * profile, so the pixels are the encoded values (design D5; bit-exactness checked on a device,
+ * task 5.2).
  */
 fun decodeArgb(
     bytes: ByteArray,

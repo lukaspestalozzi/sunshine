@@ -26,7 +26,7 @@
 ## 5. Integration
 
 - [x] 5.1 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, all unit tests and the debug APK build pass, and validation reports no failures.
-- [ ] 5.2 On-device check with the CI APK (design Verification strategy). Expected:
+- [x] 5.2 On-device check with the CI APK (design Verification strategy). Expected:
   - The panel shows `Altitude 568 m` at Interlaken, `Altitude 2061 m` at Kleine Scheidegg and `Altitude 1634 m` at Mürren (±1 m); this also checks bit-exact decoding.
   - Panning to a new area shows `Altitude …`, then a value.
   - In flight mode, an unvisited location shows `Altitude unknown`, and a visited one keeps its value.

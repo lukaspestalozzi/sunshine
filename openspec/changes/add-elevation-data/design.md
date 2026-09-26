@@ -227,9 +227,8 @@ about 5 lines, which still does not justify Koin (same reasoning as `add-sun-pos
   for 7+ days, and identified by User-Agent (see Open Questions).
 - [Tiles are rebuilt and values shift slightly] → Tests use pinned fixtures (D11). The cache
   revalidates after 7 days, and a location's value can change by decimetres after a rebuild.
-- [`BitmapFactory` decoding not bit-exact on some device] → To be checked on a device (D5,
-  task 5.2, still pending); errors would be metres to hundreds of metres, so the check detects
-  them.
+- [`BitmapFactory` decoding not bit-exact on some device] → Checked on a device (D5, task 5.2,
+  passed 2026-09-26); errors would be metres to hundreds of metres, so the check detects them.
 - [Copernicus fallback (surface model) outside national coverage counts as known] → Accepted
   (D6); it is irrelevant in the Alps.
 - [Android clears the cache directory; offline data disappears] → Accepted until change 6 brings
