@@ -25,6 +25,26 @@ fi
 openspec config set profile custom >/dev/null
 openspec config set workflows "$OPENSPEC_WORKFLOWS" >/dev/null
 
+# --- Maven Central mirror ---------------------------------------------------
+# Maven Central answers HTTP 429 from cloud sessions, so Gradle resolves its artifacts from
+# Google's public mirror here. Project build files, CI and local machines keep mavenCentral().
+mkdir -p "$HOME/.gradle/init.d"
+cat > "$HOME/.gradle/init.d/maven-central-mirror.init.gradle.kts" <<'EOF'
+// Written by .claude/hooks/session-start.sh (Claude Code cloud sessions only).
+val mavenCentralMirror = "https://maven-central.storage-download.googleapis.com/maven2/"
+val mavenCentralHosts = setOf("repo.maven.apache.org", "repo1.maven.org")
+
+fun RepositoryHandler.useMavenCentralMirror() =
+    withType(MavenArtifactRepository::class.java).configureEach {
+        if (url.host in mavenCentralHosts) setUrl(mavenCentralMirror)
+    }
+
+beforeSettings {
+    pluginManagement.repositories.useMavenCentralMirror()
+    dependencyResolutionManagement.repositories.useMavenCentralMirror()
+}
+EOF
+
 # --- Android SDK ------------------------------------------------------------
 ANDROID_CLI="$ANDROID_SDK_DIR/cmdline-tools/latest/bin/android" # replaces the deprecated sdkmanager
 if [ ! -x "$ANDROID_CLI" ]; then
