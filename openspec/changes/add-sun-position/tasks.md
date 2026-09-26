@@ -50,9 +50,9 @@
 
 ## 5. app: UI
 
-- [ ] 5.1 Make the map north-up and flat: `rotateGesturesEnabled(false)` and `tiltGesturesEnabled(false)` in `mapOptions` (design D5). Verify: `./gradlew :app:assembleDebug :app:lintDebug` passes (gesture behavior is checked on the device in 6.3).
-- [ ] 5.2 Add `SunPanel`: the selected-time label with the zone ID, a date button opening a `DatePickerDialog`, "Now", the continuous slider, azimuth, elevation, civil dawn, sunrise, sunset, civil dusk, day length and the whole-day text. Place it at the bottom above the attribution, without covering the crosshair. New texts go to `strings.xml`. Verify: `./gradlew ktlintCheck :app:lintDebug :app:assembleDebug` passes.
-- [ ] 5.3 Add `SunLine`, a `Canvas` overlay from the crosshair centre at the azimuth angle, 30 % of the shorter side of the map, solid above and dashed below the horizon, drawn between the map and the crosshair (design D5). Verify: `./gradlew ktlintCheck :app:lintDebug :app:assembleDebug` passes.
+- [x] 5.1 Make the map north-up and flat: `rotateGesturesEnabled(false)` and `tiltGesturesEnabled(false)` in `mapOptions` (design D5). Verify: `./gradlew :app:assembleDebug :app:lintDebug` passes (gesture behavior is checked on the device in 6.3).
+- [x] 5.2 Add `SunPanel`: the selected-time label with the zone ID, a date button opening a `DatePickerDialog`, "Now", the continuous slider, azimuth, elevation, civil dawn, sunrise, sunset, civil dusk, day length and the whole-day text. Place it at the bottom above the attribution, without covering the crosshair. New texts go to `strings.xml`. Verify: `./gradlew ktlintCheck :app:lintDebug :app:assembleDebug` passes.
+- [x] 5.3 Add `SunLine`, a `Canvas` overlay from the crosshair centre at the azimuth angle, 30 % of the shorter side of the map, solid above and dashed below the horizon, drawn between the map and the crosshair (design D5). Verify: `./gradlew ktlintCheck :app:lintDebug :app:assembleDebug` passes.
 
 ## 6. Integration checks
 

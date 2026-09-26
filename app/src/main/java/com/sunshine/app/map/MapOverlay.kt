@@ -37,12 +37,16 @@ fun Crosshair(modifier: Modifier = Modifier) {
     }
 }
 
-/** Selected-location coordinates, offline notice and attribution, kept clear of the system bars. */
+/**
+ * Selected-location coordinates, offline notice, [bottomPanel] and attribution, kept clear of the
+ * system bars. [bottomPanel] sits directly above the attribution, so it never covers it.
+ */
 @Composable
 fun MapLabels(
     camera: CameraState,
     isOffline: Boolean,
     modifier: Modifier = Modifier,
+    bottomPanel: @Composable () -> Unit = {},
 ) {
     Box(
         modifier
@@ -63,11 +67,16 @@ fun MapLabels(
                 )
             }
         }
-        Label(
-            text = stringResource(R.string.map_attribution),
+        Column(
             modifier = Modifier.align(Alignment.BottomStart),
-            style = MaterialTheme.typography.labelSmall,
-        )
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            bottomPanel()
+            Label(
+                text = stringResource(R.string.map_attribution),
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
     }
 }
 

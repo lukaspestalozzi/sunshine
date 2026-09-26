@@ -74,6 +74,9 @@ private fun mapOptions(
                 .build(),
         ).minZoomPreference(MIN_ZOOM)
         .maxZoomPreference(MAX_ZOOM)
+        // North-up and flat, so up on the screen is north and the sun line's angle is the azimuth.
+        .rotateGesturesEnabled(false)
+        .tiltGesturesEnabled(false)
         .logoEnabled(false)
         .attributionEnabled(false)
 
