@@ -66,4 +66,7 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     // Screenshots are written on every run, for review only; nothing is compared (add-ui-screenshot-tests D5).
     systemProperty("roborazzi.test.record", "true")
+    // Robolectric simulating SDK 35+ sets up ApplicationSharedMemory through JDK internals, which JDK 17+
+    // only allows with this flag ("Failed to interact with raw FileDescriptor internals" otherwise).
+    jvmArgs("--add-opens=java.base/jdk.internal.access=ALL-UNNAMED")
 }
