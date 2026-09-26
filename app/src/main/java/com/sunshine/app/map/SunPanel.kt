@@ -33,6 +33,7 @@ import java.time.ZonedDateTime
 fun SunPanel(
     selectedTime: ZonedDateTime,
     sun: SunInfo?,
+    elevation: ElevationState,
     onDateSelected: (LocalDate) -> Unit,
     onSliderMoved: (Float) -> Unit,
     onNowClicked: () -> Unit,
@@ -62,6 +63,8 @@ fun SunPanel(
                 valueRange = 0f..(sliderPositions(selectedTime.toLocalDate(), selectedTime.zone) - 1) * SLIDER_STEP_MINUTES.toFloat(),
                 modifier = Modifier.semantics { contentDescription = timeOfDay },
             )
+            // The altitude belongs to the location, not the time, so it does not wait for the sun values.
+            Value(R.string.sun_panel_altitude, formatAltitude(elevation))
             if (sun != null) SunValues(sun, selectedTime)
         }
     }

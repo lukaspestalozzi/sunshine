@@ -1,6 +1,7 @@
 package com.sunshine.app.map
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,10 +20,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import com.sunshine.app.R
+import com.sunshine.app.elevation.MapterhornTiles
 
 /** Crosshair marking the selected location; must share the map's bounds so it sits on the map centre. */
 @Composable
@@ -38,8 +41,9 @@ fun Crosshair(modifier: Modifier = Modifier) {
 }
 
 /**
- * Selected-location coordinates, offline notice, [bottomPanel] and attribution, kept clear of the
- * system bars. [bottomPanel] sits directly above the attribution, so it never covers it.
+ * Selected-location coordinates, offline notice, [bottomPanel] and the map and elevation
+ * attributions, kept clear of the system bars. [bottomPanel] sits directly above the attributions,
+ * so it never covers them. The elevation attribution opens the list of Mapterhorn's sources.
  */
 @Composable
 fun MapLabels(
@@ -75,6 +79,12 @@ fun MapLabels(
             Label(
                 text = stringResource(R.string.map_attribution),
                 style = MaterialTheme.typography.labelSmall,
+            )
+            val uriHandler = LocalUriHandler.current
+            Label(
+                text = stringResource(R.string.elevation_attribution),
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.clickable { uriHandler.openUri(MapterhornTiles.ATTRIBUTION_URL) },
             )
         }
     }

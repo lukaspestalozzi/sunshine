@@ -3,6 +3,8 @@ package com.sunshine.app.map
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.sunshine.app.elevation.Elevation
+import com.sunshine.app.elevation.ElevationRepository
 import com.sunshine.core.DEFAULT_LOCATION
 import com.sunshine.core.GeoPoint
 import com.sunshine.core.SunDay
@@ -26,6 +28,7 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.transform
 
 data class CameraState(
     val center: GeoPoint,
@@ -38,6 +41,17 @@ data class SunInfo(
     val day: SunDay,
 )
 
+/** Elevation of the selected location as shown on screen. */
+sealed interface ElevationState {
+    data object Loading : ElevationState
+
+    data class Known(
+        val metres: Double,
+    ) : ElevationState
+
+    data object Unknown : ElevationState
+}
+
 /**
  * State of the map screen. Times are in the zone of [clock] as it is when the view model is created
  * (the device time zone in production).
@@ -46,6 +60,7 @@ class MapViewModel(
     private val savedState: SavedStateHandle,
     isOnline: Flow<Boolean>,
     private val clock: Clock,
+    private val elevationRepository: ElevationRepository,
     computeDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
     private val zone: ZoneId = clock.zone
@@ -64,6 +79,24 @@ class MapViewModel(
             .map { (point, time) -> SunInfo(sunPosition(point, time.toInstant()), sunDay(point, time.toLocalDate(), zone)) }
             .flowOn(computeDispatcher)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), initialValue = null)
+
+    // Re-evaluated when the location changes or the network returns (an unknown elevation may then
+    // load). A result that arrives after the camera has moved on is dropped, so a previous
+    // location's value is never shown for the new one.
+    val elevation: StateFlow<ElevationState> =
+        combine(camera, isOnline) { camera, _ -> camera.center }
+            .conflate()
+            .transform { point ->
+                val cached = elevationRepository.cachedElevation(point)
+                if (cached != null) {
+                    emit(cached.toState())
+                } else {
+                    emit(ElevationState.Loading)
+                    val loaded = elevationRepository.elevation(point).toState()
+                    if (camera.value.center == point) emit(loaded)
+                }
+            }.flowOn(computeDispatcher)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), initialValue = ElevationState.Loading)
 
     // The monitor emits the current state as soon as it is collected; `false` only covers the
     // moment before that first emission.
@@ -109,6 +142,12 @@ class MapViewModel(
         }
         return CameraState(center = GeoPoint(latitude, longitude), zoom = zoom)
     }
+
+    private fun Elevation.toState(): ElevationState =
+        when (this) {
+            is Elevation.Known -> ElevationState.Known(metres)
+            Elevation.Unknown -> ElevationState.Unknown
+        }
 
     private companion object {
         const val DEFAULT_ZOOM = 10.0

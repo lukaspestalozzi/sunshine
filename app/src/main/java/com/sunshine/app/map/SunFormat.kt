@@ -28,6 +28,14 @@ fun formatAzimuth(azimuth: Double): String {
 /** One decimal, e.g. `19.7°`, `-0.7°`. */
 fun formatElevation(elevation: Double): String = "${roundHalfUp(elevation, decimals = 1).toPlainString()}°"
 
+/** Whole metres, e.g. `1634 m`; `…` while loading and `unknown` when unknown (elevation-data spec). */
+fun formatAltitude(elevation: ElevationState): String =
+    when (elevation) {
+        is ElevationState.Known -> "${roundHalfUp(elevation.metres, decimals = 0).toPlainString()} m"
+        ElevationState.Loading -> "…"
+        ElevationState.Unknown -> "unknown"
+    }
+
 /** `HH:mm` rounded to the nearest minute, with the offset appended when it differs from [selected]'s. */
 fun formatEventTime(
     event: ZonedDateTime?,
