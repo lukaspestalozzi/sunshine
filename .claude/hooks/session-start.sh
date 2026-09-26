@@ -13,8 +13,9 @@ OPENSPEC_WORKFLOWS='["propose","explore","apply","update","sync","archive","veri
 
 ANDROID_SDK_DIR="$HOME/android-sdk"
 CMDLINE_TOOLS_BUILD="16111833" # cmdline-tools 23.0
-# Keep in sync with compileSdk / build tools used by the Gradle build.
-ANDROID_PACKAGES=("platforms;android-37.0" "build-tools;37.0.0")
+# Exactly what the Gradle build uses (compileSdk 37, AGP 9.4's default build-tools, platform-tools);
+# anything missing here is downloaded by AGP during the first build instead.
+ANDROID_PACKAGES=("platforms;android-37.0" "build-tools;36.0.0" "platform-tools")
 
 export OPENSPEC_TELEMETRY=0
 
