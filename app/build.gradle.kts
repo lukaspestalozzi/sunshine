@@ -34,6 +34,9 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.lifecycle.viewmodel)
     implementation(libs.androidx.lifecycle.viewmodel.savedstate)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.maplibre.android.sdk)
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
