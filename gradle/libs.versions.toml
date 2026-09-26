@@ -9,6 +9,7 @@ maplibre = "13.6.1"
 # Must match the OkHttp version MapLibre depends on (design D7).
 okhttp = "4.12.0"
 junit = "6.1.3"
+commonsSuncalc = "3.11"
 ktlint = "14.2.0"
 
 [libraries]
@@ -24,6 +25,7 @@ okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhtt
 junit-bom = { group = "org.junit", name = "junit-bom", version.ref = "junit" }
 junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter" }
 junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher" }
+commons-suncalc = { group = "org.shredzone.commons", name = "commons-suncalc", version.ref = "commonsSuncalc" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 
 [plugins]

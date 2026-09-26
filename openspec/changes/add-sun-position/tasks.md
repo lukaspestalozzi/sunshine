@@ -2,8 +2,8 @@
 
 ## 1. Reference values and dependency
 
-- [ ] 1.1 Write `investigations/sun-position-references.md` (design D9). For every numeric scenario of the `sun-position` spec it records the commons-suncalc 3.11 output, the astral 3.2 (NOAA) output, the timeanddate.com value where one exists (from `investigations/sunrise-integration-test-plan.md`), and the scripts used to produce them. It also records the refraction gap measured below 0° (Interlaken, 2025-12-21, 07:50–08:35). Verify: every expected value in `specs/sun-position/spec.md` appears in the file, and both implementations lie within the spec tolerance of it (the 08:11 elevation is the documented exception for astral).
-- [ ] 1.2 Add `org.shredzone.commons:commons-suncalc` to `gradle/libs.versions.toml` (3.11, or a newer stable at apply time) and as an `implementation` dependency of `core`. Verify: `./gradlew :core:dependencies --configuration runtimeClasspath` lists commons-suncalc and no other new artifact, and `./gradlew :core:build` passes.
+- [x] 1.1 Write `investigations/sun-position-references.md` (design D9). For every numeric scenario of the `sun-position` spec it records the commons-suncalc 3.11 output, the astral 3.2 (NOAA) output, the timeanddate.com value where one exists (from `investigations/sunrise-integration-test-plan.md`), and the scripts used to produce them. It also records the refraction gap measured below 0° (Interlaken, 2025-12-21, 07:50–08:35). Verify: every expected value in `specs/sun-position/spec.md` appears in the file, and both implementations lie within the spec tolerance of it (the 08:11 elevation is the documented exception for astral).
+- [x] 1.2 Add `org.shredzone.commons:commons-suncalc` to `gradle/libs.versions.toml` (3.11, or a newer stable at apply time) and as an `implementation` dependency of `core`. Verify: `./gradlew :core:dependencies --configuration runtimeClasspath` lists commons-suncalc and no other new artifact, and `./gradlew :core:build` passes.
 
 ## 2. core: sun position
 

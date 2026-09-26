@@ -8,6 +8,8 @@ kotlin {
 }
 
 dependencies {
+    implementation(libs.commons.suncalc)
+
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
