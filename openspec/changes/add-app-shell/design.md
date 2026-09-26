@@ -65,7 +65,9 @@ The ViewModel holds the camera state (centre `GeoPoint` and zoom) and `isOffline
   `SavedStateHandle`, so it survives rotation and process death. It is applied to the `MapView`
   when that is (re)created.
 - The ViewModel is created with a `viewModelFactory { initializer { … } }` that passes its two
-  dependencies explicitly (`SavedStateHandle`, `NetworkMonitor`).
+  dependencies explicitly: the `SavedStateHandle` and `NetworkMonitor(…).isOnline`. The ViewModel
+  takes that `Flow<Boolean>` rather than the monitor itself, so tests fake it with a
+  `MutableStateFlow` and no interface exists only for testing.
 *Alternative:* Koin now. Rejected: a two-dependency graph does not justify it (project context:
 no speculative abstractions); Koin is introduced by the first change with a real object graph.
 
@@ -73,14 +75,19 @@ no speculative abstractions); Koin is introduced by the first change with a real
 - `core`: `data class GeoPoint(latitude, longitude)` validates finite values,
   latitude ∈ [-90, 90] and longitude ∈ [-180, 180], and throws `IllegalArgumentException`
   otherwise. It also defines `DEFAULT_LOCATION` = 46.8182, 8.2275.
-- `app` (UI): a pure `formatCoordinates(GeoPoint): String` using `Locale.ROOT`, 4 decimals and
-  N/S/E/W letters.
-- Rounding mode: `HALF_UP`, applied to the absolute value.
+- `app` (UI): a pure `formatCoordinates(GeoPoint): String` with 4 decimals and N/S/E/W letters.
+  It formats with `BigDecimal.toPlainString()`, which never uses the device locale.
+- Rounding mode: `HALF_UP` on the signed value. It is symmetric, so this equals rounding the
+  absolute value. The hemisphere letter comes from the rounded value, so a value that rounds to
+  zero gets the positive letter (-0.00001 → `0.0000° N`).
 
 ### D7. User-Agent via MapLibre's OkHttp client
 The app gives MapLibre an `OkHttpClient` with an interceptor that sets
-`Sunshine/<BuildConfig.VERSION_NAME> (Android; com.sunshine.app)`, through `HttpRequestUtil`. The
-interceptor is a small class, unit-tested with a fake `Interceptor.Chain`.
+`Sunshine/<BuildConfig.VERSION_NAME> (Android; com.sunshine.app)`, through `HttpRequestUtil`.
+The client keeps MapLibre's default limit of 20 requests per host (OkHttp's own default is 5).
+The interceptor is a small class. Its test puts it in a real `OkHttpClient` in front of a fake
+final interceptor that records the request instead of sending it; this also shows that the
+User-Agent MapLibre sets itself is replaced.
 OkHttp is declared explicitly at **4.12.0**, the version MapLibre 13.6.1 depends on (user
 decision). This is a deliberate exception to D2's "newest stable" rule: OkHttp 5.5.0 would
 force-upgrade the map library's HTTP stack.
