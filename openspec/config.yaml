@@ -19,9 +19,9 @@ context: |
   - Kotlin, Jetpack Compose (Material 3), MVVM with StateFlow, Koin DI, Coroutines/Flow.
   - Map: MapLibre Native Android showing OpenTopoMap raster tiles. osmdroid is archived; do not use.
   - Sun position: commons-suncalc (see investigations/suncalc-library-evaluation.md).
-  - Elevation: DEM tiles from AWS Open Data "Terrain Tiles" (Terrarium PNG or Skadi HGT; the exact
-    format is decided in the elevation change), downloaded and decoded locally. No per-point
-    online elevation API.
+  - Elevation: Mapterhorn DEM tiles (Terrarium-encoded lossless WebP, 512 px, zoom 12), downloaded
+    and decoded locally (see investigations/dem-source-evaluation.md and change
+    add-elevation-data). No per-point online elevation API.
   - Dependency versions: latest stable at implementation time, managed in gradle/libs.versions.toml.
 
   Modules
@@ -33,8 +33,10 @@ context: |
   Data sources and attribution (attribution must be visible in the app)
   - Map tiles: OpenTopoMap ("Map data: © OpenStreetMap contributors, SRTM | Map style: © OpenTopoMap
     (CC-BY-SA)").
-  - Elevation: AWS Terrain Tiles (Tilezen/joerd). For Europe the sources include EU-DEM (Copernicus),
-    Austria DGM (CC BY 3.0 AT) and SRTM (USGS); attribution per tilezen/joerd docs/attribution.md.
+  - Elevation: Mapterhorn ("Elevation: © Mapterhorn and its sources", linking to
+    https://mapterhorn.com/attribution/). In the Alps the sources are national terrain models
+    (swisstopo, BEV, Bavaria, IGN, ARSO, Italian regions and provinces) with Copernicus GLO-30 as
+    fallback elsewhere; the full list is https://download.mapterhorn.com/attribution.json.
   - Requests to tile servers identify the app with a descriptive User-Agent.
 
   Quality bar
