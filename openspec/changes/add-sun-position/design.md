@@ -138,9 +138,11 @@ fun sunDay(point: GeoPoint, date: LocalDate, zone: ZoneId): SunDay
 - `MapViewModel(savedState, isOnline, clock, computeDispatcher)` adds:
   - `selectedTime: StateFlow<ZonedDateTime>`, with `onDateSelected(LocalDate)`,
     `onSliderMoved(minutesSinceStartOfDay: Float)` and `onNowClicked()`;
-  - `sun: StateFlow<SunInfo?>`, which is `combine(camera, selectedTime)` →
-    `mapLatest { sunPosition + sunDay }` → `flowOn(computeDispatcher)` → `stateIn`. `null` only
-    covers the moment before the first result.
+  - `sun: StateFlow<SunInfo?>`, which is `combine(camera, selectedTime)` → `conflate()` →
+    `map { sunPosition + sunDay }` → `flowOn(computeDispatcher)` → `stateIn`. `null` only
+    covers the moment before the first result. (Planned as `mapLatest`; changed during apply
+    because `mapLatest` is experimental and needs an opt-in. `conflate()` also drops stale
+    inputs.)
 - Pure, JVM-tested files next to `CoordinateFormat.kt`:
   - `TimeSelection.kt`: day window, slider length and snapping, the date change with the DST gap
     rule, and the picker millisecond conversion.
@@ -148,7 +150,9 @@ fun sunDay(point: GeoPoint, date: LocalDate, zone: ZoneId): SunDay
     times with conditional offset, day length. Built on `BigDecimal` / `Locale.ROOT` like
     `formatCoordinates`.
 - Composables: `SunPanel` (bottom, above the attribution, holding the values, a date button,
-  "Now" and the slider) and `SunLine`, both in `app/map`. New strings go to `strings.xml`.
+  "Now" and the slider) and `SunLine`, both in `app/map`. UI labels (Sunrise, Now, …) go to
+  `strings.xml`. The value texts fixed by the spec (`none this day`, the two whole-day texts) are
+  constants in `SunFormat.kt`, so its JVM tests can check them (decided during apply).
 
 ### D8. Still no DI framework
 The factory in `MapScreen.kt` passes `Clock.systemDefaultZone()` and `Dispatchers.Default`, and
@@ -170,7 +174,7 @@ object graph don't justify Koin yet (same reasoning as add-app-shell D5).
 - Trigger: every camera-move event and every change of the selected time.
 - Work: one `SunPosition` and two `SunTimes` computations. Measured at 0.06–0.3 ms per
   recomputation on the desktop JVM.
-- Budget: ≤ 5 ms per recomputation on a mid-range phone, on `Dispatchers.Default`. `mapLatest`
+- Budget: ≤ 5 ms per recomputation on a mid-range phone, on `Dispatchers.Default`. `conflate()`
   drops stale inputs, so a fast pan never queues work. The main thread only formats strings,
   which is O(1).
 
