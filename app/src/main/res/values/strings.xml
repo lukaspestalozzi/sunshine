@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">Sunshine</string>
     <string name="map_attribution">© OpenStreetMap contributors, SRTM | Map style: © OpenTopoMap (CC-BY-SA)</string>
+    <string name="elevation_attribution">Elevation: © Mapterhorn and its sources</string>
     <string name="map_offline_notice">You are offline. Map tiles may be missing.</string>
     <string name="sun_panel_date">Date</string>
     <string name="sun_panel_now">Now</string>
@@ -13,4 +14,5 @@
     <string name="sun_panel_sunset">Sunset</string>
     <string name="sun_panel_civil_dusk">Civil dusk</string>
     <string name="sun_panel_day_length">Day length</string>
+    <string name="sun_panel_altitude">Altitude</string>
 </resources>

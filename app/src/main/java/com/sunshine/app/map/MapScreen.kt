@@ -21,6 +21,7 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.sunshine.app.SunshineApp
 import com.sunshine.app.network.NetworkMonitor
 import java.time.Clock
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +32,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel(factory = mapViewModelFactory)
     val isOffline by viewModel.isOffline.collectAsStateWithLifecycle()
     val selectedTime by viewModel.selectedTime.collectAsStateWithLifecycle()
     val sun by viewModel.sun.collectAsStateWithLifecycle()
+    val elevation by viewModel.elevation.collectAsStateWithLifecycle()
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val startInset = WindowInsets.safeDrawing.asPaddingValues().calculateStartPadding(LocalLayoutDirection.current)
@@ -46,6 +48,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel(factory = mapViewModelFactory)
             SunPanel(
                 selectedTime = selectedTime,
                 sun = sun,
+                elevation = elevation,
                 onDateSelected = viewModel::onDateSelected,
                 onSliderMoved = viewModel::onSliderMoved,
                 onNowClicked = viewModel::onNowClicked,
@@ -87,6 +90,7 @@ private val mapViewModelFactory =
                 savedState = createSavedStateHandle(),
                 isOnline = NetworkMonitor(connectivityManager).isOnline,
                 clock = Clock.systemDefaultZone(),
+                elevationRepository = (application as SunshineApp).elevationRepository,
                 computeDispatcher = Dispatchers.Default,
             )
         }

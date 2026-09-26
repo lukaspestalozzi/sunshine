@@ -109,4 +109,31 @@ class SunFormatTest {
     private companion object {
         val WINTER_NOON: ZonedDateTime = ZonedDateTime.parse("2025-12-21T12:00+01:00[Europe/Zurich]")
     }
+
+    // The panel prefixes the label "Altitude" (strings.xml).
+    @ParameterizedTest(name = "{0} m")
+    @CsvSource("1634.43, 1634 m", "567.5, 568 m", "-0.4, 0 m", "-12.6, -13 m")
+    fun `formats a known altitude in whole metres`(
+        metres: Double,
+        expected: String,
+    ) {
+        assertEquals(expected, formatAltitude(ElevationState.Known(metres)))
+    }
+
+    @Test
+    fun `altitude does not depend on the device locale`() {
+        val originalLocale = Locale.getDefault()
+        Locale.setDefault(Locale.forLanguageTag("de-CH"))
+        try {
+            assertEquals("2061 m", formatAltitude(ElevationState.Known(2061.31)))
+        } finally {
+            Locale.setDefault(originalLocale)
+        }
+    }
+
+    @Test
+    fun `shows a loading or unknown altitude explicitly`() {
+        assertEquals("…", formatAltitude(ElevationState.Loading))
+        assertEquals("unknown", formatAltitude(ElevationState.Unknown))
+    }
 }

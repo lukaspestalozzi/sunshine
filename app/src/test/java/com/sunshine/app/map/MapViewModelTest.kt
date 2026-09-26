@@ -1,13 +1,16 @@
 package com.sunshine.app.map
 
 import androidx.lifecycle.SavedStateHandle
+import com.sunshine.app.elevation.ElevationRepository
 import com.sunshine.core.DEFAULT_LOCATION
 import com.sunshine.core.GeoPoint
+import com.sunshine.core.TileKey
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -139,10 +142,97 @@ class MapViewModelTest {
             assertNotEquals(interlaken.position.azimuth, tokyo.position.azimuth)
         }
 
+    @Test
+    fun `elevation is loading until its tile arrives, then known`() =
+        runTest {
+            val tile = CompletableDeferred<ByteArray?>()
+            val viewModel =
+                newViewModel(repository = repository { tile.await() }, computeDispatcher = UnconfinedTestDispatcher(testScheduler))
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.elevation.collect {} }
+
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            assertEquals(ElevationState.Loading, viewModel.elevation.value)
+
+            tile.complete(heightBytes(568))
+            assertEquals(ElevationState.Known(568.0), viewModel.elevation.value)
+        }
+
+    @Test
+    fun `elevation within tiles in memory is known without loading`() =
+        runTest {
+            val viewModel =
+                newViewModel(repository = repository { heightBytes(568) }, computeDispatcher = UnconfinedTestDispatcher(testScheduler))
+            val states = mutableListOf<ElevationState>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.elevation.collect { states += it } }
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            states.clear()
+
+            viewModel.onCameraMoved(CameraState(center = GeoPoint(46.6870, 7.8640), zoom = 12.0))
+
+            // Equal values are not re-emitted by a StateFlow, so "no Loading" is what can be observed.
+            assertFalse(ElevationState.Loading in states)
+            assertEquals(ElevationState.Known(568.0), viewModel.elevation.value)
+        }
+
+    @Test
+    fun `elevation is unknown when its tile cannot be obtained`() =
+        runTest {
+            isOnline.value = false
+            val viewModel = newViewModel(repository = repository { null }, computeDispatcher = UnconfinedTestDispatcher(testScheduler))
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.elevation.collect {} }
+
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+
+            assertEquals(ElevationState.Unknown, viewModel.elevation.value)
+        }
+
+    @Test
+    fun `unknown elevation is loaded again when the network returns`() =
+        runTest {
+            isOnline.value = false
+            var tile: ByteArray? = null
+            val viewModel = newViewModel(repository = repository { tile }, computeDispatcher = UnconfinedTestDispatcher(testScheduler))
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.elevation.collect {} }
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            assertEquals(ElevationState.Unknown, viewModel.elevation.value)
+
+            tile = heightBytes(568)
+            isOnline.value = true
+
+            assertEquals(ElevationState.Known(568.0), viewModel.elevation.value)
+        }
+
+    @Test
+    fun `a previous location's elevation is never shown for the new location`() =
+        runTest {
+            val interlakenTile = CompletableDeferred<ByteArray?>()
+            val repository =
+                repository { key -> if (key == INTERLAKEN_TILE) interlakenTile.await() else heightBytes(1000) }
+            val viewModel = newViewModel(repository = repository, computeDispatcher = UnconfinedTestDispatcher(testScheduler))
+            val states = mutableListOf<ElevationState>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.elevation.collect { states += it } }
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+
+            viewModel.onCameraMoved(CameraState(center = GeoPoint(46.0, 9.0), zoom = 12.0))
+            interlakenTile.complete(heightBytes(568))
+
+            assertFalse(ElevationState.Known(568.0) in states)
+            assertEquals(ElevationState.Known(1000.0), viewModel.elevation.value)
+        }
+
     private fun newViewModel(
         savedState: SavedStateHandle = SavedStateHandle(),
+        repository: ElevationRepository = repository { heightBytes(568) },
         computeDispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(),
-    ) = MapViewModel(savedState, isOnline, clock, computeDispatcher)
+    ) = MapViewModel(savedState, isOnline, clock, repository, computeDispatcher)
+
+    /** Tiles whose bytes are the height of every pixel, as decimal text. */
+    private fun repository(fetch: suspend (TileKey) -> ByteArray?) =
+        ElevationRepository(fetch = fetch, decode = { bytes -> IntArray(512 * 512) { terrarium(bytes.decodeToString().toInt()) } })
+
+    private fun heightBytes(metres: Int) = metres.toString().encodeToByteArray()
+
+    private fun terrarium(metres: Int): Int = (0xFF shl 24) or ((metres + 32768) shl 8)
 
     /** A clock the test can move; the view model reads the zone and "now" from it. */
     private class MutableClock(
@@ -158,5 +248,7 @@ class MapViewModelTest {
 
     private companion object {
         val ZURICH: ZoneId = ZoneId.of("Europe/Zurich")
+        val INTERLAKEN = GeoPoint(46.6863, 7.8632)
+        val INTERLAKEN_TILE = TileKey(12, 2137, 1445)
     }
 }
