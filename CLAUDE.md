@@ -3,8 +3,8 @@
 Android app that shows where and when the sun actually shines, taking terrain occlusion into
 account. Target users: hikers in the Alps. Offline-first.
 
-**Status:** from-scratch rewrite, driven by OpenSpec. There is no app code yet; the first change
-is `add-app-shell` (see `docs/roadmap.md`).
+**Status:** from-scratch rewrite, driven by OpenSpec. The first change, `add-app-shell`, provides
+the app skeleton: the map screen and the build (see `docs/roadmap.md`).
 
 ## Where things are
 
@@ -16,9 +16,11 @@ is `add-app-shell` (see `docs/roadmap.md`).
 | `docs/roadmap.md` | Ordered list of planned changes, their status, and legacy failure modes to avoid. |
 | `docs/legacy-design.md` | Design of the discarded first implementation. Source material only. |
 | `investigations/` | Verified reference values (test oracles). |
-| `core/`, `app/` | Created by `add-app-shell`: pure Kotlin/JVM domain module; Android app module. |
-| `scripts/` | Local CI simulation and proxy helpers (re-verified by `add-app-shell`). |
-| `.claude/hooks/session-start.sh` | Installs the OpenSpec CLI and the Android SDK in web sessions. |
+| `core/` | Pure Kotlin/JVM module (no Android dependencies): domain types and computations, e.g. `GeoPoint`. |
+| `app/` | Android app (Compose, MapLibre): map screen, ViewModel, network code. Depends on `core`. |
+| `gradle/libs.versions.toml` | All dependency and plugin versions. |
+| `scripts/verify-local.sh` | Local CI simulation. |
+| `.claude/hooks/session-start.sh` | Web sessions only: installs the OpenSpec CLI and the Android SDK, and routes Maven Central through Google's mirror. |
 
 ## Workflow: no code without an approved change
 
@@ -36,15 +38,19 @@ Useful CLI: `openspec list`, `openspec show <name>`, `openspec validate --all --
 
 ## Build and verify
 
-Valid once `add-app-shell` has created the Gradle modules:
-
-- `./scripts/verify-local.sh`: full CI simulation. Run before every push.
+- `./scripts/verify-local.sh`: full CI simulation (ktlint, Android lint, unit tests, debug APK).
+  Run before every push.
 - `./scripts/verify-local.sh --quick`: ktlint only.
-- `./scripts/run-with-proxy.sh <gradle task>`: single Gradle task through the proxy helper.
+- `./gradlew :core:test` / `./gradlew :app:testDebugUnitTest --tests "*MapViewModel*"`: unit tests
+  (JUnit 6).
+- `./gradlew ktlintFormat`: fix formatting.
+- `./gradlew assembleDebug`: debug APK at `app/build/outputs/apk/debug/app-debug.apk`.
 - CI (`.github/workflows/ci.yml`): `specs` job (OpenSpec validation) and `build` job (ktlint,
-  Android lint, unit tests, debug APK).
-- Web sessions: the SessionStart hook installs the SDK at `~/android-sdk` and writes
-  `local.properties`.
+  Android lint, unit tests, debug APK uploaded as artifact `app-debug-apk`).
+- Web sessions: the SessionStart hook installs the SDK at `~/android-sdk`, writes
+  `local.properties`, and adds a Gradle init script that fetches Maven Central artifacts from
+  Google's mirror (Maven Central answers HTTP 429 there). Gradle runs directly; no proxy wrapper
+  is needed.
 
 ## Conventions
 
