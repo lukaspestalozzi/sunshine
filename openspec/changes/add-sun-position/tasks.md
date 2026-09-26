@@ -19,7 +19,7 @@
 
 ## 4. app: time selection and formatting logic
 
-- [ ] 4.1 Write `TimeSelectionTest` first, then implement `TimeSelection.kt` (design D3, D7). Cases, in Europe/Zurich unless stated:
+- [x] 4.1 Write `TimeSelectionTest` first, then implement `TimeSelection.kt` (design D3, D7). Cases, in Europe/Zurich unless stated:
   - Day length and slider range: 288 positions (00:00…23:55) on 2025-12-21, 276 on 2025-03-30 and 300 on 2025-10-26.
   - Snapping to the 5-minute grid.
   - On 2025-03-30 the position after 01:55 +1 is 03:00 +2.
@@ -29,7 +29,7 @@
   - The date-picker UTC-millisecond conversion, round-tripping 2025-12-21 in America/Los_Angeles and in Pacific/Auckland.
 
   Verify: `./gradlew :app:testDebugUnitTest --tests "*TimeSelection*"` passes.
-- [ ] 4.2 Write `SunFormatTest` first, then implement `SunFormat.kt` (design D7). Cases:
+- [x] 4.2 Write `SunFormatTest` first, then implement `SunFormat.kt` (design D7). Cases:
   - Selected-time labels: `2025-12-21 12:00 UTC+1`, `2025-06-21 15:00 UTC+2`, `UTC+5:30` (Asia/Kolkata), `UTC` (Etc/UTC), and the de-CH locale.
   - Azimuth: 173.49 → `173° S`; 22.4 → `22° N`; 22.5 → `23° NE`; 359.6 → `0° N`.
   - Elevation: 19.66 → `19.7°`; -0.7246 → `-0.7°`.
@@ -38,7 +38,7 @@
   - The two whole-day texts.
 
   Verify: `./gradlew :app:testDebugUnitTest --tests "*SunFormat*"` passes.
-- [ ] 4.3 Extend `MapViewModel` with `Clock` and a compute dispatcher, `selectedTime`, `onDateSelected`, `onSliderMoved`, `onNowClicked` and the `sun` flow (design D7, D8), and update the factory in `MapScreen.kt`. Extend `MapViewModelTest`, one case at a time, with a fixed clock at 2025-12-21 09:47:31 Europe/Zurich and a test dispatcher:
+- [x] 4.3 Extend `MapViewModel` with `Clock` and a compute dispatcher, `selectedTime`, `onDateSelected`, `onSliderMoved`, `onNowClicked` and the `sun` flow (design D7, D8), and update the factory in `MapScreen.kt`. Extend `MapViewModelTest`, one case at a time, with a fixed clock at 2025-12-21 09:47:31 Europe/Zurich and a test dispatcher:
   - The initial time is 09:47.
   - The selected time is restored from `SavedStateHandle`.
   - "Now" after a date change returns to 09:47, and no update follows while the clock advances.
