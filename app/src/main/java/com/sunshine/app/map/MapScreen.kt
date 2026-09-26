@@ -1,9 +1,11 @@
 package com.sunshine.app.map
 
 import android.net.ConnectivityManager
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -16,12 +18,17 @@ import com.sunshine.app.network.NetworkMonitor
 @Composable
 fun MapScreen(viewModel: MapViewModel = viewModel(factory = mapViewModelFactory)) {
     val camera by viewModel.camera.collectAsStateWithLifecycle()
+    val isOffline by viewModel.isOffline.collectAsStateWithLifecycle()
 
-    MapLibreMap(
-        initialCamera = camera,
-        onCameraMoved = viewModel::onCameraMoved,
-        modifier = Modifier.fillMaxSize(),
-    )
+    Box(Modifier.fillMaxSize()) {
+        MapLibreMap(
+            initialCamera = camera,
+            onCameraMoved = viewModel::onCameraMoved,
+            modifier = Modifier.fillMaxSize(),
+        )
+        Crosshair(Modifier.align(Alignment.Center))
+        MapLabels(camera = camera, isOffline = isOffline)
+    }
 }
 
 private val mapViewModelFactory =
