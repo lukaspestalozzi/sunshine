@@ -2,16 +2,15 @@
 # Local verification script - Matches CI Pipeline exactly
 #
 # CI Pipeline steps (in order):
-#   1. ktlintCheck    - Code style
-#   2. detekt         - Static analysis
-#   3. lintDebug      - Android lint
-#   4. testDebugUnitTest - Unit tests
-#   5. assembleDebug  - Build APK
+#   1. ktlintCheck                          - Code style
+#   2. lintDebug                            - Android lint
+#   3. :core:test :app:testDebugUnitTest    - Unit tests
+#   4. assembleDebug                        - Build APK
 #
 # Usage:
-#   ./scripts/verify-local.sh              # Full CI simulation (all 5 steps)
-#   ./scripts/verify-local.sh --quick      # Quick check (ktlint + detekt only)
-#   ./scripts/verify-local.sh --standalone # Standalone tools (no Android SDK needed)
+#   ./scripts/verify-local.sh              # Full CI simulation (all 4 steps)
+#   ./scripts/verify-local.sh --quick      # Quick check (ktlint only)
+#   ./scripts/verify-local.sh --standalone # Standalone ktlint (no Android SDK needed)
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -32,20 +31,21 @@ log_step() { echo -e "\n${YELLOW}=== Step $1: $2 ===${NC}"; }
 
 mkdir -p "$TOOLS_DIR"
 
-# CI Pipeline steps
-CI_STEPS=("ktlintCheck" "detekt" "lintDebug" "testDebugUnitTest" "assembleDebug")
+# CI Pipeline steps (each entry is one Gradle invocation; tasks separated by spaces)
+CI_STEPS=("ktlintCheck" "lintDebug" ":core:test :app:testDebugUnitTest" "assembleDebug")
 CI_DESCRIPTIONS=(
     "Code style (ktlint)"
-    "Static analysis (detekt)"
     "Android lint"
     "Unit tests"
     "Build APK"
 )
 
-# Run a Gradle task via proxy
+# Run Gradle tasks given as one space-separated string
 run_gradle_task() {
-    local task="$1"
-    if "$SCRIPT_DIR/run-with-proxy.sh" "$task" 2>&1; then
+    local tasks
+    read -ra tasks <<< "$1"
+    cd "$PROJECT_DIR"
+    if ./gradlew "${tasks[@]}" 2>&1; then
         return 0
     else
         return 1
@@ -65,21 +65,9 @@ setup_ktlint() {
     echo "$ktlint_path"
 }
 
-# Download detekt if not present (for standalone mode)
-setup_detekt() {
-    local detekt_version="1.23.7"
-    local detekt_path="$TOOLS_DIR/detekt-cli.jar"
-
-    if [ ! -f "$detekt_path" ]; then
-        log_info "Downloading detekt $detekt_version..."
-        curl -sSL "https://github.com/detekt/detekt/releases/download/v${detekt_version}/detekt-cli-${detekt_version}-all.jar" -o "$detekt_path"
-    fi
-    echo "$detekt_path"
-}
-
 # Run standalone ktlint (fallback - may differ from CI)
 run_standalone_ktlint() {
-    log_warn "Using standalone ktlint 1.5.0 (may differ from CI's ~1.0-1.3)"
+    log_warn "Using standalone ktlint 1.5.0 (may differ from the Gradle plugin's ktlint)"
     local ktlint
     ktlint=$(setup_ktlint)
 
@@ -91,38 +79,9 @@ run_standalone_ktlint() {
     fi
 }
 
-# Run standalone detekt (fallback)
-run_standalone_detekt() {
-    log_info "Using standalone detekt..."
-    local detekt
-    detekt=$(setup_detekt)
-    local config="$PROJECT_DIR/config/detekt/detekt.yml"
-
-    cd "$PROJECT_DIR"
-    if [ -f "$config" ]; then
-        if java -jar "$detekt" --input app/src --config "$config" 2>&1; then
-            return 0
-        else
-            return 1
-        fi
-    else
-        log_warn "detekt config not found, running with defaults..."
-        if java -jar "$detekt" --input app/src --build-upon-default-config 2>&1; then
-            return 0
-        else
-            return 1
-        fi
-    fi
-}
-
-# Check if Gradle can work (proxy script exists and Android SDK present)
+# Check if Gradle can work (Android SDK present)
 can_use_gradle() {
-    # Check if ANDROID_HOME is set
     if [ -z "$ANDROID_HOME" ] && [ -z "$ANDROID_SDK_ROOT" ]; then
-        return 1
-    fi
-    # Check if proxy script exists
-    if [ ! -x "$SCRIPT_DIR/run-with-proxy.sh" ]; then
         return 1
     fi
     return 0
@@ -133,13 +92,14 @@ run_full_ci() {
     local failed=0
     local passed=0
     local step_num=0
+    local total=${#CI_STEPS[@]}
 
     for i in "${!CI_STEPS[@]}"; do
         step_num=$((i + 1))
         local task="${CI_STEPS[$i]}"
         local desc="${CI_DESCRIPTIONS[$i]}"
 
-        log_step "$step_num/5" "$desc"
+        log_step "$step_num/$total" "$desc"
 
         if run_gradle_task "$task"; then
             log_pass "$task"
@@ -162,12 +122,12 @@ run_full_ci() {
     return 0
 }
 
-# Run quick checks (ktlint + detekt only)
+# Run quick checks (ktlint only)
 run_quick_checks() {
     local use_gradle="$1"
     local failed=0
 
-    log_step "1/2" "Code style (ktlint)"
+    log_step "1/1" "Code style (ktlint)"
     if $use_gradle; then
         if run_gradle_task "ktlintCheck"; then
             log_pass "ktlintCheck"
@@ -180,23 +140,6 @@ run_quick_checks() {
             log_pass "ktlint (standalone)"
         else
             log_fail "ktlint (standalone)"
-            ((failed++))
-        fi
-    fi
-
-    log_step "2/2" "Static analysis (detekt)"
-    if $use_gradle; then
-        if run_gradle_task "detekt"; then
-            log_pass "detekt"
-        else
-            log_fail "detekt"
-            ((failed++))
-        fi
-    else
-        if run_standalone_detekt; then
-            log_pass "detekt (standalone)"
-        else
-            log_fail "detekt (standalone)"
             ((failed++))
         fi
     fi
@@ -215,21 +158,20 @@ print_usage() {
     echo "Runs local verification matching CI pipeline."
     echo ""
     echo "Options:"
-    echo "  (no option)    Full CI simulation: all 5 steps via Gradle"
-    echo "  --quick        Quick check: ktlint + detekt only (via Gradle)"
-    echo "  --standalone   Standalone tools: ktlint + detekt without Android SDK"
+    echo "  (no option)    Full CI simulation: all 4 steps via Gradle"
+    echo "  --quick        Quick check: ktlint only (via Gradle)"
+    echo "  --standalone   Standalone ktlint without Android SDK"
     echo "  --help, -h     Show this help message"
     echo ""
     echo "CI Pipeline Steps:"
-    echo "  1. ktlintCheck       - Code style"
-    echo "  2. detekt            - Static analysis"
-    echo "  3. lintDebug         - Android lint"
-    echo "  4. testDebugUnitTest - Unit tests"
-    echo "  5. assembleDebug     - Build APK"
+    echo "  1. ktlintCheck                        - Code style"
+    echo "  2. lintDebug                          - Android lint"
+    echo "  3. :core:test :app:testDebugUnitTest  - Unit tests"
+    echo "  4. assembleDebug                      - Build APK"
     echo ""
     echo "Requirements:"
     echo "  Full/Quick:   ANDROID_HOME set, Java 17+"
-    echo "  Standalone:   Java 17+, curl"
+    echo "  Standalone:   curl"
     echo ""
     echo "Examples:"
     echo "  $0                   # Run full CI (recommended before push)"
@@ -266,7 +208,7 @@ main() {
 
     if [ "$mode" = "standalone" ]; then
         echo ""
-        log_warn "Standalone mode: only ktlint + detekt"
+        log_warn "Standalone mode: only ktlint"
         log_warn "ktlint version may differ from CI!"
         echo ""
         if ! run_quick_checks false; then
@@ -282,7 +224,6 @@ main() {
         echo ""
         log_fail "Cannot run Gradle verification:"
         log_fail "  - ANDROID_HOME or ANDROID_SDK_ROOT must be set"
-        log_fail "  - run-with-proxy.sh must exist"
         echo ""
         log_info "Options:"
         log_info "  1. Set ANDROID_HOME and retry"
@@ -293,7 +234,7 @@ main() {
     echo ""
 
     if [ "$mode" = "quick" ]; then
-        log_info "Quick mode: ktlint + detekt only"
+        log_info "Quick mode: ktlint only"
         echo ""
         if ! run_quick_checks true; then
             log_fail "Some checks failed"
@@ -302,7 +243,7 @@ main() {
         log_pass "Quick checks passed"
         log_warn "Note: lintDebug, tests, and build not verified"
     else
-        log_info "Full CI simulation: all 5 steps"
+        log_info "Full CI simulation: all ${#CI_STEPS[@]} steps"
         echo ""
         if ! run_full_ci; then
             log_fail "CI simulation failed"
