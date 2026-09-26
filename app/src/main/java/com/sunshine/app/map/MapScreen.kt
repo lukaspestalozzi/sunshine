@@ -14,6 +14,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.sunshine.app.network.NetworkMonitor
+import java.time.Clock
+import kotlinx.coroutines.Dispatchers
 
 @Composable
 fun MapScreen(viewModel: MapViewModel = viewModel(factory = mapViewModelFactory)) {
@@ -39,6 +41,11 @@ private val mapViewModelFactory =
                 checkNotNull(application.getSystemService(ConnectivityManager::class.java)) {
                     "ConnectivityManager is not available"
                 }
-            MapViewModel(createSavedStateHandle(), NetworkMonitor(connectivityManager).isOnline)
+            MapViewModel(
+                savedState = createSavedStateHandle(),
+                isOnline = NetworkMonitor(connectivityManager).isOnline,
+                clock = Clock.systemDefaultZone(),
+                computeDispatcher = Dispatchers.Default,
+            )
         }
     }
