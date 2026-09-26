@@ -9,7 +9,7 @@
 
 ## 2. core: GeoPoint
 
-- [ ] 2.1 Write `GeoPointTest` first: ±90 and ±180 are accepted; NaN, ±Infinity, 90.0001, -90.0001, 180.0001 and -180.0001 are rejected with `IllegalArgumentException`; `DEFAULT_LOCATION` is 46.8182, 8.2275. Then implement `GeoPoint` (design D6). Verify: `./gradlew :core:test` passes, and `core` has no Android dependency (`./gradlew :core:dependencies --configuration runtimeClasspath` lists no `androidx`/`com.android` artifact).
+- [x] 2.1 Write `GeoPointTest` first: ±90 and ±180 are accepted; NaN, ±Infinity, 90.0001, -90.0001, 180.0001 and -180.0001 are rejected with `IllegalArgumentException`; `DEFAULT_LOCATION` is 46.8182, 8.2275. Then implement `GeoPoint` (design D6). Verify: `./gradlew :core:test` passes, and `core` has no Android dependency (`./gradlew :core:dependencies --configuration runtimeClasspath` lists no `androidx`/`com.android` artifact).
 
 ## 3. app: map screen
 
