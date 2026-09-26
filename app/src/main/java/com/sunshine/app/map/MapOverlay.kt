@@ -19,7 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
@@ -75,7 +74,6 @@ fun MapLabels(
             bottomPanel()
             Label(
                 text = stringResource(R.string.map_attribution),
-                modifier = Modifier.testTag(ATTRIBUTION_TAG),
                 style = MaterialTheme.typography.labelSmall,
             )
         }
