@@ -31,20 +31,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Temporary gate: the Gradle modules are (re)created by the OpenSpec change add-app-shell,
-      # which removes this gate again.
-      - name: Detect Gradle modules
-        id: gradle
-        run: |
-          if [ -f app/build.gradle.kts ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No Gradle modules yet - Gradle steps skipped until add-app-shell is applied."
-          fi
-
       - name: Set up JDK 17
-        if: steps.gradle.outputs.present == 'true'
         uses: actions/setup-java@v4
         with:
           java-version: '17'
@@ -52,28 +39,28 @@ jobs:
           cache: gradle
 
       - name: Grant execute permission for gradlew
-        if: steps.gradle.outputs.present == 'true'
         run: chmod +x gradlew
 
       - name: Run ktlint
-        if: steps.gradle.outputs.present == 'true'
         run: ./gradlew ktlintCheck
 
-      - name: Run detekt
-        if: steps.gradle.outputs.present == 'true'
-        run: ./gradlew detekt
-
       - name: Run Android lint
-        if: steps.gradle.outputs.present == 'true'
         run: ./gradlew lintDebug
 
       - name: Run unit tests
-        if: ${{ !cancelled() && steps.gradle.outputs.present == 'true' }}
-        run: ./gradlew testDebugUnitTest
+        if: ${{ !cancelled() }}
+        run: ./gradlew :core:test :app:testDebugUnitTest
 
       - name: Build debug APK
-        if: ${{ !cancelled() && steps.gradle.outputs.present == 'true' }}
+        if: ${{ !cancelled() }}
         run: ./gradlew assembleDebug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: app-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload build reports
         uses: actions/upload-artifact@v4
@@ -83,3 +70,5 @@ jobs:
           path: |
             app/build/reports/
             app/build/test-results/
+            core/build/reports/
+            core/build/test-results/
