@@ -56,7 +56,7 @@
 
 ## 6. Integration checks
 
-- [ ] 6.1 Run the full local CI simulation. Verify: `./scripts/verify-local.sh` passes every step (ktlint, Android lint, unit tests, assemble), and `openspec validate --all --strict` passes.
+- [x] 6.1 Run the full local CI simulation. Verify: `./scripts/verify-local.sh` passes every step (ktlint, Android lint, unit tests, assemble), and `openspec validate --all --strict` passes.
 - [ ] 6.2 Push and check CI. Verify: the `specs` and `build` jobs are green and the `app-debug.apk` artifact is attached to the run.
 - [ ] 6.3 On-device check by the user with the CI APK. Expected:
   - At launch, the panel shows the current time with `UTC+1`/`UTC+2` and `Europe/Zurich`.
