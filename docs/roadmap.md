@@ -6,7 +6,7 @@ Ordered list of planned OpenSpec changes. Each row becomes one change under `ope
 
 | # | Change | Capabilities | Scope | Open decisions | Status |
 |---|--------|--------------|-------|----------------|--------|
-| 1 | `add-app-shell` | map-view | `core` + `app` Gradle modules, CI, MapLibre map with OpenTopoMap tiles, default view on the Swiss Alps, crosshair = selected location, attribution | resolved in its design.md | proposed |
+| 1 | `add-app-shell` | map-view | `core` + `app` Gradle modules, CI, MapLibre map with OpenTopoMap tiles, default view on the Swiss Alps, crosshair = selected location, attribution | resolved in its design.md | archived 2026-09-26 |
 | 2 | `add-sun-position` | sun-position, time-selection | Sun azimuth/elevation and astronomical sunrise/sunset (commons-suncalc) for the selected location and day; date/time controls; info panel | time zone basis (device vs. location); refraction handling | planned |
 | 3 | `add-elevation-data` | elevation-data | DEM tiles (AWS Terrain Tiles): fetch, decode, cache; interpolated elevation at a point; explicit "no data" | Terrarium vs. Skadi HGT; zoom/resolution | planned |
 | 4 | `add-terrain-horizon` | terrain-horizon, point-sunshine | 360° horizon profile (earth curvature + refraction); sun visible now; terrain-aware first/last sunshine; Interlaken oracles | sampling strategy; performance budget | planned |
