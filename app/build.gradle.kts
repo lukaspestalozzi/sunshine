@@ -18,6 +18,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     compileOptions {
@@ -37,6 +38,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.maplibre.android.sdk)
+    implementation(libs.okhttp)
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
