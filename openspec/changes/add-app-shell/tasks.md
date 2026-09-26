@@ -21,11 +21,11 @@
 
 ## 4. CI and local tooling
 
-- [ ] 4.1 In `.github/workflows/ci.yml`: remove the temporary Gradle gate and the detekt step; run the tests as `./gradlew :core:test :app:testDebugUnitTest`; upload `app-debug.apk` as a workflow artifact on success; include `core/build/reports/` in the failure reports. Verify: `python3 -c "import yaml; yaml.safe_load(open('.github/workflows/ci.yml'))"` succeeds and `grep -c detekt .github/workflows/ci.yml` prints 0.
-- [ ] 4.2 Adapt `scripts/verify-local.sh` to the modules without detekt: remove the detekt steps and standalone-detekt code, and make `--quick` run ktlint only. Delete `config/detekt/detekt.yml`. Verify: `./scripts/verify-local.sh --quick` passes, and `grep -rn detekt scripts/ config/` finds nothing.
-- [ ] 4.3 Run Gradle directly in the cloud container. Based on what works, keep or delete `scripts/run-with-proxy.sh`, `scripts/auth-proxy.py` and `scripts/setup-offline-build.sh` (the last one pins the stale AGP 8.7.2). Verify: the remaining scripts are referenced from CLAUDE.md and run as documented.
-- [ ] 4.4 Align `ANDROID_PACKAGES` in `.claude/hooks/session-start.sh` with the compileSdk and build-tools the build actually uses. Verify: a hook rerun (`CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR=$PWD .claude/hooks/session-start.sh`) exits 0 without installing anything, and `./gradlew assembleDebug` downloads no SDK package.
-- [ ] 4.5 Update the "Where things are" and "Build and verify" sections of CLAUDE.md to the real module layout and commands. Verify: every command listed in CLAUDE.md "Build and verify" runs as written.
+- [x] 4.1 In `.github/workflows/ci.yml`: remove the temporary Gradle gate and the detekt step; run the tests as `./gradlew :core:test :app:testDebugUnitTest`; upload `app-debug.apk` as a workflow artifact on success; include `core/build/reports/` in the failure reports. Verify: `python3 -c "import yaml; yaml.safe_load(open('.github/workflows/ci.yml'))"` succeeds and `grep -c detekt .github/workflows/ci.yml` prints 0.
+- [x] 4.2 Adapt `scripts/verify-local.sh` to the modules without detekt: remove the detekt steps and standalone-detekt code, and make `--quick` run ktlint only. Delete `config/detekt/detekt.yml`. Verify: `./scripts/verify-local.sh --quick` passes, and `grep -rn detekt scripts/ config/` finds nothing.
+- [x] 4.3 Run Gradle directly in the cloud container. Based on what works, keep or delete `scripts/run-with-proxy.sh`, `scripts/auth-proxy.py` and `scripts/setup-offline-build.sh` (the last one pins the stale AGP 8.7.2). Verify: the remaining scripts are referenced from CLAUDE.md and run as documented.
+- [x] 4.4 Align `ANDROID_PACKAGES` in `.claude/hooks/session-start.sh` with the compileSdk and build-tools the build actually uses. Verify: a hook rerun (`CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR=$PWD .claude/hooks/session-start.sh`) exits 0 without installing anything, and `./gradlew assembleDebug` downloads no SDK package.
+- [x] 4.5 Update the "Where things are" and "Build and verify" sections of CLAUDE.md to the real module layout and commands. Verify: every command listed in CLAUDE.md "Build and verify" runs as written.
 
 ## 5. Integration checks
 
