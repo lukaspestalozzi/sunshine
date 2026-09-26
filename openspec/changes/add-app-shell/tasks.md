@@ -2,9 +2,10 @@
 
 ## 1. Build skeleton
 
-- [ ] 1.1 Update the Gradle wrapper to 9.8.0 (or a newer stable, if one exists at apply time). Verify: `./gradlew --version` prints that Gradle version.
-- [ ] 1.2 Rewrite `gradle/libs.versions.toml`, `settings.gradle.kts` (include `:core`, `:app`) and the root `build.gradle.kts` without detekt, using the versions in design D2 after re-checking for newer stable releases. Create `core/build.gradle.kts` (Kotlin JVM, toolchain 17, JUnit 5) and a minimal `app/build.gradle.kts` (AGP 9.4.1, compileSdk/targetSdk 37, minSdk 29, `com.sunshine.app`, versionName 0.1.0, Compose), plus a manifest (with `INTERNET` and `ACCESS_NETWORK_STATE`) and an empty `MainActivity`. Verify: `./gradlew :app:assembleDebug` succeeds with no AGP warning about compileSdk 37. If AGP rejects 37, stop and ask.
-- [ ] 1.3 Apply the ktlint Gradle plugin to both modules. Verify: `./gradlew ktlintCheck` passes.
+- [x] 1.1 Update the Gradle wrapper to 9.8.0 (or a newer stable, if one exists at apply time). Verify: `./gradlew --version` prints that Gradle version.
+- [x] 1.2 Make cloud sessions fetch Maven Central artifacts from Google's mirror (design D11): extend `.claude/hooks/session-start.sh` to write a Gradle init script to `~/.gradle/init.d/` that rewrites Maven Central repository URLs to `https://maven-central.storage-download.googleapis.com/maven2/`. Project build files stay on `mavenCentral()`. Verify: the hook exits 0 and writes the init script; after 1.3, `./gradlew help --refresh-dependencies --info` shows downloads from the mirror and no request to `repo.maven.apache.org`.
+- [x] 1.3 Rewrite `gradle/libs.versions.toml`, `settings.gradle.kts` (include `:core`, `:app`) and the root `build.gradle.kts` without detekt, using the versions in design D2 after re-checking for newer stable releases. Create `core/build.gradle.kts` (Kotlin JVM, toolchain 17, JUnit 6) and a minimal `app/build.gradle.kts` (AGP 9.4.1, compileSdk/targetSdk 37, minSdk 29, `com.sunshine.app`, versionName 0.1.0, Compose), plus a manifest (with `INTERNET` and `ACCESS_NETWORK_STATE`) and an empty `MainActivity`. Verify: `./gradlew :app:assembleDebug` succeeds with no AGP warning about compileSdk 37, and `./gradlew buildEnvironment` shows kotlin-gradle-plugin 2.4.20. If AGP rejects 37 or another Kotlin version wins, stop and ask.
+- [x] 1.4 Apply the ktlint Gradle plugin to both modules. Verify: `./gradlew ktlintCheck` passes.
 
 ## 2. core: GeoPoint
 
