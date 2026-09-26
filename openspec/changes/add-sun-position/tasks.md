@@ -58,7 +58,7 @@
 
 - [x] 6.1 Run the full local CI simulation. Verify: `./scripts/verify-local.sh` passes every step (ktlint, Android lint, unit tests, assemble), and `openspec validate --all --strict` passes.
 - [x] 6.2 Push and check CI. Verify: the `specs` and `build` jobs are green and the `app-debug.apk` artifact is attached to the run.
-- [ ] 6.3 On-device check by the user with the CI APK. Expected:
+- [x] 6.3 On-device check by the user with the CI APK. Expected:
   - At launch, the panel shows the current time with `UTC+1`/`UTC+2` and `Europe/Zurich`.
   - With the map at `46.6863° N, 7.8632° E`, choosing 2025-12-21 shows sunrise `08:10` ±2 and sunset `16:43` ±2. Moving the slider to 12:00 shows about `173° S` / `19.7°` and a solid line pointing almost straight down; 02:00 shows a dashed line towards the upper right (NE).
   - "Now" returns to the current time.
