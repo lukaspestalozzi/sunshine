@@ -7,9 +7,9 @@
 
 ## 2. core: sun position
 
-- [ ] 2.1 Write `SunPositionTest` first, as a parameterized test over the five `Sun position` scenarios (Interlaken 2025-12-21 12:00 +1, 2025-06-21 15:00 +2, 08:20 refraction, 08:11 no refraction, 02:00 night; azimuth ±0.2°, elevation ±0.1°). Run it and see it fail, then implement `SunPosition` and `sunPosition(point, instant)` (design D2, D6). Verify: `./gradlew :core:test --tests "*SunPositionTest*"` passes.
-- [ ] 2.2 Add the `Sun above the horizon` cases to `SunPositionTest`: 2025-12-21 08:11 +1 is above, 08:05 +1 is below. Verify: `./gradlew :core:test --tests "*SunPositionTest*"` passes.
-- [ ] 2.3 Record the refraction limitation in `docs/roadmap.md`, entry #4 (design D2: no refraction at or below 0° geometric; 3–5 min pessimistic where the terrain horizon is ≤ 0°). Mark entry #2's open decisions as resolved in its design.md. Verify: `grep -n "refraction" docs/roadmap.md` shows the note in the row for entry #4.
+- [x] 2.1 Write `SunPositionTest` first, as a parameterized test over the five `Sun position` scenarios (Interlaken 2025-12-21 12:00 +1, 2025-06-21 15:00 +2, 08:20 refraction, 08:11 no refraction, 02:00 night; azimuth ±0.2°, elevation ±0.1°). Run it and see it fail, then implement `SunPosition` and `sunPosition(point, instant)` (design D2, D6). Verify: `./gradlew :core:test --tests "*SunPositionTest*"` passes.
+- [x] 2.2 Add the `Sun above the horizon` cases to `SunPositionTest`: 2025-12-21 08:11 +1 is above, 08:05 +1 is below. Verify: `./gradlew :core:test --tests "*SunPositionTest*"` passes.
+- [x] 2.3 Record the refraction limitation in `docs/roadmap.md`, entry #4 (design D2: no refraction at or below 0° geometric; 3–5 min pessimistic where the terrain horizon is ≤ 0°). Mark entry #2's open decisions as resolved in its design.md. Verify: `grep -n "refraction" docs/roadmap.md` shows the note in the row for entry #4.
 
 ## 3. core: sun events of a day
 
