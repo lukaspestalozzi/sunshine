@@ -24,4 +24,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Sunshine"
-include(":app")
+include(":core", ":app")
