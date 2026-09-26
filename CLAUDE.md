@@ -17,7 +17,7 @@ the app skeleton: the map screen and the build (see `docs/roadmap.md`).
 | `docs/legacy-design.md` | Design of the discarded first implementation. Source material only. |
 | `investigations/` | Verified reference values (test oracles). |
 | `core/` | Pure Kotlin/JVM module (no Android dependencies): domain types and computations, e.g. `GeoPoint`. |
-| `app/` | Android app (Compose, MapLibre): map screen, ViewModel, network code. Depends on `core`. |
+| `app/` | Android app (Compose, MapLibre): map screen, ViewModel, network code, elevation tiles (`elevation/`: Mapterhorn fetching, cache, decoding). Depends on `core`. |
 | `gradle/libs.versions.toml` | All dependency and plugin versions. |
 | `scripts/verify-local.sh` | Local CI simulation. |
 | `.claude/hooks/session-start.sh` | Web sessions only: installs the OpenSpec CLI and the Android SDK, and routes Maven Central through Google's mirror. |
