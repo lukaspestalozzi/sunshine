@@ -14,6 +14,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -217,6 +218,40 @@ class MapViewModelTest {
             interlakenTile.complete(heightBytes(568))
 
             assertFalse(ElevationState.Known(568.0) in states)
+            assertEquals(ElevationState.Known(1000.0), viewModel.elevation.value)
+        }
+
+    @Test
+    fun `zooming without moving does not retry a failed tile`() =
+        runTest {
+            var fetches = 0
+            val repository =
+                repository {
+                    fetches++
+                    null
+                }
+            val viewModel = newViewModel(repository = repository, computeDispatcher = UnconfinedTestDispatcher(testScheduler))
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.elevation.collect {} }
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            val fetchesAfterMove = fetches
+
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 14.0))
+
+            assertEquals(fetchesAfterMove, fetches)
+            assertEquals(ElevationState.Unknown, viewModel.elevation.value)
+        }
+
+    @Test
+    fun `a location whose tile never arrives does not block the next location`() =
+        runTest {
+            val repository =
+                repository { key -> if (key == INTERLAKEN_TILE) awaitCancellation() else heightBytes(1000) }
+            val viewModel = newViewModel(repository = repository, computeDispatcher = UnconfinedTestDispatcher(testScheduler))
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.elevation.collect {} }
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+
+            viewModel.onCameraMoved(CameraState(center = GeoPoint(46.0, 9.0), zoom = 12.0))
+
             assertEquals(ElevationState.Known(1000.0), viewModel.elevation.value)
         }
 

@@ -18,17 +18,21 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.transform
+import kotlinx.coroutines.launch
 
 data class CameraState(
     val center: GeoPoint,
@@ -80,22 +84,28 @@ class MapViewModel(
             .flowOn(computeDispatcher)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), initialValue = null)
 
-    // Re-evaluated when the location changes or the network returns (an unknown elevation may then
-    // load). A result that arrives after the camera has moved on is dropped, so a previous
-    // location's value is never shown for the new one.
+    // Re-evaluated when the location changes (not on zoom alone) or the network returns, which may
+    // load an unknown elevation. Latest wins: a new input cancels the previous lookup, including its
+    // HTTP call, and waits for it to stop, so a previous location's value is never shown for the new
+    // one. Hand-written instead of mapLatest, which is experimental.
     val elevation: StateFlow<ElevationState> =
-        combine(camera, isOnline) { camera, _ -> camera.center }
-            .conflate()
-            .transform { point ->
-                val cached = elevationRepository.cachedElevation(point)
-                if (cached != null) {
-                    emit(cached.toState())
-                } else {
-                    emit(ElevationState.Loading)
-                    val loaded = elevationRepository.elevation(point).toState()
-                    if (camera.value.center == point) emit(loaded)
+        channelFlow {
+            var lookup: Job? = null
+            combine(camera.map { it.center }.distinctUntilChanged(), isOnline) { point, _ -> point }
+                .collect { point ->
+                    lookup?.cancelAndJoin()
+                    lookup =
+                        launch {
+                            val cached = elevationRepository.cachedElevation(point)
+                            if (cached != null) {
+                                send(cached.toState())
+                            } else {
+                                send(ElevationState.Loading)
+                                send(elevationRepository.elevation(point).toState())
+                            }
+                        }
                 }
-            }.flowOn(computeDispatcher)
+        }.flowOn(computeDispatcher)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), initialValue = ElevationState.Loading)
 
     // The monitor emits the current state as soon as it is collected; `false` only covers the

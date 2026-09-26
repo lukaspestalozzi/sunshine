@@ -132,20 +132,29 @@ fun interpolateElevation(point: GeoPoint, zoom: Int, tileSize: Int, tiles: Map<T
 - `app/elevation/MapterhornTiles.kt`: the constants of D1 and `url(key)`.
 - `app/elevation/DemTileFetcher.kt`: `suspend fun fetch(key): ByteArray?` using the DEM
   `OkHttpClient` and the D3 fallback. It returns `null` on 404, 5xx, IO error, or a cache miss
-  while offline. It runs on `Dispatchers.IO`.
+  while offline. It uses OkHttp's asynchronous `enqueue` inside `suspendCancellableCoroutine`, so
+  cancelling the caller cancels the HTTP call (changed after review; planned as a blocking call
+  on `Dispatchers.IO`).
 - `app/elevation/ElevationRepository.kt`:
   - `suspend fun elevation(point): Elevation`, with
     `sealed interface Elevation { data class Known(val metres: Double) : Elevation; data object Unknown : Elevation }`;
   - `fun cachedElevation(point): Elevation?`, a fast path that answers only from memory.
 
-  It keeps decoded tiles in an in-memory LRU of 8 tiles (8 MiB). If any required tile is
-  unavailable or does not decode, the result is `Unknown`.
+  It keeps decoded tiles in an in-memory LRU of 8 tiles (8 MiB) and loads only the tiles
+  missing from it. A tile that loads is kept even when a neighbour fails, so a retry fetches only
+  the missing one. If any required tile is unavailable or does not decode, the result is
+  `Unknown`. The decoder rejects images that are not 512 × 512.
 - `MapViewModel` gains `elevation: StateFlow<ElevationState>`, where `ElevationState` is
   `Loading | Known(metres) | Unknown`:
-  - Input: `combine(camera.map { it.center }, isOnline)` → `conflate()`.
+  - Input: `combine(camera.map { it.center }.distinctUntilChanged(), isOnline)`, so zooming
+    without moving triggers nothing.
   - For each input, emit the memory fast path if it exists. Otherwise emit `Loading`, then the
     repository result.
-  - The flow uses `flow { }` / `transform`, which are not experimental, so no opt-in is needed.
+  - Latest wins: a `channelFlow` cancels the previous lookup (and so its HTTP call) with
+    `cancelAndJoin` before starting the next. A slow tile therefore never delays the current
+    location, and a previous location's value is never emitted for the new one. `mapLatest`
+    would do the same but is experimental (changed after review; planned as `conflate()` +
+    `transform`, which let a slow request block the next location for up to 20 s).
   - A change of `isOnline` from false to true re-evaluates the current location, which gives the
     "connectivity returns" scenario. A failed fetch is not retried until the location or
     connectivity changes; that follows from the flow being driven only by those inputs.
@@ -187,8 +196,9 @@ about 5 lines, which still does not justify Koin (same reasoning as `add-sun-pos
 - Memory fast path, when all needed tiles are decoded in memory: tile math plus 4 samples,
   < 0.1 ms. Pans within loaded tiles therefore update the row on every frame.
 - Decoding from the disk cache: estimated ≤ 50 ms per tile on a mid-range phone (a 512² WebP
-  decode plus 262,144 conversions; not measured). It runs on `Dispatchers.IO`/`Default`, so the
-  UI thread is never blocked. `conflate()` drops intermediate positions of a fast pan.
+  decode plus 262,144 conversions; not measured). It runs on `Dispatchers.Default` (HTTP on
+  OkHttp's threads), so the UI thread is never blocked. A new position cancels the lookup of the
+  previous one, so a fast pan does not queue work.
 - Network: one ~140 KiB request per new tile, at most 4 per location. They are fetched
   concurrently, with the 10 s / 20 s timeouts.
 - Memory: at most 8 decoded tiles (8 MiB) plus OkHttp's disk cache (100 MiB, on disk).
@@ -217,8 +227,9 @@ about 5 lines, which still does not justify Koin (same reasoning as `add-sun-pos
   for 7+ days, and identified by User-Agent (see Open Questions).
 - [Tiles are rebuilt and values shift slightly] → Tests use pinned fixtures (D11). The cache
   revalidates after 7 days, and a location's value can change by decimetres after a rebuild.
-- [`BitmapFactory` decoding not bit-exact on some device] → Checked on a device (D5); errors
-  would be metres to hundreds of metres, so the check detects them.
+- [`BitmapFactory` decoding not bit-exact on some device] → To be checked on a device (D5,
+  task 5.2, still pending); errors would be metres to hundreds of metres, so the check detects
+  them.
 - [Copernicus fallback (surface model) outside national coverage counts as known] → Accepted
   (D6); it is irrelevant in the Alps.
 - [Android clears the cache directory; offline data disappears] → Accepted until change 6 brings
