@@ -150,7 +150,11 @@ fun sunDay(point: GeoPoint, date: LocalDate, zone: ZoneId): SunDay
     times with conditional offset, day length. Built on `BigDecimal` / `Locale.ROOT` like
     `formatCoordinates`.
 - Composables: `SunPanel` (bottom, above the attribution, holding the values, a date button,
-  "Now" and the slider) and `SunLine`, both in `app/map`. UI labels (Sunrise, Now, …) go to
+  "Now" and the slider) and `SunLine`, both in `app/map`. The panel is at most 360 dp wide; in
+  landscape `sunPanelMaxWidth` narrows it to the space left of the centre crosshair (half the
+  width minus the start inset and 32 dp), so it cannot cover the crosshair on narrow landscape
+  screens (added after review). A very short portrait window (split screen) can still bring the
+  panel up to the crosshair; that would need a collapsible panel and is not handled. UI labels (Sunrise, Now, …) go to
   `strings.xml`. The value texts fixed by the spec (`none this day`, the two whole-day texts) are
   constants in `SunFormat.kt`, so its JVM tests can check them (decided during apply).
 
