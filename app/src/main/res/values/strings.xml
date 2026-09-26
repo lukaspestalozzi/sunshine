@@ -3,4 +3,14 @@
     <string name="app_name">Sunshine</string>
     <string name="map_attribution">© OpenStreetMap contributors, SRTM | Map style: © OpenTopoMap (CC-BY-SA)</string>
     <string name="map_offline_notice">You are offline. Map tiles may be missing.</string>
+    <string name="sun_panel_date">Date</string>
+    <string name="sun_panel_now">Now</string>
+    <string name="sun_panel_time_of_day">Time of day</string>
+    <string name="sun_panel_azimuth">Azimuth</string>
+    <string name="sun_panel_elevation">Elevation</string>
+    <string name="sun_panel_civil_dawn">Civil dawn</string>
+    <string name="sun_panel_sunrise">Sunrise</string>
+    <string name="sun_panel_sunset">Sunset</string>
+    <string name="sun_panel_civil_dusk">Civil dusk</string>
+    <string name="sun_panel_day_length">Day length</string>
 </resources>
