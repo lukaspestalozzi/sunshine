@@ -81,6 +81,9 @@ no speculative abstractions); Koin is introduced by the first change with a real
 The app gives MapLibre an `OkHttpClient` with an interceptor that sets
 `Sunshine/<BuildConfig.VERSION_NAME> (Android; com.sunshine.app)`, through `HttpRequestUtil`. The
 interceptor is a small class, unit-tested with a fake `Interceptor.Chain`.
+OkHttp is declared explicitly at **4.12.0**, the version MapLibre 13.6.1 depends on (user
+decision). This is a deliberate exception to D2's "newest stable" rule: OkHttp 5.5.0 would
+force-upgrade the map library's HTTP stack.
 
 ### D8. Offline detection
 `NetworkMonitor` wraps `ConnectivityManager.registerDefaultNetworkCallback` as a `Flow<Boolean>`
@@ -96,8 +99,8 @@ not come back, stop and ask.
   This change removes the detekt CI step, the detekt steps of `scripts/verify-local.sh` and
   `config/detekt/detekt.yml`. It is revisited when detekt 2.0 is stable (noted in
   `docs/roadmap.md`).
-- Tests use JUnit 5 (Jupiter) in both modules; its parameterized tests suit the oracle tables of
-  later changes. `app` runs them with `useJUnitPlatform()`; the ViewModel is tested with
+- Tests use JUnit 6 (6.1.3, Jupiter API; user decision) in both modules; its parameterized tests
+  suit the oracle tables of later changes. `app` runs them with `useJUnitPlatform()`; the ViewModel is tested with
   `kotlinx-coroutines-test`.
 
 ### D10. CI and local verification
@@ -108,6 +111,17 @@ not come back, stop and ask.
 - First try Gradle directly in the cloud container (JAVA_TOOL_OPTIONS already routes Java through
   the proxy). Keep or delete `scripts/run-with-proxy.sh` / `auth-proxy.py` /
   `setup-offline-build.sh` based on what actually works, and say which in CLAUDE.md.
+
+### D11. Maven Central through Google's mirror in cloud sessions (user decision)
+From the cloud container, Maven Central (`repo.maven.apache.org`, `repo1.maven.org`) has answered
+HTTP 429 for hours, and the Gradle Plugin Portal 303-redirects Central-hosted artifacts there too.
+The SessionStart hook writes a Gradle init script to `~/.gradle/init.d/`. The script rewrites
+those repository URLs to `https://maven-central.storage-download.googleapis.com/maven2/`,
+Google's public mirror of Maven Central.
+- Only cloud sessions are affected. Project build files, CI (GitHub runners) and local machines
+  keep plain `mavenCentral()`.
+*Alternatives:* committing the mirror to `settings.gradle.kts` would change every environment;
+waiting would leave the rewrite blocked for an unknown time.
 
 ### Performance budget
 Each camera-move event does only O(1) work on the main thread: a state update plus string
@@ -123,7 +137,7 @@ blocking I/O on the main thread.
 
 ## Risks / Trade-offs
 
-- [AGP 9.4.1 may not accept `compileSdk` 37] → Task 1.2 builds first. If AGP rejects or warns,
+- [AGP 9.4.1 may not accept `compileSdk` 37] → Task 1.3 builds first. If AGP rejects or warns,
   stop and ask; the fallback is 36 plus aligning the hook.
 - [MapLibre 13.x may have changed the `HttpRequestUtil` OkHttp hook] → Verify against the 13.6.1
   API in task 3.4 before relying on it. If it is gone, stop and ask.
@@ -131,8 +145,10 @@ blocking I/O on the main thread.
   ABI splits are a release concern.
 - [No detekt: no complexity or size checks] → Keep classes small by review. Revisit with
   detekt 2.0.
-- [Maven Central returned HTTP 429 once from the cloud container] → Gradle's cache plus a single
-  retry. A persistent failure is reported, not worked around.
+- [Maven Central answers HTTP 429 from the cloud container, persistently] → D11 mirror in cloud
+  sessions. CI is not affected.
+- [The mirror lags Maven Central or goes away] → It only affects cloud sessions; CI still
+  resolves from Maven Central, so a lagging mirror shows up as a local failure, not a wrong build.
 - [No emulator: UI behavior is not verified automatically] → JVM tests for the logic plus a manual
   device check with the CI APK.
 
