@@ -2,10 +2,10 @@
 
 ## 1. core: sweep geometry and hull
 
-- [ ] 1.1 Write `SunShadeGeometryTest` first:
+- [x] 1.1 Write `SunShadeGeometryTest` first:
   - `MapArea(centre, zoom, widthDp, heightDp)` gives the visible bounds of a north-up Web-Mercator map (512 px tiles): at 46.5935° N, 7.9091° E, zoom 12, 400 × 850 dp, the width is 5.24 km ±1 %;
   - the gnomonic frame maps the centre to (0, 0) and back within 1e-9°;
-  - lines towards azimuth 180° are 2 dp apart and their direction at a cell 5 km off-centre is within 0.03° of the azimuth there;
+  - lines are 2 dp apart, point at the sun's azimuth from the centre (±0.001°), and are great circles (three points of a line 5 km off-centre lie in one plane through the earth's centre);
   - the grid covers every corner of the visible area.
 
   Then implement `MapArea`, the frame and the line layout (design D2) in `core/.../SunShade.kt`. Verify: `./gradlew :core:test --tests "*SunShadeGeometryTest*"` passes.
