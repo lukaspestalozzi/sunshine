@@ -15,16 +15,16 @@
   Then implement the band schedule, the sampling (step ≤ 0.5 px; zooms per design D2), and `HorizonTracer` with `groundTiles`, `start`, `nextTiles`, `advance`, `isDone` and `profile` (design D5). Verify: `./gradlew :core:test --tests "*HorizonGeometryTest*"` passes.
 - [x] 2.2 Write `HorizonTerminationTest` first. Early termination with `H_max` (design D3) gives a profile identical to a run without termination on three synthetic terrains. `nextTiles()` excludes tiles only reachable by finished rays. The `H_max` region rule: 4810 m at 46.7° N 7.9° E, 8849 m at 27.9° N 86.9° E. Then implement the termination and the region rule. Verify: `./gradlew :core:test --tests "*HorizonTerminationTest*"` passes.
 - [ ] 2.3 Write `SunEnvelopeTest` first. For Interlaken, `s_max` at azimuth 180° is about 66.8° plus the upper-limb offset (±0.3°), and azimuths north of the sun's range have no ray. Then implement `sunEnvelope` and the year clamp in the tracer (design D4). Add a test that the clamped profile gives the same sunshine states as the unclamped one at 1000 random instants over a year on a synthetic terrain. Verify: `./gradlew :core:test --tests "*SunEnvelopeTest*"` passes.
-- [ ] 2.4 Write `IncompleteHorizonTest` first, with the two spec scenarios: a missing far tile behind a 30° ridge → complete at 30°; a missing tile at 20 km behind a 2° horizon → incomplete with a lower bound of 2°. Also: a missing zoom-14 ground tile → the tracer reports that the ground is unknown and produces no profile. Then implement the `null`-tile handling. Verify: `./gradlew :core:test --tests "*IncompleteHorizonTest*"` passes.
+- [x] 2.4 Write `IncompleteHorizonTest` first, with the two spec scenarios: a missing far tile behind a 30° ridge → complete at 30°; a missing tile at 20 km behind a 2° horizon → incomplete with a lower bound of 2°. Also: a missing zoom-14 ground tile → the tracer reports that the ground is unknown and produces no profile. Then implement the `null`-tile handling. Verify: `./gradlew :core:test --tests "*IncompleteHorizonTest*"` passes.
 
 ## 3. core: sunshine and sun periods
 
-- [ ] 3.1 Write `SunshineTest` first:
+- [x] 3.1 Write `SunshineTest` first:
   - constant 10° horizon at Interlaken on 2025-12-21 → SUN when `elevation + 0.266 > 10`, SHADE otherwise, checked at 5 instants;
   - an incomplete bin → SHADE when the sun is below its bound, UNKNOWN above.
 
   Then implement `sunshineAt` (design D5). Verify: `./gradlew :core:test --tests "*SunshineTest*"` passes.
-- [ ] 3.2 Write `SunPeriodsTest` first:
+- [x] 3.2 Write `SunPeriodsTest` first:
   - constant 10° horizon → one period whose boundaries equal the times at which the upper edge crosses 10°, ±20 s (computed with commons-suncalc in the test, cross-checked once against astral in `investigations/terrain-horizon-algorithms.md`);
   - a synthetic notch → two periods;
   - a 40-s sunny sliver → omitted;
