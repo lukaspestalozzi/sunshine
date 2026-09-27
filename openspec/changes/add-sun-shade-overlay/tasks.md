@@ -139,7 +139,7 @@
   - switching off stops it.
 
   Then wire `DayOverlay` into `MapViewModel` (design D8, D11). Verify: `./gradlew :app:testDebugUnitTest --tests "*MapViewModel*"` passes, including the existing tests.
-- [ ] 10.3 Add a debug log of the day: steps done out of total, night steps, and total time when finished. Verify: a `MapViewModel` test sees the log line, and `./gradlew :app:assembleDebug` succeeds.
+- [x] 10.3 Add a debug log of the day: steps done out of total, night steps, and total time when finished. Verify: a `MapViewModel` test sees the log line, and `./gradlew :app:assembleDebug` succeeds.
 
 ## 11. Docs (revision 2026-09-27)
 

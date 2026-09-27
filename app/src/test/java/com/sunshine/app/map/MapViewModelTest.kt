@@ -730,6 +730,19 @@ class MapViewModelTest {
         }
 
     @Test
+    fun `debug builds log the day's steps, night steps and total time when it is finished`() =
+        runTest {
+            val logged = mutableListOf<String>()
+            val viewModel = dayViewModel(mutableListOf(), log = { logged += it })
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+
+            assertTrue(logged.any { it.matches(Regex("Overlay day 2025-12-21: 288 of 288 steps, 177 at night, in \\d+ ms")) }, "$logged")
+        }
+
+    @Test
     fun `switching the overlay off stops the day`() =
         runTest {
             val suns = mutableListOf<SunPosition>()
