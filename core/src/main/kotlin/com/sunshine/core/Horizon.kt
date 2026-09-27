@@ -231,7 +231,7 @@ class HorizonTracer(
 
 /** Bilinear heights from a band's tiles, remembering the last tile used. */
 internal class TileGrid(
-    private val zoom: Int,
+    val zoom: Int,
     private val tileSize: Int,
     private val tiles: Map<TileKey, HeightTile?>,
 ) {

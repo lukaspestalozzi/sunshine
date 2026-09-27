@@ -9,7 +9,7 @@
   - the grid covers every corner of the visible area.
 
   Then implement `MapArea`, the frame and the line layout (design D2) in `core/.../SunShade.kt`. Verify: `./gradlew :core:test --tests "*SunShadeGeometryTest*"` passes.
-- [ ] 1.2 Write `SunShadeHullTest` first, on synthetic terrain (helper building `HeightTile`s from a height function, as in #4's tests):
+- [x] 1.2 Write `SunShadeHullTest` first, on synthetic terrain (helper building `HeightTile`s from a height function, as in #4's tests):
   - a 1000 m east–west ridge with the sun at 20° in azimuth 180° → shade up to 2741 m north of the crest, sun beyond (±1 cell);
   - a peak 4000 m above the eye at 100 km → shade at 1.80°, sun at 2.00°;
   - a flat plain → all sun at 30°, all shade at −10°;

@@ -183,6 +183,154 @@ class SunShadeSweep(
         }
     }
 
+    /** Zoom of the samples inside the area and up to [NEAR_BAND] upwind (design D3). */
+    val viewZoom: Int = min(MAX_ZOOM, floor(area.zoom).toInt() + 2)
+
+    // Cells lie on every [sub]-th sample of their line, in the middle of their square.
+    private val sub: Int = 2 * ceil(spacing / (2 * halfPixel(viewZoom))).toInt()
+    private val viewStep = spacing / sub
+
+    private val upperEdge = sun.elevation + SUN_UPPER_LIMB
+
+    /** How far upwind the lines start, in metres. */
+    internal var reach: Double = MAX_RANGE
+
+    /** The states of [lines], from the [tiles] they sample (`null` = unavailable). */
+    fun compute(
+        tiles: Map<TileKey, HeightTile?>,
+        lines: IntRange = 0 until lineCount,
+    ): ShadeGridPart {
+        val grids = HashMap<Int, TileGrid>()
+        val grid = { zoom: Int -> grids.getOrPut(zoom) { TileGrid(zoom, tileSize, tiles) } }
+        val hull = SunShadeHull(INITIAL_HULL)
+        val states =
+            Array(lines.count()) { index ->
+                val k = lines.first + index
+                val cells = ByteArray(lineCells[k])
+                if (cells.isNotEmpty()) {
+                    hull.clear()
+                    val start = lineStart[k]
+                    for (band in upwindBands()) {
+                        sampleBand(grid(band.zoom), k, start - band.far, start - band.near, band.step) { s, h -> hull.push(s, h) }
+                    }
+                    var i = 0
+                    sample(grid(viewZoom), k, start, viewStep, cells.size * sub) { s, h ->
+                        if (i % sub == sub / 2) cells[i / sub] = state(hull, s, h) else hull.push(s, h)
+                        i++
+                    }
+                }
+                cells
+            }
+        return ShadeGridPart(lines, states)
+    }
+
+    /** The grid made of [parts], which together cover every line once. */
+    fun assemble(parts: List<ShadeGridPart>): ShadeGrid {
+        val states = arrayOfNulls<ByteArray>(lineCount)
+        for (part in parts) part.lines.forEachIndexed { i, k -> states[k] = part.states[i] }
+        return ShadeGrid(this, Array(lineCount) { k -> checkNotNull(states[k]) { "Line $k not computed" } })
+    }
+
+    /** Sun, shade or unknown at a cell's sample ([s], ground [h]); pushes the sample (design D1, D6). */
+    private fun state(
+        hull: SunShadeHull,
+        s: Double,
+        h: Double,
+    ): Byte {
+        if (h.isNaN()) {
+            hull.push(s, h)
+            return UNKNOWN
+        }
+        val tan = hull.pushObserver(s, h)
+        val complete =
+            hull.lastGap == Double.NEGATIVE_INFINITY ||
+                run {
+                    val d = s - hull.lastGap
+                    tan >= (heightBound - (h + EYE_HEIGHT) - CURVATURE * d * d) / d
+                }
+        return when {
+            upperEdge <= Math.toDegrees(atan(tan)) -> SHADE
+            complete -> SUN
+            else -> UNKNOWN
+        }
+    }
+
+    /** Upwind bands, farthest first, cut at [reach] (design D3, D4). */
+    private fun upwindBands(): List<Band> =
+        listOf(
+            Band(FAR_BAND, MAX_RANGE, 10),
+            Band(MIDDLE_BAND, FAR_BAND, 11),
+            Band(NEAR_BAND, MIDDLE_BAND, 12),
+            Band(0.0, NEAR_BAND, viewZoom),
+        ).filter { it.near < reach }
+            .map { Band(it.near, min(it.far, reach), it.zoom, halfPixel(it.zoom)) }
+
+    private class Band(
+        val near: Double,
+        val far: Double,
+        val zoom: Int,
+        val step: Double = 0.0,
+    )
+
+    /** Samples every [step] from [from] up to (excluding) [to] on line [k], nearest the sun first. */
+    private inline fun sampleBand(
+        grid: TileGrid,
+        k: Int,
+        from: Double,
+        to: Double,
+        step: Double,
+        action: (s: Double, h: Double) -> Unit,
+    ) {
+        val count = ((to - from) / step).toInt()
+        sample(grid, k, to - count * step, step, count, action)
+    }
+
+    /**
+     * Heights at `s = from + i · step` (i < [count]) on line [k]: exact positions at knots every
+     * [KNOT_EVERY] samples, linear in between, as in [HorizonTracer].
+     */
+    private inline fun sample(
+        grid: TileGrid,
+        k: Int,
+        from: Double,
+        step: Double,
+        count: Int,
+        action: (s: Double, h: Double) -> Unit,
+    ) {
+        val a = DoubleArray(2)
+        val b = DoubleArray(2)
+        var i0 = 0
+        while (i0 < count) {
+            val i1 = min(i0 + KNOT_EVERY, count - 1)
+            pixelOnLine(k, from + i0 * step, grid.zoom, a)
+            pixelOnLine(k, from + i1 * step, grid.zoom, b)
+            val span = max(i1 - i0, 1)
+            val stop = min(i0 + KNOT_EVERY, count)
+            for (i in i0 until stop) {
+                val f = (i - i0).toDouble() / span
+                action(from + i * step, grid.bilinear(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f))
+            }
+            i0 = stop
+        }
+    }
+
+    /** Global pixel coordinates (pixel centres) at [zoom] of position [s] on line [k]. */
+    private fun pixelOnLine(
+        k: Int,
+        s: Double,
+        zoom: Int,
+        out: DoubleArray,
+    ) {
+        pointOnLine(k, s, out)
+        val worldPixels = (1L shl zoom).toDouble() * tileSize
+        val sinLat = sin(Math.toRadians(out[0]))
+        out[0] = (out[1] + 180.0) / 360.0 * worldPixels - 0.5
+        out[1] = (1.0 - 0.5 * ln((1 + sinLat) / (1 - sinLat)) / PI) / 2.0 * worldPixels - 0.5
+    }
+
+    private fun halfPixel(zoom: Int): Double =
+        PI * EARTH_RADIUS * cos(Math.toRadians(area.center.latitude)) / ((1L shl zoom).toDouble() * tileSize)
+
     /** Across-line position of line [k]. */
     internal fun lineW(k: Int): Double = wMin + (k + 0.5) * spacing
 
@@ -227,5 +375,136 @@ class SunShadeSweep(
     companion object {
         /** Width of a cell in dp (user decision, design D2). */
         const val CELL_DP = 2.0
+
+        internal const val SUN: Byte = 0
+        internal const val SHADE: Byte = 1
+        internal const val UNKNOWN: Byte = 2
+
+        private const val MAX_ZOOM = 14
+        private const val MAX_RANGE = 150_000.0
+        private const val NEAR_BAND = 1_500.0
+        private const val MIDDLE_BAND = 6_000.0
+        private const val FAR_BAND = 25_000.0
+        private const val KNOT_EVERY = 32
+        private const val INITIAL_HULL = 1024
     }
 }
+
+/** The states of some lines of a [SunShadeSweep]; [SunShadeSweep.assemble] joins them. */
+class ShadeGridPart internal constructor(
+    internal val lines: IntRange,
+    internal val states: Array<ByteArray>,
+)
+
+/** Sun, shade or unknown for every cell of [sweep]'s area (sun-shade-overlay spec). */
+class ShadeGrid internal constructor(
+    private val sweep: SunShadeSweep,
+    private val states: Array<ByteArray>,
+) {
+    val area: MapArea get() = sweep.area
+    val sun: SunPosition get() = sweep.sun
+
+    /** Whether some cell is unknown. */
+    val hasUnknown: Boolean = states.any { line -> line.any { it == SunShadeSweep.UNKNOWN } }
+
+    /** The state of the cell containing the point, or `null` outside the grid. */
+    fun stateAt(
+        latitude: Double,
+        longitude: Double,
+    ): Sunshine? {
+        val (k, j) = sweep.cellOf(latitude, longitude) ?: return null
+        return when (states[k][j]) {
+            SunShadeSweep.SUN -> Sunshine.SUN
+            SunShadeSweep.SHADE -> Sunshine.SHADE
+            else -> Sunshine.UNKNOWN
+        }
+    }
+
+    fun stateAt(point: GeoPoint): Sunshine? = stateAt(point.latitude, point.longitude)
+}
+
+/**
+ * Upper convex hull of the samples of one line in (s, g = h − c·s²), where the spec's curved-earth
+ * elevation tangent is a straight slope (design D1): from the eye (s_p, G_p = g_p + 1.7 m) to an
+ * earlier sample j it is (g_j − G_p) / (s_p − s_j) − 2c·s_p. Samples must come in increasing s.
+ */
+internal class SunShadeHull(
+    capacity: Int,
+) {
+    private var s = DoubleArray(capacity)
+    private var g = DoubleArray(capacity)
+    private var n = 0
+
+    /** Position of the latest missing sample, or −∞. */
+    var lastGap = Double.NEGATIVE_INFINITY
+        private set
+
+    fun clear() {
+        n = 0
+        lastGap = Double.NEGATIVE_INFINITY
+    }
+
+    /** Adds terrain sample ([position], height [h]); NaN records a gap. */
+    fun push(
+        position: Double,
+        h: Double,
+    ) {
+        if (h.isNaN()) {
+            lastGap = position
+            return
+        }
+        val gp = h - CURVATURE * position * position
+        popBelow(position, gp)
+        append(position, gp)
+    }
+
+    /**
+     * The tangent of the horizon of an eye [EYE_HEIGHT] above sample ([position], [h]) over all
+     * earlier samples (−∞ if none), then adds the sample.
+     */
+    fun pushObserver(
+        position: Double,
+        h: Double,
+    ): Double {
+        val gp = h - CURVATURE * position * position
+        // Vertices under the segment to the ground point are never the eye's tangent point either.
+        popBelow(position, gp)
+        val eye = gp + EYE_HEIGHT
+        var best = Double.NEGATIVE_INFINITY
+        if (n > 0) {
+            var j = n - 1
+            best = (g[j] - eye) / (position - s[j])
+            while (j > 0) {
+                val t = (g[j - 1] - eye) / (position - s[j - 1])
+                if (t < best) break
+                best = t
+                j--
+            }
+        }
+        append(position, gp)
+        return best - 2 * CURVATURE * position
+    }
+
+    private fun popBelow(
+        position: Double,
+        gp: Double,
+    ) {
+        while (n >= 2 && (g[n - 1] - g[n - 2]) * (position - s[n - 2]) <= (gp - g[n - 2]) * (s[n - 1] - s[n - 2])) n--
+    }
+
+    private fun append(
+        position: Double,
+        gp: Double,
+    ) {
+        if (n == s.size) {
+            s = s.copyOf(2 * n)
+            g = g.copyOf(2 * n)
+        }
+        s[n] = position
+        g[n] = gp
+        n++
+    }
+}
+
+/** Parabolic drop of the terrain line of sight per square metre of distance: (1 − k) / 2R. */
+internal const val CURVATURE = (1 - REFRACTION) / (2 * EARTH_RADIUS)
