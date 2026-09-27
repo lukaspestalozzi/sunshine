@@ -161,9 +161,10 @@ termination, and it would serialise the loading.
   off (user decision). New `overlay: StateFlow<OverlayUiState>`:
   - `Off`;
   - `ZoomedOut`;
-  - `Computing(kept: ShadeGrid?)`. `kept` is the previous grid after a pan, and `null` after a time
+  - `Computing(kept: Ready?)`. `kept` is the previous overlay after a pan, and `null` after a time
     or date change (user decision);
-  - `Ready(grid, time)`.
+  - `Ready(grid, time, image)`. The image is rendered by `renderOverlay` (D9) on the compute
+    dispatcher, not in composition (changed during apply, task 5.2).
 - **Triggers:** a latest-wins `channelFlow` over (area, selected time, toggle, online), as for the
   horizon.
   - A camera change waits `SETTLE_MILLIS` (300 ms); time changes start at once.

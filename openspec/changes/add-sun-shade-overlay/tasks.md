@@ -81,6 +81,8 @@
   Then implement `renderOverlay` (design D9). Verify: `./gradlew :app:testDebugUnitTest --tests "*RenderOverlayTest*"` passes.
 - [ ] 5.2 Add the `overlay: OverlayImage?` parameter to `MapLibreMap`: an `ImageSource` with the bounds' `LatLngQuad` and a `RasterLayer` directly above `opentopomap`; `null` removes it; a new image replaces it. Pass the state from `MapScreen`. Verify: `./gradlew :app:assembleDebug` succeeds. On an emulator or device, with a debug grid of all SHADE, the tint covers exactly the map area and stays on the terrain while panning.
 
+  Status (apply): code done, `assembleDebug` and unit tests pass; the device part is open (no emulator in the cloud session) and is checked in 7.2.
+
 ## 6. app: UI and debug checks
 
 - [ ] 6.1 Add the toggle icon button (top end), the legend (`Shade`, `Unknown` swatches) while on, and the notices `Zoom in to see sun and shade` and `Computing sun and shade …` in `MapLabels`' top column. Strings go in `strings.xml`; report the map size in dp from `MapScreen` to `onMapSizeChanged` (design D10). Verify: `./gradlew :app:testDebugUnitTest` and `./gradlew :app:lintDebug` pass. On a device, the toggle, legend and both notices appear as specified, and none covers the crosshair, sun line, panel or attributions.

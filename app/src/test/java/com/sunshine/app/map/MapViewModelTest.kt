@@ -475,7 +475,7 @@ class MapViewModelTest {
             viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
             viewModel.onOverlayToggled()
             advanceTimeBy(SETTLE_MILLIS)
-            val previous = (viewModel.overlay.value as OverlayUiState.Ready).grid
+            val previous = viewModel.overlay.value as OverlayUiState.Ready
 
             viewModel.onCameraMoved(CameraState(center = GeoPoint(46.69, 7.87), zoom = 12.0))
             assertEquals(OverlayUiState.Computing(kept = previous), viewModel.overlay.value)

@@ -35,6 +35,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel(factory = mapViewModelFactory)
     val sun by viewModel.sun.collectAsStateWithLifecycle()
     val elevation by viewModel.elevation.collectAsStateWithLifecycle()
     val computedSunshine by viewModel.sunshine.collectAsStateWithLifecycle()
+    val overlay by viewModel.overlay.collectAsStateWithLifecycle()
     val sunshine = computedSunshine.at(camera.center)
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -44,6 +45,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel(factory = mapViewModelFactory)
             initialCamera = camera,
             onCameraMoved = viewModel::onCameraMoved,
             modifier = Modifier.fillMaxSize(),
+            overlay = overlay.image(),
         )
         sun?.let { SunLine(it.position, (sunshine as? SunshineUiState.Ready)?.atSelectedTime) }
         Crosshair(Modifier.align(Alignment.Center))
@@ -101,4 +103,12 @@ private val mapViewModelFactory =
                 log = ::debugLog,
             )
         }
+    }
+
+/** The image to draw: the finished overlay, or the one kept while a pan is recomputed. */
+private fun OverlayUiState.image(): OverlayImage? =
+    when (this) {
+        is OverlayUiState.Ready -> image
+        is OverlayUiState.Computing -> kept?.image
+        OverlayUiState.Off, OverlayUiState.ZoomedOut -> null
     }
