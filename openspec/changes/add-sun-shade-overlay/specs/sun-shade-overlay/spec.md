@@ -137,23 +137,33 @@ it SHALL take place.
 The overlay SHALL be computed off the main thread; the map SHALL stay responsive while it is
 computed. It SHALL be recomputed:
 - when the camera has rested for 300 ms after a move;
-- when the selected time or date changes;
+- when the selected date changes;
 - when the network connection returns while some cell is unknown.
 
-A newer trigger SHALL replace a computation still running. The overlay SHALL never show the state
-of another time:
+A change of the selected time within the selected day SHALL show that time's overlay if it has
+already been computed ("Overlay of the whole day"); otherwise that time SHALL be computed next. A
+newer trigger SHALL replace a computation still running. While a new overlay is being computed:
 - **After a camera move**, the previous overlay stays on its geographic area until the new one is
   ready. Newly visible areas stay untinted meanwhile.
-- **After a change of the selected time or date**, the previous overlay is removed immediately.
-  A `Computing sun and shade …` indicator is shown until the new overlay is ready.
+- **After a change of the selected time or date**, the previous overlay also stays until the new
+  one is ready. Meanwhile the notice `Computing sun and shade …` SHALL be shown, because the
+  overlay on screen belongs to another time.
 
 #### Scenario: Pan
 - **WHEN** the overlay is on and the user pans the map by half a screen
 - **THEN** the previous overlay stays aligned with the terrain it was computed for, and the new overlay replaces it after the camera has rested for 300 ms and the computation has finished
 
-#### Scenario: Time change
-- **WHEN** the overlay is on and the user moves the time slider from 12:00 to 15:00
-- **THEN** the overlay for 12:00 disappears at once, `Computing sun and shade …` is shown, and then the overlay for 15:00 is drawn
+#### Scenario: Time change to a time not yet computed
+- **WHEN** the overlay is on, shows 12:00, and the user moves the time slider to 15:00 before 15:00 has been computed
+- **THEN** the overlay for 12:00 stays and `Computing sun and shade …` is shown until the overlay for 15:00 replaces it
+
+#### Scenario: Time change to a time already computed
+- **WHEN** the overlay is on and the user moves the time slider to a time of the selected day whose overlay has been computed
+- **THEN** that overlay is drawn within 100 ms, without the notice
+
+#### Scenario: Date change
+- **WHEN** the overlay is on and the user picks another date
+- **THEN** the previous overlay stays and `Computing sun and shade …` is shown until the overlay for the new date and time replaces it
 
 #### Scenario: Slider dragged continuously
 - **WHEN** the user drags the time slider across many positions while the overlay is on
@@ -162,3 +172,35 @@ of another time:
 #### Scenario: Connectivity returns
 - **WHEN** some cells are unknown because the device was offline and the network connection returns
 - **THEN** the overlay is recomputed without the user moving the map or changing the time
+
+### Requirement: Overlay of the whole day
+Once the overlay of the selected time is ready, the app SHALL compute in the background the overlay
+of the visible area for every slider position of the selected day (5-minute steps from the start
+of the day, over its actual length; time-selection "Choose the time of day"):
+- **Order:** nearest to the selected time first.
+- **CPU:** at most half of the device's processor cores. The overlay of the selected time itself
+  may use all cores.
+- **Night positions:** at a position where the sun's upper edge at the map centre is below −3.5°,
+  every cell SHALL be shade where its ground height is known and unknown where it is not, without
+  terrain computation. Every terrain horizon within 150 km of an eye at most 4812 m high, over
+  ground at least 1000 m below sea level, lies above −2.9°, so this is exact.
+- **Stop and restart:** the background computation SHALL stop when the overlay is switched off.
+  It SHALL start over, with the selected time first, after a camera rest, a change of the selected
+  date, or a reconnect while some cell is unknown. A change of the selected time within the day
+  SHALL NOT restart it; if that time has not been computed yet, it is computed next.
+
+#### Scenario: Scrubbing a computed day
+- **WHEN** the overlay is on at Lauterbrunnen, 46.5935° N, 7.9091° E, map zoom 12, on 2025-12-21 at 12:00, and the day's computation has finished
+- **THEN** moving the slider to 14:35 shows the overlay for 14:35 within 100 ms, without `Computing sun and shade …`
+
+#### Scenario: Night positions
+- **WHEN** the day of 2025-12-21 is computed for Interlaken, 46.6863° N, 7.8632° E
+- **THEN** the overlay for 02:00 is shade in every cell with known ground, and no terrain beyond the visible area's own tiles is used for it
+
+#### Scenario: A pan starts the day over
+- **WHEN** the day is being computed and the user pans the map
+- **THEN** after the camera has rested for 300 ms, the day is computed again for the new area, starting with the selected time
+
+#### Scenario: Responsive while computing the day
+- **WHEN** the day is being computed in the background
+- **THEN** the map can be panned and the time slider moved without delay

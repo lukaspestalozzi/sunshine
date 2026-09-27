@@ -37,11 +37,14 @@ See proposal.md (Why) and the spec `sun-shade-overlay`. Measurements, math and l
   oracle.
 - Every cell of the visible area at every zoom ≥ 11, with no cap.
 - Unknown only where missing data could change the result.
-- Interaction stays fluid: computation is off the main thread and cancellable. There is never a
-  state from another time.
+- Interaction stays fluid: computation is off the main thread and cancellable. A state from
+  another time is only shown while its replacement is computed, and always with the
+  `Computing sun and shade …` notice (revised 2026-09-27).
+- Scrubbing through the selected day is instant once the day is computed (D11).
 
 **Non-Goals:**
-- Per-cell sun periods or the day product (#7). Persisting grids.
+- Per-cell sun periods and the heatmap display (#7), although D11's day grids contain the data.
+- Persisting grids, or keeping a day after the area or the date changes.
 - A per-cell sun position (see D2).
 - Reusing `HorizonProfile`s. The overlay needs one azimuth per cell, not 1440.
 
@@ -161,8 +164,11 @@ termination, and it would serialise the loading.
   off (user decision). New `overlay: StateFlow<OverlayUiState>`:
   - `Off`;
   - `ZoomedOut`;
-  - `Computing(kept: Ready?)`. `kept` is the previous overlay after a pan, and `null` after a time
-    or date change (user decision);
+  - `Computing(kept: Ready?)`. `kept` is the previous overlay, after a pan and also after a time
+    or date change (user decision, revised 2026-09-27). The earlier decision was `null` after a
+    time or date change, i.e. clearing the map at once. It was replaced because the map should not
+    blink on every slider move. The notice `Computing sun and shade …` shows whenever `kept` is
+    `null` or belongs to another time than the selected one;
   - `Ready(grid, time, image)`. The image is rendered by `renderOverlay` (D9) on the compute
     dispatcher, not in composition (changed during apply, task 5.2).
 - **Triggers:** a latest-wins `channelFlow` over (area, selected time, toggle, online), as for the
@@ -170,6 +176,8 @@ termination, and it would serialise the loading.
   - A camera change waits `SETTLE_MILLIS` (300 ms); time changes start at once.
   - `conflate` drops slider positions that arrive while a computation runs.
   - A reconnect recomputes only if the grid has unknown cells.
+  - A time change within the selected day is answered from the day (D11) when that time is
+    computed, without calling the repository.
 - **Panel consistency:** the grid and the panel's `SunshineUiState` stay independent. With D3 they
   agree at the crosshair except within one cell at cliff feet (spec tolerance).
 
@@ -205,23 +213,75 @@ hatching would rotate with the sun, and MapLibre interpolates quads in Mercator 
   `Computing` with `kept == null`. Both are `Label`s in `MapLabels`' top column.
 - Strings live in `strings.xml`.
 
+### D11. The whole day: selected time first, then every slider step in the background (user decisions, 2026-09-27)
+- **Steps:** every slider position of the selected day: 5-minute steps from the day's start over
+  its actual length (23 or 25 h on DST days, as `sliderTime`). An off-grid selected time (`Now`,
+  launch) is computed too, as its own entry.
+- **Order:**
+  1. the selected time, on all cores, exactly as today (D8);
+  2. then the other steps, nearest to the selected time first (alternating later and earlier).
+  A selected step that is not yet computed jumps the queue and is computed next, on all cores.
+- **Parallelism:** background steps run their chunks on
+  `Dispatchers.Default.limitedParallelism(max(1, cores / 2))` (user decision: half the cores).
+- **Lifetime:** one `DayOverlay` per (area, date):
+  - a map from time to `ShadeGrid`, filled as steps finish;
+  - its job is cancelled and the day discarded after a camera rest, a date change, a reconnect
+    while some cell is unknown, or when the overlay is switched off;
+  - a time change within the day keeps it.
+- **Rendering:** only the selected time's grid is rendered (`renderOverlay`, D9). The day keeps
+  grids, never bitmaps: ~1.4 MB per bitmap × 190 steps would be too much.
+- **Tiles:** the ground tiles stay in the repository's kept map for the whole day. Upwind tiles
+  come through the kept map and the 64-tile LRU. Consecutive steps differ by ~1–2° of azimuth, so
+  their upwind tiles mostly overlap.
+- *Alternatives (asked):*
+  - 15-minute steps: 3× cheaper, but slider positions in between would still wait;
+  - 1° azimuth steps with per-cell interpolation: feeds #7, but is not exact at slider times
+    (spike E3: p90 7–16 min/day) and needs floats per cell;
+  - all cores or one core for the background.
+
+### D12. Night steps from the ground tiles alone
+With the sun's upper edge below −3.5° at the map centre, `SunShadeSweep.night(ground)` gives:
+- shade in every cell whose ground sample is available;
+- unknown where it is not;
+- no upwind tiles and no sweep.
+
+Why this is exact: the lowest horizon a cell can have occurs when all terrain within 150 km is far
+below its eye. For an eye at most 4812 m high over ground at least −1000 m, the elevation angle
+`−(Δ/d + c·d)` rises with d up to √(Δ/c) ≈ 290 km. So within 150 km its maximum is at 150 km:
+−2.81°. Every real horizon is higher, so the sun is blocked everywhere.
+
+The single overlay (D8) uses the same path below −3.5°. That also removes today's most expensive
+case: the sun below 0° made the lines reach the full 150 km. There is no cheaper exact rule
+between −3.5° and 0°, so those steps are swept.
+
+### D13. Packed cell states
+`ShadeGrid` stores 2 bits per cell (4 cells per byte) instead of a byte: SUN, SHADE, UNKNOWN. A
+day of up to ~190 steps × ~90k cells then takes ≤ ~4.3 MB instead of ~17 MB. The API is unchanged
+(`stateAt`, `cellState`, `sampleCells`, `hasUnknown`).
+
 ### Performance budget
 - **Triggers:** the camera at rest for 300 ms, a time or date change (slider positions conflated),
   and a reconnect with unknown cells. Only while the toggle is on and zoom ≥ 11.
 - **Sweep, tiles in memory, map zoom 12, portrait phone** (~200–430 lines, 2–4 M samples):
   - budget ≤ 500 ms on a mid-range phone with all cores;
   - desktop JVM estimate 60–150 ms on 3 threads, from the spike's 65–88 ns per sample;
-  - unmeasured on a phone; task 7.2 measures it.
+  - unmeasured on a phone; task 12.2 measures it.
 - **Map zoom 11:** z13 along lines, 26 m cells over ~10 × 21 km, similar sample counts. Same
   budget.
 - **Tiles from the disk cache:** plus decoding up to ~70 WebP tiles. Budget ≤ 3 s.
 - **Cold network:** 7–10 MB, limited by the connection. The previous overlay (pan) or the
   `Computing …` notice (time) is shown meanwhile.
 - **Resample and upload of the bitmap:** ≤ 50 ms.
+- **The day (D11):**
+  - a time already computed shows within 100 ms (render ≤ 50 ms);
+  - a night step (D12) ≤ 20 ms;
+  - all ~100 (21 Dec) to ~190 (21 Jun) steps take about 20–110 s of CPU on half the cores. That
+    is an estimate from the desktop numbers, unmeasured on a phone; task 12.2 measures it.
 - **Memory:**
   - the referenced tile map ≤ ~70 tiles × 512 KiB ≈ 35 MiB during a computation, plus the
     64-tile cache (32 MiB);
-  - grid and bitmap ≤ 3 MiB.
+  - grid and bitmap ≤ 3 MiB;
+  - the day's packed grids ≤ ~5 MiB (D13).
 - **Threading:** loading on OkHttp threads; sweep and rendering on `Dispatchers.Default`.
   Everything is cancellable between line chunks.
 - Debug builds log the timings (loading, sweep, rendering) with `debugLog`, as #4 does.
@@ -238,6 +298,9 @@ If the phone misses the sweep budget, tune constants, in this order; none change
   - the upwind cut gives the same grid as the full 150 km;
   - bundling stays within the lateral bound, and on synthetic ridges matches the unbundled grid;
   - the three missing-tile scenarios and a missing ground tile → unknown;
+  - the night grid: shade where the ground is known, unknown where a ground tile is missing, no
+    upwind tiles requested;
+  - packed states: the same grids as before, ≤ 23 KB for 90k cells;
   - `tiles()` covers every sampled pixel and its bilinear neighbours.
 - **`core`, oracle:** on two synthetic landscapes (ridges and a cirque), at 200 random cells, the
   state equals `sunshineAt(HorizonTracer profile)` with the same sun, except within one cell of a
@@ -247,7 +310,9 @@ If the phone misses the sweep budget, tune constants, in this order; none change
   - off → no work;
   - zoomed out;
   - settle after a pan and keep the old grid;
-  - a time change drops the old grid;
+  - a time change keeps the old grid with the notice, and a computed time shows without a
+    repository call;
+  - the day's order (nearest first), its parallelism (half the cores) and its restart rules;
   - conflated slider;
   - reconnect with unknown cells.
 - **Device check:**
@@ -255,14 +320,15 @@ If the phone misses the sweep budget, tune constants, in this order; none change
   - Lauterbrunnen at 15:00: a debug-only log of agreement with the point tracer at 200 random
     cells, ≥ 99.5 %;
   - offline, a never-visited area → hatched;
-  - the timings.
+  - after switching on, the day finishes in the background, and scrubbing through it is instant;
+  - the timings, including the day's total.
 
 ## Risks / Trade-offs
 
 - [45–70 DEM tiles per new screen strain Mapterhorn and mobile data] → The overlay is off by
   default (user decision). The disk cache, the 300 ms settle, the upwind cut and bundling limit the
   load. #4's usage-policy question becomes more pressing (Open Questions).
-- [Phone performance unknown; the budget is an estimate] → Task 7.2 measures it. The tuning order
+- [Phone performance unknown; the budget is an estimate] → Task 12.2 measures it. The tuning order
   is under "Performance budget". Constants only; no spec change.
 - [Memory peak of ~35 MiB of referenced tiles plus the 32 MiB cache on low-memory phones] →
   Tiles are released right after a computation, except the reuse map. That map is dropped when
@@ -279,6 +345,14 @@ If the phone misses the sweep budget, tune constants, in this order; none change
   unknown. `HorizonTracer` has no sun-based cut, so for the crosshair the panel can say `unknown`
   where the overlay says sun. The overlay is right in that case (found during apply, task 2.3);
   aligning the panel is left to a later change.
+- [Battery and heat from the day's background CPU (about 20–110 s per area and day, estimated)] →
+  It uses half the cores (user decision), runs only while the overlay is on, and is cancelled by
+  every new area or date. Night steps cost nothing (D12). Task 12.2 measures it. If it is too
+  heavy, limiting the day to a window around the selected time would be a spec change, decided
+  with the user. The nearest-first order already makes the most useful times ready first.
+- [More tiles per area: the day's upwind terrain lies in every sun direction] → Up to ~50 more
+  z10/z11 tiles (~5–8 MB) on a cold cache, cached on disk afterwards. The overlay is off by
+  default.
 - [The spike covered one area (Lauterbrunnen)] → The oracle tests use synthetic landscapes, and
   the device check covers Interlaken.
 
