@@ -2,18 +2,18 @@
 
 ## 1. core: compact height tiles
 
-- [ ] 1.1 Change `HeightTile` to 16-bit storage (design D6): `h = (s + 32768) · 0.25 − 1000` m, with `fromMetres(size, FloatArray)` and `height(row, column)`. Adapt `interpolateElevation` and #3's tests to the new constructor. Write the quantisation test first: −430 m, 0 m, 568.0 m and 8849 m round-trip within 0.125 m; a value outside −1000…15,383 m is rejected. Verify: `./gradlew :core:test` passes, including `ElevationInterpolationTest` unchanged in its expectations.
+- [x] 1.1 Change `HeightTile` to 16-bit storage (design D6): `h = (s + 32768) · 0.25 − 1000` m, with `fromMetres(size, FloatArray)` and `height(row, column)`. Adapt `interpolateElevation` and #3's tests to the new constructor. Write the quantisation test first: −430 m, 0 m, 568.0 m and 8849 m round-trip within 0.125 m; a value outside −1000…15,383 m is rejected. Verify: `./gradlew :core:test` passes, including `ElevationInterpolationTest` unchanged in its expectations.
 
 ## 2. core: horizon tracer
 
-- [ ] 2.1 Write `HorizonGeometryTest` first, on synthetic terrain (a helper builds `HeightTile`s from a height function at the right zoom). Cases:
+- [x] 2.1 Write `HorizonGeometryTest` first, on synthetic terrain (a helper builds `HeightTile`s from a height function at the right zoom). Cases:
   - a ridge 1000 m above the eye at 5 km → 11.29° ±0.05°;
   - a peak 4000 m above the eye at 100 km → 1.90° ±0.05°;
   - a flat plain → the curvature dip at every azimuth;
   - the eye height is the zoom-14 ground height + 1.7 m.
 
   Then implement the band schedule, the sampling (step ≤ 0.5 px; zooms per design D2), and `HorizonTracer` with `groundTiles`, `start`, `nextTiles`, `advance`, `isDone` and `profile` (design D5). Verify: `./gradlew :core:test --tests "*HorizonGeometryTest*"` passes.
-- [ ] 2.2 Write `HorizonTerminationTest` first. Early termination with `H_max` (design D3) gives a profile identical to a run without termination on three synthetic terrains. `nextTiles()` excludes tiles only reachable by finished rays. The `H_max` region rule: 4810 m at 46.7° N 7.9° E, 8849 m at 27.9° N 86.9° E. Then implement the termination and the region rule. Verify: `./gradlew :core:test --tests "*HorizonTerminationTest*"` passes.
+- [x] 2.2 Write `HorizonTerminationTest` first. Early termination with `H_max` (design D3) gives a profile identical to a run without termination on three synthetic terrains. `nextTiles()` excludes tiles only reachable by finished rays. The `H_max` region rule: 4810 m at 46.7° N 7.9° E, 8849 m at 27.9° N 86.9° E. Then implement the termination and the region rule. Verify: `./gradlew :core:test --tests "*HorizonTerminationTest*"` passes.
 - [ ] 2.3 Write `SunEnvelopeTest` first. For Interlaken, `s_max` at azimuth 180° is about 66.8° plus the upper-limb offset (±0.3°), and azimuths north of the sun's range have no ray. Then implement `sunEnvelope` and the year clamp in the tracer (design D4). Add a test that the clamped profile gives the same sunshine states as the unclamped one at 1000 random instants over a year on a synthetic terrain. Verify: `./gradlew :core:test --tests "*SunEnvelopeTest*"` passes.
 - [ ] 2.4 Write `IncompleteHorizonTest` first, with the two spec scenarios: a missing far tile behind a 30° ridge → complete at 30°; a missing tile at 20 km behind a 2° horizon → incomplete with a lower bound of 2°. Also: a missing zoom-14 ground tile → the tracer reports that the ground is unknown and produces no profile. Then implement the `null`-tile handling. Verify: `./gradlew :core:test --tests "*IncompleteHorizonTest*"` passes.
 
