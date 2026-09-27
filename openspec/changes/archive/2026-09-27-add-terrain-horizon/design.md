@@ -95,15 +95,15 @@ separately.
 tracer therefore works in distance bands and asks for the tiles of each band:
 
 ```kotlin
-class HorizonTracer(observer: GeoPoint, bound: Double /* H_max */) {
+class HorizonTracer(observer: GeoPoint, tileSize: Int = 512, heightBound: Double = heightBoundAt(observer)) {
     fun groundTiles(): Set<TileKey>                           // zoom-14 tiles at the observer
     fun start(tiles: Map<TileKey, HeightTile?>)               // sets h_eye; null tile -> unknown
     fun nextTiles(): Set<TileKey>                             // tiles of the next band, active rays only
     fun advance(tiles: Map<TileKey, HeightTile?>)             // null = unavailable -> ray incomplete
     val isDone: Boolean
-    fun profile(): HorizonProfile
+    fun profile(): HorizonProfile?                            // null when the ground height is unknown
 }
-class HorizonProfile(val angles: FloatArray /* 1440 */, val complete: BooleanArray)
+class HorizonProfile(val eyeHeight: Double, val angles: DoubleArray /* 1440 */, val complete: BooleanArray)
 enum class Sunshine { SUN, SHADE, UNKNOWN }
 fun sunshineAt(profile: HorizonProfile, point: GeoPoint, instant: Instant): Sunshine
 sealed interface SunPeriods { data class Known(val periods: List<SunPeriod>); data object Unknown }
