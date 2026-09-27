@@ -96,6 +96,7 @@ private val mapViewModelFactory =
                 clock = Clock.systemDefaultZone(),
                 elevationRepository = (application as SunshineApp).elevationRepository,
                 horizonProfile = application.sunshineRepository::profile,
+                overlayGrid = application.overlayRepository::grid,
                 computeDispatcher = Dispatchers.Default,
                 log = ::debugLog,
             )
