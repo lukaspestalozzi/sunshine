@@ -143,7 +143,7 @@
 
 ## 11. Docs (revision 2026-09-27)
 
-- [ ] 11.1 Update `docs/roadmap.md` entry #5 (whole day in the background) and the `app` row of `CLAUDE.md` (`DayOverlay`). Verify: `grep -n "DayOverlay" CLAUDE.md` and `grep -n "whole day" docs/roadmap.md` show the entries.
+- [x] 11.1 Update `docs/roadmap.md` entry #5 (whole day in the background) and the `app` row of `CLAUDE.md` (`DayOverlay`). Verify: `grep -n "DayOverlay" CLAUDE.md` and `grep -n "whole day" docs/roadmap.md` show the entries.
 
 ## 12. Integration (after the revision)
 
