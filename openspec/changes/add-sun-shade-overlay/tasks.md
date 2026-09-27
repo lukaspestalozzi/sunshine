@@ -70,12 +70,13 @@
 
 ## 5. app: rendering
 
-- [ ] 5.1 Write `RenderOverlayTest` first:
+- [x] 5.1 Write `RenderOverlayTest` first:
   - a grid of all SHADE → every pixel `#455A64` at alpha 0.45;
   - all SUN → transparent;
   - UNKNOWN → stripes where `(x + y) mod 8 < 2` dp;
-  - a grid rotated for azimuth 135° resamples to north-up, with a known cell landing on the right pixel (±1 px);
-  - pixels outside the grid are transparent.
+  - a grid for a sun at azimuth 135° resamples to north-up: the shadow edge 1061 m north of a cliff lands on its pixel row (±1 cell).
+
+  ("Pixels outside the grid" was dropped during apply: the image covers exactly the grid's own area, which the grid covers with a cell of margin.)
 
   Then implement `renderOverlay` (design D9). Verify: `./gradlew :app:testDebugUnitTest --tests "*RenderOverlayTest*"` passes.
 - [ ] 5.2 Add the `overlay: OverlayImage?` parameter to `MapLibreMap`: an `ImageSource` with the bounds' `LatLngQuad` and a `RasterLayer` directly above `opentopomap`; `null` removes it; a new image replaces it. Pass the state from `MapScreen`. Verify: `./gradlew :app:assembleDebug` succeeds. On an emulator or device, with a debug grid of all SHADE, the tint covers exactly the map area and stays on the terrain while panning.
