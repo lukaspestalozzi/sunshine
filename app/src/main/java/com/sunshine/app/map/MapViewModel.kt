@@ -26,6 +26,7 @@ import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.random.Random
+import kotlin.time.measureTime
 import kotlin.time.measureTimedValue
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
@@ -259,7 +260,16 @@ class MapViewModel(
                         dayJob?.cancelAndJoin()
                         val newDay = DayOverlay(area, input.time.toLocalDate(), zone, overlayGrid, dayDispatcher ?: computeDispatcher)
                         day = newDay
-                        dayJob = dayDispatcher?.let { launch { newDay.computeRest { mutableSelectedTime.value } } }
+                        dayJob =
+                            dayDispatcher?.let {
+                                launch {
+                                    val took = measureTime { newDay.computeRest { mutableSelectedTime.value } }
+                                    log(
+                                        "Overlay day ${newDay.date}: ${newDay.computedSteps} of ${newDay.steps.size} steps, " +
+                                            "${newDay.nightSteps} at night, in ${took.inWholeMilliseconds} ms",
+                                    )
+                                }
+                            }
                     }
                     val selectedDay = checkNotNull(day)
                     send(OverlayUiState.Computing(kept = current))
