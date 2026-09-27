@@ -6,6 +6,9 @@ import com.sunshine.core.HorizonProfile
 import com.sunshine.core.HorizonTracer
 import com.sunshine.core.TileKey
 import kotlin.math.roundToLong
+import kotlin.time.Duration
+import kotlin.time.TimeSource
+import kotlin.time.measureTimedValue
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -17,6 +20,7 @@ import kotlinx.coroutines.coroutineScope
  */
 class SunshineRepository(
     private val tile: suspend (TileKey) -> HeightTile?,
+    private val log: (String) -> Unit = {},
 ) {
     private val profiles =
         object : LinkedHashMap<Pair<Long, Long>, HorizonProfile>(CACHED_PROFILES, LOAD_FACTOR, true) {
@@ -27,10 +31,19 @@ class SunshineRepository(
     suspend fun profile(point: GeoPoint): HorizonProfile? {
         val key = cacheKey(point)
         synchronized(profiles) { profiles[key] }?.let { return it }
+        val start = TimeSource.Monotonic.markNow()
+        var loading = Duration.ZERO
+        var tiles = 0
+        val timedLoad: suspend (Set<TileKey>) -> Map<TileKey, HeightTile?> = { keys ->
+            tiles += keys.size
+            measureTimedValue { load(keys) }.also { loading += it.duration }.value
+        }
         val tracer = HorizonTracer(point)
-        tracer.start(load(tracer.groundTiles()))
-        while (!tracer.isDone) tracer.advance(load(tracer.nextTiles()))
+        tracer.start(timedLoad(tracer.groundTiles()))
+        while (!tracer.isDone) tracer.advance(timedLoad(tracer.nextTiles()))
         val profile = tracer.profile()
+        val total = start.elapsedNow()
+        log("Horizon at $point: ${total.inWholeMilliseconds} ms, of which $tiles tiles ${loading.inWholeMilliseconds} ms")
         if (profile != null && profile.complete.all { it }) synchronized(profiles) { profiles[key] = profile }
         return profile
     }
