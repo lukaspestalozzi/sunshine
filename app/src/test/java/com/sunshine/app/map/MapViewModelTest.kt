@@ -25,6 +25,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -35,6 +36,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -522,6 +524,34 @@ class MapViewModelTest {
             val ready = viewModel.overlay.value as OverlayUiState.Ready
             assertEquals(ZonedDateTime.of(2025, 12, 21, 13, 0, 0, 0, ZURICH), ready.time)
             assertEquals(ready.grid.sun, suns.last())
+        }
+
+    @Test
+    fun `slider positions arriving while a sweep cannot stop yet start no extra sweeps`() =
+        runTest {
+            val gate = MutableStateFlow(true)
+            var sweeps = 0
+            val viewModel =
+                overlayViewModel(
+                    mutableListOf(),
+                    before = {
+                        sweeps++
+                        // Like the CPU-bound sweep, which only stops between chunks.
+                        withContext(NonCancellable) { gate.first { it } }
+                    },
+                )
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            gate.value = false
+            sweeps = 0
+
+            for (minutes in listOf(600f, 660f, 720f, 780f)) viewModel.onSliderMoved(minutes)
+            gate.value = true
+
+            assertEquals(ZonedDateTime.of(2025, 12, 21, 13, 0, 0, 0, ZURICH), (viewModel.overlay.value as OverlayUiState.Ready).time)
+            // 10:00 is running and cannot stop yet; 11:00 and 12:00 are dropped in favour of 13:00.
+            assertEquals(2, sweeps)
         }
 
     @Test

@@ -221,37 +221,41 @@ class MapViewModel(
             var requestedTime: ZonedDateTime? = null
             combine(camera, selectedTime, mutableOverlayOn, mapSize, isOnline) { camera, time, on, size, online ->
                 OverlayInput(camera, time, on, size, online)
-            }.collect { input ->
-                val area = input.area()
-                if (area == null) {
-                    lookup?.cancelAndJoin()
-                    shown = null
-                    requestedTime = null
-                    send(if (input.on && input.camera.zoom < MIN_OVERLAY_ZOOM) OverlayUiState.ZoomedOut else OverlayUiState.Off)
-                    return@collect
-                }
-                val current = shown
-                val unchanged = current != null && current.grid.area == area && current.time == input.time && requestedTime == input.time
-                if (unchanged && (!input.online || !current!!.grid.hasUnknown)) return@collect
-                val timeChanged = requestedTime != null && requestedTime != input.time
-                requestedTime = input.time
-                lookup?.cancelAndJoin()
-                send(OverlayUiState.Computing(kept = current?.takeIf { it.time == input.time }))
-                lookup =
-                    launch {
-                        if (!timeChanged) delay(SETTLE_MILLIS)
-                        val sun = sunPosition(area.center, input.time.toInstant())
-                        val (grid, computing) = measureTimedValue { overlayGrid(area, sun) }
-                        val (image, rendering) = measureTimedValue { renderOverlay(grid) }
-                        log(
-                            "Overlay ${area.widthDp.toInt()}×${area.heightDp.toInt()} dp at zoom ${area.zoom}: " +
-                                "grid ${computing.inWholeMilliseconds} ms, image ${rendering.inWholeMilliseconds} ms",
-                        )
-                        val ready = OverlayUiState.Ready(grid, input.time, image)
-                        shown = ready
-                        send(ready)
-                    }
             }
+                // While a sweep that cannot stop mid-chunk is being cancelled, keep only the latest input.
+                .conflate()
+                .collect { input ->
+                    val area = input.area()
+                    if (area == null) {
+                        lookup?.cancelAndJoin()
+                        shown = null
+                        requestedTime = null
+                        send(if (input.on && input.camera.zoom < MIN_OVERLAY_ZOOM) OverlayUiState.ZoomedOut else OverlayUiState.Off)
+                        return@collect
+                    }
+                    val current = shown
+                    val unchanged =
+                        current != null && current.grid.area == area && current.time == input.time && requestedTime == input.time
+                    if (unchanged && (!input.online || !current!!.grid.hasUnknown)) return@collect
+                    val timeChanged = requestedTime != null && requestedTime != input.time
+                    requestedTime = input.time
+                    lookup?.cancelAndJoin()
+                    send(OverlayUiState.Computing(kept = current?.takeIf { it.time == input.time }))
+                    lookup =
+                        launch {
+                            if (!timeChanged) delay(SETTLE_MILLIS)
+                            val sun = sunPosition(area.center, input.time.toInstant())
+                            val (grid, computing) = measureTimedValue { overlayGrid(area, sun) }
+                            val (image, rendering) = measureTimedValue { renderOverlay(grid) }
+                            log(
+                                "Overlay ${area.widthDp.toInt()}×${area.heightDp.toInt()} dp at zoom ${area.zoom}: " +
+                                    "grid ${computing.inWholeMilliseconds} ms, image ${rendering.inWholeMilliseconds} ms",
+                            )
+                            val ready = OverlayUiState.Ready(grid, input.time, image)
+                            shown = ready
+                            send(ready)
+                        }
+                }
         }.flowOn(computeDispatcher)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), initialValue = OverlayUiState.Off)
 
