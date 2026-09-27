@@ -28,10 +28,16 @@ Roadmap: implements entry #5, `add-sun-shade-overlay`, of `docs/roadmap.md`.
   on the number of cells. Shade is tinted, sun is left clear, and unknown is hatched.
 - `app`: a toggle button (off by default) with a legend, and a notice when the overlay is on but
   the map is zoomed out below 11.
-- `app`: the overlay is recomputed when the camera rests, when the selected time or date changes,
-  and when the network returns with cells still unknown. After a pan, the previous overlay stays
-  on its area. After a time change it is removed and a "computing" indicator is shown until the new
-  one is ready.
+- `app`: the overlay is recomputed when the camera rests, when the selected date changes, and when
+  the network returns with cells still unknown. After a pan, the previous overlay stays on its area.
+  After a time or date change, the previous overlay also stays until the new one is ready, and a
+  "computing" notice says that it belongs to another time (user decision, revised 2026-09-27).
+- `app`: the whole selected day is computed (user decision, 2026-09-27).
+  - The selected time comes first, on all cores.
+  - Then every 5-minute slider step of the day follows in the background, on half the cores,
+    nearest to the selected time first.
+  - Steps with the sun far below every horizon need no terrain work.
+  - Moving the slider to a time already computed shows its overlay at once.
 
 ## Capabilities
 
@@ -48,8 +54,9 @@ Roadmap: implements entry #5, `add-sun-shade-overlay`, of `docs/roadmap.md`.
 
 ## Non-goals
 
-- Hours of sun per cell over a day (heatmap, roadmap #7). The time slider recomputes one instant
-  at a time (user decision), with no day product in the background.
+- Showing hours of sun per cell (heatmap, roadmap #7), although the day's overlays now exist.
+- A progress display for the day's background computation.
+- Keeping a computed day across app restarts or after the visible area or the date changes.
 - Downloading regions for offline use (roadmap #6). Offline, the overlay depends on the DEM disk
   cache and shows unknown where tiles are missing.
 - The overlay below map zoom 11 (user decision).
@@ -71,13 +78,20 @@ Roadmap: implements entry #5, `add-sun-shade-overlay`, of `docs/roadmap.md`.
     Most of that is z14 in the visible area; the rest lies upwind.
   - While a grid is computed, its tiles stay referenced (≤ about 35 MB), in addition to the
     64-tile cache.
+  - The day adds up to about 5 MB of packed cell states, and the upwind tiles of every sun
+    direction of the day: up to about 50 more z10/z11 tiles (about 5–8 MB) on a cold cache.
   - Off by default, so users who don't turn it on pay nothing.
+- **CPU and battery:** about 20–110 s of background CPU per area and day on half the cores (an
+  estimate from desktop measurements; the phone is unmeasured). It runs only while the overlay is
+  on, and every new area or date cancels it.
 - **Dependencies:** none new. MapLibre 13.6.1 already has `ImageSource`.
 - **Tests:**
   - `core` tests on synthetic terrain with exact shadow geometry, curvature, missing tiles and the
     upwind cut;
   - a `core` test of the sweep against `HorizonTracer` at sample cells;
-  - `MapViewModel` tests for update and staleness rules;
+  - `core` tests for the night grid and the packed states;
+  - `MapViewModel` tests for update and staleness rules and for the day's order, parallelism and
+    restarts;
   - a device check at Lauterbrunnen and Interlaken.
 - **Docs:** `docs/roadmap.md` entry #5 and `CLAUDE.md` (new `core` file). `investigations/`
   already holds the spike.

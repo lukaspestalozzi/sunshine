@@ -81,26 +81,74 @@
   Then implement `renderOverlay` (design D9). Verify: `./gradlew :app:testDebugUnitTest --tests "*RenderOverlayTest*"` passes.
 - [ ] 5.2 Add the `overlay: OverlayImage?` parameter to `MapLibreMap`: an `ImageSource` with the bounds' `LatLngQuad` and a `RasterLayer` directly above `opentopomap`; `null` removes it; a new image replaces it. Pass the state from `MapScreen`. Verify: `./gradlew :app:assembleDebug` succeeds. On an emulator or device, with a debug grid of all SHADE, the tint covers exactly the map area and stays on the terrain while panning.
 
-  Status (apply): code done, `assembleDebug` and unit tests pass; the device part is open (no emulator in the cloud session) and is checked in 7.2.
+  Status (apply): code done, `assembleDebug` and unit tests pass; the device part is open (no emulator in the cloud session) and is checked in 12.2.
 
 ## 6. app: UI and debug checks
 
 - [ ] 6.1 Add the toggle icon button (top end), the legend (`Shade`, `Unknown` swatches) while on, and the notices `Zoom in to see sun and shade` and `Computing sun and shade …` in `MapLabels`' top column. Strings go in `strings.xml`; report the map size in dp from `MapScreen` to `onMapSizeChanged` (design D10). Verify: `./gradlew :app:testDebugUnitTest` and `./gradlew :app:lintDebug` pass. On a device, the toggle, legend and both notices appear as specified, and none covers the crosshair, sun line, panel or attributions.
 
-  Status (apply): code done (toggle as a `FilterChip` "Sun & shade", no icon library), `overlayNotice` unit-tested, unit tests and lint pass; the device part is open and is checked in 7.2.
+  Status (apply): code done (toggle as a `FilterChip` "Sun & shade", no icon library), `overlayNotice` unit-tested, unit tests and lint pass; the device part is open and is checked in 12.2.
 - [ ] 6.2 Add debug-only logs:
   - the overlay timings (tile loading, sweep, rendering; tiles in memory / disk / network);
   - an agreement check that, in debug builds, evaluates `HorizonTracer` + `sunshineAt` at 200 random cells of a finished grid and logs the percentage of agreement.
 
-  Verify: `./gradlew :app:assembleDebug` succeeds. `adb logcat -s Sunshine` shows both on a device (checked in 7.2).
+  Verify: `./gradlew :app:assembleDebug` succeeds. `adb logcat -s Sunshine` shows both on a device (checked in 12.2).
 
-  Status (apply): code done — `OverlayRepository` logs tiles (kept / from disk / from network, counted by `DemTileFetcher.loads()` / rest in memory or unavailable) and sweep time, `MapViewModel` logs grid and image time, and in debug builds the agreement over 200 cells once an overlay has stayed 3 s (unit-tested); `assembleDebug` passes. The logcat part is open until 7.2.
+  Status (apply): code done — `OverlayRepository` logs tiles (kept / from disk / from network, counted by `DemTileFetcher.loads()` / rest in memory or unavailable) and sweep time, `MapViewModel` logs grid and image time, and in debug builds the agreement over 200 cells once an overlay has stayed 3 s (unit-tested); `assembleDebug` passes. The logcat part is open until 12.2.
 - [x] 6.3 Update `docs/roadmap.md` entry #5 (decisions resolved in its design.md, spike reference) and the `app` row of `CLAUDE.md` (overlay repository, rendering). Verify: `grep -n "add-sun-shade-overlay" docs/roadmap.md` shows "resolved in its design.md".
 
 ## 7. Integration
 
 - [x] 7.1 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, all unit tests and the debug APK pass, and validation reports no failures.
-- [ ] 7.2 On-device check with the CI APK. Expected:
+7.2 (the on-device check) moved to 12.2, after the revision of 2026-09-27.
+
+## 8. core: night grid and packed states (revision 2026-09-27)
+
+- [ ] 8.1 Write `SunShadeNightTest` first:
+  - with the sun's upper edge at −3.6°, `night(ground)` gives SHADE in every cell whose ground tile is available and UNKNOWN where it is missing;
+  - it needs only `groundTiles()` (no upwind tile is read, checked with a recording tile map);
+  - on two synthetic landscapes, it equals the full sweep at −3.6°, the sweep being made to reach 150 km.
+
+  Then implement `SunShadeSweep.night(ground)` (design D12). Verify: `./gradlew :core:test --tests "*SunShadeNightTest*"` passes.
+- [ ] 8.2 Write the packing test first: 90k cells take ≤ 23 KB of states, and a grid round-trips every state. Then store `ShadeGrid` states at 2 bits per cell (design D13). Verify: `./gradlew :core:test` passes, all existing sun-shade tests unchanged.
+
+## 9. app: keep the overlay on time changes (revision 2026-09-27)
+
+- [ ] 9.1 Change the `MapViewModel` tests first:
+  - a time or date change → `Computing(kept = previous)`;
+  - the notice shows while `kept` belongs to another time (`overlayNotice` gets the selected time);
+  - `OverlayRepository.grid` uses the night grid (D12) below −3.5°.
+
+  Then implement it (design D8, D12). Verify: `./gradlew :app:testDebugUnitTest --tests "*MapViewModel*" --tests "*OverlayNotices*" --tests "*OverlayRepository*"` passes.
+
+## 10. app: the whole day (revision 2026-09-27)
+
+- [ ] 10.1 Write `DayOverlayTest` first (test dispatcher, fake grid function):
+  - the steps of 2025-12-21 and of the DST days 2025-03-30 (276) and 2025-10-26 (300) come from `sliderTime`;
+  - the order is selected time, then nearest first, alternating later/earlier;
+  - background steps run on a dispatcher limited to half the cores (at least 1);
+  - night steps use the night grid;
+  - a selected step not yet computed jumps the queue;
+  - cancelling stops between steps.
+
+  Then implement `DayOverlay` (design D11). Verify: `./gradlew :app:testDebugUnitTest --tests "*DayOverlayTest*"` passes.
+- [ ] 10.2 Write the `MapViewModel` day tests first:
+  - after the selected time is ready, the day continues in the background;
+  - a time change to a computed step gives `Ready` without calling the repository;
+  - a camera rest, a date change or a reconnect with unknown cells starts the day over;
+  - switching off stops it.
+
+  Then wire `DayOverlay` into `MapViewModel` (design D8, D11). Verify: `./gradlew :app:testDebugUnitTest --tests "*MapViewModel*"` passes, including the existing tests.
+- [ ] 10.3 Add a debug log of the day: steps done out of total, night steps, and total time when finished. Verify: a `MapViewModel` test sees the log line, and `./gradlew :app:assembleDebug` succeeds.
+
+## 11. Docs (revision 2026-09-27)
+
+- [ ] 11.1 Update `docs/roadmap.md` entry #5 (whole day in the background) and the `app` row of `CLAUDE.md` (`DayOverlay`). Verify: `grep -n "DayOverlay" CLAUDE.md` and `grep -n "whole day" docs/roadmap.md` show the entries.
+
+## 12. Integration (after the revision)
+
+- [ ] 12.1 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, all unit tests and the debug APK pass, and validation reports no failures.
+- [ ] 12.2 On-device check with the CI APK. Expected:
   - off at launch;
   - at Interlaken, zoom 12, 2025-12-21 12:00 the crosshair's cell is untinted (sun) and at 15:00 tinted (shade);
   - at Lauterbrunnen, zoom 12, 2025-12-21 15:00 the debug agreement log shows ≥ 99.5 %;
@@ -108,4 +156,7 @@
   - in flight mode over a never-visited area the overlay is hatched;
   - zoom 10.5 shows `Zoom in to see sun and shade`;
   - dragging the slider ends with the overlay of the final position;
-  - the logged timings are within the design's performance budget, or the misses are recorded in design.md.
+  - moving the slider to a time not yet computed keeps the previous overlay with `Computing sun and shade …`;
+  - after the day's log reports it finished, scrubbing shows each overlay at once, without the notice;
+  - the logged timings (selected time, day total, night steps) are within the design's performance budget, or the misses are recorded in design.md;
+  - the device parts of 5.2, 6.1 and 6.2 (placement and panning, controls, logcat).
