@@ -403,8 +403,17 @@ class MapViewModelTest {
             viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
             advanceTimeBy(SETTLE_MILLIS)
 
-            assertEquals(SunshineUiState.Ready(SunPeriods.Unknown, Sunshine.UNKNOWN), viewModel.sunshine.value)
+            assertEquals(SunshineUiState.Ready(INTERLAKEN, SunPeriods.Unknown, Sunshine.UNKNOWN), viewModel.sunshine.value)
         }
+
+    @Test
+    fun `a result for another location than the camera centre is shown as loading`() {
+        val ready = SunshineUiState.Ready(INTERLAKEN, SunPeriods.Unknown, Sunshine.UNKNOWN)
+
+        assertEquals(ready, ready.at(INTERLAKEN))
+        assertEquals(SunshineUiState.Loading, ready.at(GeoPoint(46.0, 9.0)))
+        assertEquals(SunshineUiState.Loading, SunshineUiState.Loading.at(INTERLAKEN))
+    }
 
     private fun newViewModel(
         savedState: SavedStateHandle = SavedStateHandle(),
