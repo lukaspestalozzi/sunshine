@@ -1,5 +1,6 @@
 package com.sunshine.app.map
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -41,8 +42,8 @@ fun Crosshair(modifier: Modifier = Modifier) {
 }
 
 /**
- * Selected-location coordinates, offline notice, [bottomPanel] and the map and elevation
- * attributions, kept clear of the system bars. [bottomPanel] sits directly above the attributions,
+ * Selected-location coordinates, offline notice, an optional [notice], the [topEnd] controls,
+ * [bottomPanel] and the map and elevation attributions, kept clear of the system bars. [bottomPanel] sits directly above the attributions,
  * so it never covers them. The elevation attribution opens the list of Mapterhorn's sources.
  */
 @Composable
@@ -50,6 +51,8 @@ fun MapLabels(
     camera: CameraState,
     isOffline: Boolean,
     modifier: Modifier = Modifier,
+    @StringRes notice: Int? = null,
+    topEnd: @Composable () -> Unit = {},
     bottomPanel: @Composable () -> Unit = {},
 ) {
     Box(
@@ -70,7 +73,9 @@ fun MapLabels(
                     containerColor = MaterialTheme.colorScheme.errorContainer,
                 )
             }
+            notice?.let { Label(text = stringResource(it)) }
         }
+        Box(Modifier.align(Alignment.TopEnd)) { topEnd() }
         Column(
             modifier = Modifier.align(Alignment.BottomStart),
             verticalArrangement = Arrangement.spacedBy(8.dp),

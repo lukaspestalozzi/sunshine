@@ -86,6 +86,8 @@
 ## 6. app: UI and debug checks
 
 - [ ] 6.1 Add the toggle icon button (top end), the legend (`Shade`, `Unknown` swatches) while on, and the notices `Zoom in to see sun and shade` and `Computing sun and shade …` in `MapLabels`' top column. Strings go in `strings.xml`; report the map size in dp from `MapScreen` to `onMapSizeChanged` (design D10). Verify: `./gradlew :app:testDebugUnitTest` and `./gradlew :app:lintDebug` pass. On a device, the toggle, legend and both notices appear as specified, and none covers the crosshair, sun line, panel or attributions.
+
+  Status (apply): code done (toggle as a `FilterChip` "Sun & shade", no icon library), `overlayNotice` unit-tested, unit tests and lint pass; the device part is open and is checked in 7.2.
 - [ ] 6.2 Add debug-only logs:
   - the overlay timings (tile loading, sweep, rendering; tiles in memory / disk / network);
   - an agreement check that, in debug builds, evaluates `HorizonTracer` + `sunshineAt` at 200 random cells of a finished grid and logs the percentage of agreement.
