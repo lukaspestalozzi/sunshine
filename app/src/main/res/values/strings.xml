@@ -15,4 +15,5 @@
     <string name="sun_panel_civil_dusk">Civil dusk</string>
     <string name="sun_panel_day_length">Day length</string>
     <string name="sun_panel_altitude">Altitude</string>
+    <string name="sun_panel_sunshine">Sunshine</string>
 </resources>

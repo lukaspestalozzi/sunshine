@@ -34,6 +34,7 @@ fun SunPanel(
     selectedTime: ZonedDateTime,
     sun: SunInfo?,
     elevation: ElevationState,
+    sunshine: SunshineUiState,
     onDateSelected: (LocalDate) -> Unit,
     onSliderMoved: (Float) -> Unit,
     onNowClicked: () -> Unit,
@@ -63,8 +64,9 @@ fun SunPanel(
                 valueRange = 0f..(sliderPositions(selectedTime.toLocalDate(), selectedTime.zone) - 1) * SLIDER_STEP_MINUTES.toFloat(),
                 modifier = Modifier.semantics { contentDescription = timeOfDay },
             )
-            // The altitude belongs to the location, not the time, so it does not wait for the sun values.
+            // Altitude and sunshine belong to the location and day, so they do not wait for the sun values.
             Value(R.string.sun_panel_altitude, formatAltitude(elevation))
+            Value(R.string.sun_panel_sunshine, formatSunshine(sunshine, selectedTime))
             if (sun != null) SunValues(sun, selectedTime)
         }
     }
