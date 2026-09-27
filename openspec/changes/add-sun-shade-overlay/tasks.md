@@ -132,7 +132,7 @@
   - cancelling stops between steps.
 
   Then implement `DayOverlay` (design D11). Verify: `./gradlew :app:testDebugUnitTest --tests "*DayOverlayTest*"` passes.
-- [ ] 10.2 Write the `MapViewModel` day tests first:
+- [x] 10.2 Write the `MapViewModel` day tests first:
   - after the selected time is ready, the day continues in the background;
   - a time change to a computed step gives `Ready` without calling the repository;
   - a camera rest, a date change or a reconnect with unknown cells starts the day over;
