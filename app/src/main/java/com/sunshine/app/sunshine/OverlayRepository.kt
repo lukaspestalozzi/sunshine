@@ -9,6 +9,7 @@ import com.sunshine.core.TileKey
 import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.min
+import kotlin.time.TimeSource
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -23,6 +24,8 @@ import kotlinx.coroutines.ensureActive
 class OverlayRepository(
     private val tile: suspend (TileKey) -> HeightTile?,
     private val chunks: Int = Runtime.getRuntime().availableProcessors(),
+    private val inMemory: (TileKey) -> Boolean = { false },
+    private val log: (String) -> Unit = {},
 ) {
     private var kept: Kept? = null
 
@@ -37,10 +40,15 @@ class OverlayRepository(
         sun: SunPosition,
     ): ShadeGrid =
         coroutineScope {
+            val start = TimeSource.Monotonic.markNow()
             val sweep = SunShadeSweep(area, sun)
             val reusable = kept?.takeIf { it.area.isNear(area) }?.tiles.orEmpty()
-            val ground = load(sweep.groundTiles(), reusable)
-            val tiles = ground + load(sweep.tiles(ground) - ground.keys, reusable)
+            val planned = sweep.groundTiles()
+            val memory = planned.count { it !in reusable && inMemory(it) }
+            val ground = load(planned, reusable)
+            val upwind = sweep.tiles(ground) - ground.keys
+            val tiles = ground + load(upwind, reusable)
+            val loaded = start.elapsedNow()
             val parts =
                 sweep.chunks(chunks).map { lines ->
                     async {
@@ -49,6 +57,12 @@ class OverlayRepository(
                     }
                 }
             val grid = sweep.assemble(parts.awaitAll())
+            val reused = tiles.keys.count { it in reusable }
+            log(
+                "Overlay tiles: ${tiles.size} ($reused kept, ≥ $memory in memory, ${tiles.size - reused - memory} else) " +
+                    "in ${loaded.inWholeMilliseconds} ms; sweep ${(start.elapsedNow() - loaded).inWholeMilliseconds} ms " +
+                    "on ${sweep.chunks(chunks).size} chunks",
+            )
             // Unavailable tiles are not kept: the network may be back next time.
             kept = Kept(area, tiles.mapNotNull { (key, tile) -> tile?.let { key to it } }.toMap())
             grid

@@ -13,6 +13,7 @@ import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sinh
 import kotlin.math.sqrt
+import kotlin.random.Random
 
 /**
  * The visible part of a north-up Web-Mercator map with 512-dp tiles, as MapLibre shows it: the world
@@ -636,6 +637,22 @@ class ShadeGrid internal constructor(
     }
 
     fun stateAt(point: GeoPoint): Sunshine? = stateAt(point.latitude, point.longitude)
+
+    /** The sample points and states of [count] random cells, e.g. to check them against the point tracer. */
+    fun sampleCells(
+        count: Int,
+        random: Random,
+    ): List<Pair<GeoPoint, Sunshine>> {
+        val lines = (0 until sweep.lineCount).filter { sweep.lineCells[it] > 0 }
+        if (lines.isEmpty()) return emptyList()
+        val point = DoubleArray(2)
+        return List(count) {
+            val k = lines[random.nextInt(lines.size)]
+            val j = random.nextInt(sweep.lineCells[k])
+            sweep.samplePoint(k, j, point)
+            GeoPoint(point[0], point[1]) to cellState(k, j)
+        }
+    }
 
     internal fun cellState(
         line: Int,

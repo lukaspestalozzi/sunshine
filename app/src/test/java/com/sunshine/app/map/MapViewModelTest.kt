@@ -555,6 +555,32 @@ class MapViewModelTest {
         assertFalse(newViewModel().isOverlayOn.value)
     }
 
+    @Test
+    fun `debug builds log the overlay's agreement with the point tracer once it has stayed`() =
+        runTest {
+            val logged = mutableListOf<String>()
+            val viewModel =
+                MapViewModel(
+                    SavedStateHandle(),
+                    isOnline,
+                    clock,
+                    repository { heightBytes(568) },
+                    { horizonOf(-1.0) },
+                    { area, sun -> flatGrid(area, sun, available = true) },
+                    UnconfinedTestDispatcher(testScheduler),
+                    log = { logged += it },
+                    checkOverlayAgreement = true,
+                )
+            viewModel.onMapSizeChanged(MAP_WIDTH, MAP_HEIGHT)
+            viewModel.onSliderMoved(12 * 60f)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS + 3_000)
+
+            // Flat terrain at noon is sun everywhere, as is a -1° horizon: all 200 agree.
+            assertTrue(logged.any { it.startsWith("Overlay agreement with the point tracer: 200 of 200") }, "$logged")
+        }
+
     /**
      * A view model whose overlay grids come from flat 568 m terrain, or from no terrain at all while
      * offline. [before] runs before each grid, [areas] and [suns] record the requests.

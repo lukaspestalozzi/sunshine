@@ -31,7 +31,9 @@ class SunshineApp : Application() {
 
     val sunshineRepository: SunshineRepository by lazy { SunshineRepository(tile = tileCache::tile, log = ::debugLog) }
 
-    val overlayRepository: OverlayRepository by lazy { OverlayRepository(tile = tileCache::tile) }
+    val overlayRepository: OverlayRepository by lazy {
+        OverlayRepository(tile = tileCache::tile, inMemory = { tileCache.cached(it) != null }, log = ::debugLog)
+    }
 
     override fun onCreate() {
         super.onCreate()

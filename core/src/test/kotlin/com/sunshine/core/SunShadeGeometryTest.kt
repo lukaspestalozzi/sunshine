@@ -75,6 +75,17 @@ class SunShadeGeometryTest {
         }
     }
 
+    @Test
+    fun `sampled cells lie in their own cell and carry its state`() {
+        val terrain = SyntheticTerrain { lat, lon -> 900.0 + 400.0 * sin(lat * 900.0) * cos(lon * 700.0) }
+        val grid = terrain.grid(MapArea(AREA.center, 13.0, 80.0, 120.0), SunPosition(160.0, 15.0, true))
+
+        val cells = grid.sampleCells(50, kotlin.random.Random(3))
+
+        assertEquals(50, cells.size)
+        for ((point, state) in cells) assertEquals(state, grid.stateAt(point), "$point")
+    }
+
     private fun bearing(
         lat1: Double,
         lon1: Double,
