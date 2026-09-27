@@ -91,6 +91,7 @@ private val mapViewModelFactory =
                 isOnline = NetworkMonitor(connectivityManager).isOnline,
                 clock = Clock.systemDefaultZone(),
                 elevationRepository = (application as SunshineApp).elevationRepository,
+                horizonProfile = application.sunshineRepository::profile,
                 computeDispatcher = Dispatchers.Default,
             )
         }

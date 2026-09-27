@@ -7,19 +7,26 @@ import com.sunshine.app.elevation.Elevation
 import com.sunshine.app.elevation.ElevationRepository
 import com.sunshine.core.DEFAULT_LOCATION
 import com.sunshine.core.GeoPoint
+import com.sunshine.core.HorizonProfile
 import com.sunshine.core.SunDay
+import com.sunshine.core.SunPeriods
 import com.sunshine.core.SunPosition
+import com.sunshine.core.Sunshine
 import com.sunshine.core.sunDay
+import com.sunshine.core.sunPeriods
 import com.sunshine.core.sunPosition
+import com.sunshine.core.sunshineAt
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -56,6 +63,18 @@ sealed interface ElevationState {
     data object Unknown : ElevationState
 }
 
+/** Terrain-aware sunshine at the selected location as shown on screen (point-sunshine spec). */
+sealed interface SunshineUiState {
+    /** The horizon is being computed. */
+    data object Loading : SunshineUiState
+
+    /** The sun periods of the selected day and the sunshine state at the selected time. */
+    data class Ready(
+        val periods: SunPeriods,
+        val atSelectedTime: Sunshine,
+    ) : SunshineUiState
+}
+
 /**
  * State of the map screen. Times are in the zone of [clock] as it is when the view model is created
  * (the device time zone in production).
@@ -65,6 +84,7 @@ class MapViewModel(
     isOnline: Flow<Boolean>,
     private val clock: Clock,
     private val elevationRepository: ElevationRepository,
+    private val horizonProfile: suspend (GeoPoint) -> HorizonProfile?,
     computeDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
     private val zone: ZoneId = clock.zone
@@ -107,6 +127,40 @@ class MapViewModel(
                 }
         }.flowOn(computeDispatcher)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), initialValue = ElevationState.Loading)
+
+    // The horizon of the camera centre, recomputed when the centre changes or the network returns
+    // after an incomplete result. Latest wins, as for elevation. The camera must rest for
+    // [SETTLE_MILLIS] first, so that panning starts no downloads (design D8).
+    private val horizon: Flow<HorizonState> =
+        channelFlow {
+            var lookup: Job? = null
+            val done = AtomicReference<HorizonState.Computed?>(null)
+            combine(camera.map { it.center }.distinctUntilChanged(), isOnline) { point, online -> point to online }
+                .collect { (point, online) ->
+                    val previous = done.get()
+                    if (previous?.point == point && (!online || previous.isComplete)) return@collect
+                    lookup?.cancelAndJoin()
+                    done.set(null)
+                    lookup =
+                        launch {
+                            send(HorizonState.Loading)
+                            delay(SETTLE_MILLIS)
+                            val computed = HorizonState.Computed(point, horizonProfile(point))
+                            done.set(computed)
+                            send(computed)
+                        }
+                }
+        }
+
+    // Periods depend on the date only, so a new time of day costs one sun position (design D8).
+    private var periodsOfDay: Triple<HorizonState.Computed, LocalDate, SunPeriods>? = null
+
+    val sunshine: StateFlow<SunshineUiState> =
+        combine(horizon, selectedTime) { horizon, time -> horizon to time }
+            .conflate()
+            .map { (horizon, time) -> if (horizon is HorizonState.Computed) sunshineState(horizon, time) else SunshineUiState.Loading }
+            .flowOn(computeDispatcher)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), initialValue = SunshineUiState.Loading)
 
     // The monitor emits the current state as soon as it is collected; `false` only covers the
     // moment before that first emission.
@@ -153,6 +207,34 @@ class MapViewModel(
         return CameraState(center = GeoPoint(latitude, longitude), zoom = zoom)
     }
 
+    private fun sunshineState(
+        horizon: HorizonState.Computed,
+        time: ZonedDateTime,
+    ): SunshineUiState {
+        val profile = horizon.profile ?: return SunshineUiState.Ready(SunPeriods.Unknown, Sunshine.UNKNOWN)
+        val date = time.toLocalDate()
+        val memo = periodsOfDay
+        val periods =
+            if (memo != null && memo.first === horizon && memo.second == date) {
+                memo.third
+            } else {
+                sunPeriods(profile, horizon.point, date, zone).also { periodsOfDay = Triple(horizon, date, it) }
+            }
+        return SunshineUiState.Ready(periods, sunshineAt(profile, horizon.point, time.toInstant()))
+    }
+
+    private sealed interface HorizonState {
+        data object Loading : HorizonState
+
+        /** The horizon at [point]; [profile] is `null` when the ground height is unknown. */
+        class Computed(
+            val point: GeoPoint,
+            val profile: HorizonProfile?,
+        ) : HorizonState {
+            val isComplete: Boolean get() = profile != null && profile.complete.all { it }
+        }
+    }
+
     private fun Elevation.toState(): ElevationState =
         when (this) {
             is Elevation.Known -> ElevationState.Known(metres)
@@ -162,6 +244,7 @@ class MapViewModel(
     private companion object {
         const val DEFAULT_ZOOM = 10.0
         const val STOP_TIMEOUT_MILLIS = 5_000L
+        const val SETTLE_MILLIS = 300L
         const val KEY_LATITUDE = "camera_latitude"
         const val KEY_LONGITUDE = "camera_longitude"
         const val KEY_ZOOM = "camera_zoom"
