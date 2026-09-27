@@ -16,7 +16,7 @@ the app skeleton: the map screen and the build (see `docs/roadmap.md`).
 | `docs/roadmap.md` | Ordered list of planned changes, their status, and legacy failure modes to avoid. |
 | `docs/legacy-design.md` | Design of the discarded first implementation. Source material only. |
 | `investigations/` | Verified reference values (test oracles). |
-| `core/` | Pure Kotlin/JVM module (no Android dependencies): domain types and computations, e.g. `GeoPoint`; `Horizon.kt` (horizon tracer, no I/O) and `Sunshine.kt` (sunshine at an instant, sun periods of a day). |
+| `core/` | Pure Kotlin/JVM module (no Android dependencies): domain types and computations, e.g. `GeoPoint`; `Horizon.kt` (horizon tracer, no I/O), `Sunshine.kt` (sunshine at an instant, sun periods of a day) and `SunShade.kt` (sun/shade grid of the visible area by a convex-hull sweep, no I/O). |
 | `app/` | Android app (Compose, MapLibre): map screen, ViewModel, network code, elevation tiles (`elevation/`: Mapterhorn fetching, decoding, and `TileCache`, the tile cache shared by altitude and horizon), horizon profiles (`sunshine/`). Depends on `core`. |
 | `gradle/libs.versions.toml` | All dependency and plugin versions. |
 | `scripts/verify-local.sh` | Local CI simulation. |
