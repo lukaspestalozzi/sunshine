@@ -114,7 +114,7 @@
 
 ## 9. app: keep the overlay on time changes (revision 2026-09-27)
 
-- [ ] 9.1 Change the `MapViewModel` tests first:
+- [x] 9.1 Change the `MapViewModel` tests first:
   - a time or date change → `Computing(kept = previous)`;
   - the notice shows while `kept` belongs to another time (`overlayNotice` gets the selected time);
   - `OverlayRepository.grid` uses the night grid (D12) below −3.5°.

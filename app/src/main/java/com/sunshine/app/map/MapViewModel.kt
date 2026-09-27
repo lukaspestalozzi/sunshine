@@ -96,8 +96,8 @@ sealed interface OverlayUiState {
     data object ZoomedOut : OverlayUiState
 
     /**
-     * A new grid is being computed. [kept] is the previous overlay after a camera move (still right
-     * for its area), and `null` after a change of time or date, whose previous overlay would be wrong.
+     * A new grid is being computed. [kept] is the previous overlay, shown until the new one is ready,
+     * also after a change of time or date (then with a notice, as it belongs to another time).
      */
     data class Computing(
         val kept: Ready?,
@@ -211,9 +211,9 @@ class MapViewModel(
     private val mapSize = MutableStateFlow<Pair<Double, Double>?>(null)
 
     // The overlay of the visible area at the selected time (design D8 of add-sun-shade-overlay).
-    // Latest wins, as for the horizon. A camera move waits [SETTLE_MILLIS] and keeps the previous
-    // grid meanwhile; a time change starts at once and drops it. A reconnect recomputes only a grid
-    // with unknown cells.
+    // Latest wins, as for the horizon. A camera move waits [SETTLE_MILLIS]; a time change starts at
+    // once. Both keep the previous grid meanwhile. A reconnect recomputes only a grid with unknown
+    // cells.
     val overlay: StateFlow<OverlayUiState> =
         channelFlow {
             var lookup: Job? = null
@@ -240,7 +240,7 @@ class MapViewModel(
                     val timeChanged = requestedTime != null && requestedTime != input.time
                     requestedTime = input.time
                     lookup?.cancelAndJoin()
-                    send(OverlayUiState.Computing(kept = current?.takeIf { it.time == input.time }))
+                    send(OverlayUiState.Computing(kept = current))
                     lookup =
                         launch {
                             if (!timeChanged) delay(SETTLE_MILLIS)
