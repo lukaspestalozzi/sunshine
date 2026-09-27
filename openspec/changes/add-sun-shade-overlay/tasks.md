@@ -123,7 +123,7 @@
 
 ## 10. app: the whole day (revision 2026-09-27)
 
-- [ ] 10.1 Write `DayOverlayTest` first (test dispatcher, fake grid function):
+- [x] 10.1 Write `DayOverlayTest` first (test dispatcher, fake grid function):
   - the steps of 2025-12-21 and of the DST days 2025-03-30 (276) and 2025-10-26 (300) come from `sliderTime`;
   - the order is selected time, then nearest first, alternating later/earlier;
   - background steps run on a dispatcher limited to half the cores (at least 1);
