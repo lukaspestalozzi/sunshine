@@ -110,7 +110,7 @@
   - on two synthetic landscapes, it equals the full sweep at −3.6°, the sweep being made to reach 150 km.
 
   Then implement `SunShadeSweep.night(ground)` (design D12). Verify: `./gradlew :core:test --tests "*SunShadeNightTest*"` passes.
-- [ ] 8.2 Write the packing test first: 90k cells take ≤ 23 KB of states, and a grid round-trips every state. Then store `ShadeGrid` states at 2 bits per cell (design D13). Verify: `./gradlew :core:test` passes, all existing sun-shade tests unchanged.
+- [x] 8.2 Write the packing test first: 90k cells take ≤ 23 KB of states, and a grid round-trips every state. Then store `ShadeGrid` states at 2 bits per cell (design D13). Verify: `./gradlew :core:test` passes, all existing sun-shade tests unchanged.
 
 ## 9. app: keep the overlay on time changes (revision 2026-09-27)
 

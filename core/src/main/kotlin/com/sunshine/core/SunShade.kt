@@ -646,16 +646,30 @@ class ShadeGridPart internal constructor(
     internal val states: Array<ByteArray>,
 )
 
-/** Sun, shade or unknown for every cell of [sweep]'s area (sun-shade-overlay spec). */
+/**
+ * Sun, shade or unknown for every cell of [sweep]'s area (sun-shade-overlay spec). The states are
+ * packed at 2 bits per cell, 4 cells per byte, so that a whole day of grids fits in memory (design D13).
+ */
 class ShadeGrid internal constructor(
     private val sweep: SunShadeSweep,
-    private val states: Array<ByteArray>,
+    states: Array<ByteArray>,
 ) {
     val area: MapArea get() = sweep.area
     val sun: SunPosition get() = sweep.sun
 
+    private val packed: Array<ByteArray> =
+        Array(states.size) { k ->
+            val line = states[k]
+            val bytes = ByteArray((line.size + 3) / 4)
+            for (j in line.indices) bytes[j shr 2] = (bytes[j shr 2].toInt() or (line[j].toInt() shl ((j and 3) * 2))).toByte()
+            bytes
+        }
+
     /** Whether some cell is unknown. */
     val hasUnknown: Boolean = states.any { line -> line.any { it == SunShadeSweep.UNKNOWN } }
+
+    /** Bytes taken by the packed states. */
+    internal val stateBytes: Int get() = packed.sumOf { it.size }
 
     /** The state of the cell containing the point, or `null` outside the grid. */
     fun stateAt(
@@ -688,7 +702,7 @@ class ShadeGrid internal constructor(
         line: Int,
         cell: Int,
     ): Sunshine =
-        when (states[line][cell]) {
+        when ((packed[line][cell shr 2].toInt() shr ((cell and 3) * 2) and 3).toByte()) {
             SunShadeSweep.SUN -> Sunshine.SUN
             SunShadeSweep.SHADE -> Sunshine.SHADE
             else -> Sunshine.UNKNOWN
