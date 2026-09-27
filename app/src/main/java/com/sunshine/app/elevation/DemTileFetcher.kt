@@ -103,8 +103,8 @@ class DemTileFetcher(
     private fun toResult(response: Response): Result =
         when {
             response.isSuccessful -> Result.Tile(response.body!!.bytes())
-            response.code >= SERVER_ERROR -> Result.Failed
-            else -> Result.Missing
+            response.code == NOT_FOUND -> Result.Missing
+            else -> Result.Failed
         }
 
     private sealed interface Result {
@@ -118,7 +118,7 @@ class DemTileFetcher(
     }
 
     private companion object {
-        const val SERVER_ERROR = 500
+        const val NOT_FOUND = 404
     }
 }
 
