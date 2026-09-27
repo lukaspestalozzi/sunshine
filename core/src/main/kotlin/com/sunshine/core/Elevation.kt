@@ -13,13 +13,50 @@ data class TileKey(
     val y: Int,
 )
 
-/** A square height tile: [size] × [size] heights in metres, row-major, one per pixel centre. */
-class HeightTile(
+/**
+ * A square height tile: [size] × [size] heights, row-major, one per pixel centre. Stored as 16 bits
+ * per height in steps of 0.25 m from −1000 m (range −999.75 … 15,383.75 m, error ≤ 0.125 m), so a
+ * 512 px tile takes 512 KiB (design D6 of add-terrain-horizon). A height may be absent ([Double.NaN]).
+ */
+class HeightTile private constructor(
     val size: Int,
-    val heights: FloatArray,
+    private val encoded: ShortArray,
 ) {
-    init {
-        require(heights.size == size * size) { "Expected ${size * size} heights, was ${heights.size}" }
+    /** Height in metres at [row]/[column], or NaN where the tile has no value. */
+    fun height(
+        row: Int,
+        column: Int,
+    ): Double {
+        val s = encoded[row * size + column]
+        return if (s == NO_VALUE) Double.NaN else (s + OFFSET) * STEP + LOWEST
+    }
+
+    companion object {
+        /** Encodes [metres] (row-major, NaN = no value); heights outside the range are rejected. */
+        fun fromMetres(
+            size: Int,
+            metres: FloatArray,
+        ): HeightTile {
+            require(metres.size == size * size) { "Expected ${size * size} heights, was ${metres.size}" }
+            val encoded =
+                ShortArray(metres.size) { i ->
+                    val h = metres[i]
+                    if (h.isNaN()) {
+                        NO_VALUE
+                    } else {
+                        require(h in MIN_METRES..MAX_METRES) { "Height $h m outside $MIN_METRES..$MAX_METRES" }
+                        (Math.round((h - LOWEST) / STEP) - OFFSET).toShort()
+                    }
+                }
+            return HeightTile(size, encoded)
+        }
+
+        private const val STEP = 0.25
+        private const val LOWEST = -1000.0
+        private const val OFFSET = 32768
+        private const val NO_VALUE = Short.MIN_VALUE
+        private const val MIN_METRES = -999.75f
+        private const val MAX_METRES = 15_383.75f
     }
 }
 
@@ -53,7 +90,7 @@ fun interpolateElevation(
     val (northWest, northEast, southWest, southEast) =
         neighbourhood.samples.map { sample ->
             val tile = requireNotNull(tiles[sample.tile]) { "Missing tile ${sample.tile}" }
-            tile.heights[sample.row * tile.size + sample.column].toDouble()
+            tile.height(sample.row, sample.column)
         }
     val east = neighbourhood.eastWeight
     val south = neighbourhood.southWeight

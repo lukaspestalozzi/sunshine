@@ -64,7 +64,7 @@ class ElevationRepository(
     private suspend fun load(key: TileKey): HeightTile? {
         val pixels = fetch(key)?.let(decode) ?: return null
         if (pixels.size != MapterhornTiles.TILE_SIZE * MapterhornTiles.TILE_SIZE) return null
-        return HeightTile(MapterhornTiles.TILE_SIZE, terrariumHeights(pixels))
+        return HeightTile.fromMetres(MapterhornTiles.TILE_SIZE, terrariumHeights(pixels))
     }
 
     private fun keys(point: GeoPoint) = tilesFor(point, MapterhornTiles.ZOOM, MapterhornTiles.TILE_SIZE)
