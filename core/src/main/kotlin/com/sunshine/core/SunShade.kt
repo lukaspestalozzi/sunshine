@@ -318,6 +318,33 @@ class SunShadeSweep(
         return ShadeGridPart(lines, states)
     }
 
+    /**
+     * Whether the sun's upper edge is below every possible horizon (design D12): within 150 km, an
+     * eye at most 4812 m high over ground at least 1000 m below sea level sees no horizon lower than
+     * −2.81°, so below [NIGHT_EDGE] every cell with known ground is shade.
+     */
+    val isNight: Boolean get() = upperEdge < NIGHT_EDGE
+
+    /**
+     * The grid while [isNight], from the [ground] tiles alone (`null` = unavailable): shade where a
+     * cell's ground is known, unknown where it is not. No upwind tile and no sweep.
+     */
+    fun night(ground: Map<TileKey, HeightTile?>): ShadeGrid {
+        check(isNight) { "The sun's upper edge $upperEdge° is not below $NIGHT_EDGE°" }
+        val grid = TileGrid(viewZoom, tileSize, ground)
+        val states =
+            Array(lineCount) { k ->
+                val cells = ByteArray(lineCells[k])
+                var j = 0
+                // The cells' sample points: the same positions as in [compute], one per cell.
+                sample(grid, lineW(k), lineStart[k] + spacing / 2, spacing, cells.size) { _, h ->
+                    cells[j++] = if (h.isNaN()) UNKNOWN else SHADE
+                }
+                cells
+            }
+        return ShadeGrid(this, states)
+    }
+
     /** The grid made of [parts], which together cover every line once. */
     fun assemble(parts: List<ShadeGridPart>): ShadeGrid {
         val states = arrayOfNulls<ByteArray>(lineCount)
@@ -603,6 +630,9 @@ class SunShadeSweep(
         private const val FAR_BAND = 25_000.0
         private const val KNOT_EVERY = 32
         private const val LATERAL_BOUND_DEGREES = 0.125
+
+        /** Upper-edge elevation below which every cell is shade (design D12). */
+        const val NIGHT_EDGE = -3.5
         private const val INITIAL_HULL = 1024
 
         // Lowest height a HeightTile can hold.
