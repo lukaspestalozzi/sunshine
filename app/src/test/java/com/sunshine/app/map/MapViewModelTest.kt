@@ -490,20 +490,39 @@ class MapViewModelTest {
         }
 
     @Test
-    fun `a time change drops the previous overlay at once`() =
+    fun `a time change keeps the previous overlay until the new one is ready`() =
         runTest {
             val gate = MutableStateFlow(true)
             val viewModel = overlayViewModel(mutableListOf(), before = { gate.first { it } })
             viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
             viewModel.onOverlayToggled()
             advanceTimeBy(SETTLE_MILLIS)
+            val previous = viewModel.overlay.value as OverlayUiState.Ready
             gate.value = false
 
             viewModel.onSliderMoved(15 * 60f)
 
-            assertEquals(OverlayUiState.Computing(kept = null), viewModel.overlay.value)
+            assertEquals(OverlayUiState.Computing(kept = previous), viewModel.overlay.value)
             gate.value = true
             assertEquals(ZonedDateTime.of(2025, 12, 21, 15, 0, 0, 0, ZURICH), (viewModel.overlay.value as OverlayUiState.Ready).time)
+        }
+
+    @Test
+    fun `a date change keeps the previous overlay until the new one is ready`() =
+        runTest {
+            val gate = MutableStateFlow(true)
+            val viewModel = overlayViewModel(mutableListOf(), before = { gate.first { it } })
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            val previous = viewModel.overlay.value as OverlayUiState.Ready
+            gate.value = false
+
+            viewModel.onDateSelected(LocalDate.of(2025, 6, 21))
+
+            assertEquals(OverlayUiState.Computing(kept = previous), viewModel.overlay.value)
+            gate.value = true
+            assertEquals(ZonedDateTime.of(2025, 6, 21, 12, 0, 0, 0, ZURICH), (viewModel.overlay.value as OverlayUiState.Ready).time)
         }
 
     @Test

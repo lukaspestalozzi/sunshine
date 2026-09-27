@@ -57,7 +57,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel(factory = mapViewModelFactory)
         MapLabels(
             camera = camera,
             isOffline = isOffline,
-            notice = overlayNotice(overlay),
+            notice = overlayNotice(overlay, selectedTime),
             topEnd = { OverlayControl(isOn = isOverlayOn, onToggle = viewModel::onOverlayToggled) },
         ) {
             SunPanel(
@@ -116,7 +116,7 @@ private val mapViewModelFactory =
         }
     }
 
-/** The image to draw: the finished overlay, or the one kept while a pan is recomputed. */
+/** The image to draw: the finished overlay, or the one kept while a new one is computed. */
 private fun OverlayUiState.image(): OverlayImage? =
     when (this) {
         is OverlayUiState.Ready -> image

@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.sunshine.app.R
+import java.time.ZonedDateTime
 
 /**
  * The overlay switch and, while it is on, the legend (sun-shade-overlay spec, "Overlay toggle",
@@ -49,12 +50,18 @@ fun OverlayControl(
     }
 }
 
-/** The notice for [state], if any: zoomed out, or computing without an overlay to keep. */
+/**
+ * The notice for [state], if any: zoomed out, or computing while the overlay on screen, if any,
+ * belongs to another time than [selectedTime].
+ */
 @StringRes
-fun overlayNotice(state: OverlayUiState): Int? =
+fun overlayNotice(
+    state: OverlayUiState,
+    selectedTime: ZonedDateTime,
+): Int? =
     when (state) {
         OverlayUiState.ZoomedOut -> R.string.overlay_zoom_in
-        is OverlayUiState.Computing -> if (state.kept == null) R.string.overlay_computing else null
+        is OverlayUiState.Computing -> if (state.kept?.time != selectedTime) R.string.overlay_computing else null
         OverlayUiState.Off, is OverlayUiState.Ready -> null
     }
 

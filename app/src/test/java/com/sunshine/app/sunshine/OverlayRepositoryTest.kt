@@ -6,6 +6,7 @@ import com.sunshine.core.MapArea
 import com.sunshine.core.ShadeGrid
 import com.sunshine.core.SunPosition
 import com.sunshine.core.SunShadeSweep
+import com.sunshine.core.Sunshine
 import com.sunshine.core.TileKey
 import kotlin.math.PI
 import kotlin.math.atan
@@ -87,6 +88,17 @@ class OverlayRepositoryTest {
             val kept = nearSweep.tiles(nearSweep.groundTiles().associateWith(::heightTile))
             val overlap = SunShadeSweep(far, SUN).groundTiles() intersect kept
             assertTrue(overlap.isNotEmpty() && requested.containsAll(overlap), "a far pan reuses tiles")
+        }
+
+    @Test
+    fun `at night only the ground tiles are requested and every cell is shade`() =
+        runTest {
+            val night = SunPosition(10.0, -20.0, false)
+
+            val grid = repository().grid(AREA, night)
+
+            assertEquals(SunShadeSweep(AREA, night).groundTiles(), requested.toSet())
+            for (point in AREA.corners() + AREA.center) assertEquals(Sunshine.SHADE, grid.stateAt(point), "$point")
         }
 
     @Test

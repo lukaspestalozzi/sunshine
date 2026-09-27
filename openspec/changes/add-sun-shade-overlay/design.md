@@ -210,7 +210,7 @@ hatching would rotate with the sun, and MapLibre interpolates quads in Mercator 
   - *Alternatives:* adding `material-icons-extended` (a large dependency for one icon), or a
     hand-drawn icon, which would need a content description and a legend anyway.
 - **Notices:** `Zoom in to see sun and shade` below zoom 11, and `Computing sun and shade …` while
-  `Computing` with `kept == null`. Both are `Label`s in `MapLabels`' top column.
+  `Computing` with `kept` null or of another time than the selected one (D8). Both are `Label`s in `MapLabels`' top column.
 - Strings live in `strings.xml`.
 
 ### D11. The whole day: selected time first, then every slider step in the background (user decisions, 2026-09-27)

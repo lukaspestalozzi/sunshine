@@ -46,6 +46,13 @@ class OverlayRepository(
             val reusable = kept?.takeIf { it.area.isNear(area) }?.tiles.orEmpty()
             val before = loads()
             val ground = load(sweep.groundTiles(), reusable)
+            // Below −3.5° every cell with ground is shade: no upwind tiles, no sweep (design D12). The
+            // kept upwind tiles stay for the next daytime grid.
+            if (sweep.isNight) {
+                kept = Kept(area, reusable + ground.mapNotNull { (key, tile) -> tile?.let { key to it } })
+                log("Overlay at night: ${ground.size} ground tiles in ${start.elapsedNow().inWholeMilliseconds} ms")
+                return@coroutineScope sweep.night(ground)
+            }
             val upwind = sweep.tiles(ground) - ground.keys
             val tiles = ground + load(upwind, reusable)
             val loaded = start.elapsedNow()
