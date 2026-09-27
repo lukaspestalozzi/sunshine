@@ -268,6 +268,11 @@ If the phone misses the sweep budget, tune constants, in this order; none change
   crosshair (spec).
 - [At cliff feet the crosshair's cell can disagree with the panel] → Stated in the spec as
   within-cell variability. The panel stays authoritative for the crosshair point.
+- [Offline, the overlay can be more decided than the panel] → The upwind cut (D4) never samples
+  terrain that cannot rise above the sun, so a missing tile beyond the cut does not make a cell
+  unknown. `HorizonTracer` has no sun-based cut, so for the crosshair the panel can say `unknown`
+  where the overlay says sun. The overlay is right in that case (found during apply, task 2.3);
+  aligning the panel is left to a later change.
 - [The spike covered one area (Lauterbrunnen)] → The oracle tests use synthetic landscapes, and
   the device check covers Interlaken.
 
