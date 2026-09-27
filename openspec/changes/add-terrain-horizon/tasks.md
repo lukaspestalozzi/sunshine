@@ -69,7 +69,7 @@
 ## 6. Integration
 
 - [x] 6.1 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, all unit tests and the debug APK pass, and validation reports no failures.
-- [ ] 6.2 On-device check with the CI APK. Expected:
+- [x] 6.2 On-device check with the CI APK. Expected:
   - Interlaken 2025-12-21 shows `Sunshine 10:09–14:51, 15:11–15:52` (±5 min per boundary), and the sun line is dashed at 15:00 and solid at 12:00;
   - Lauterbrunnen 2025-12-21 shows one period of about 11:47–13:13;
   - Interlaken 2025-06-21 shows about 06:04–20:09;
@@ -77,3 +77,5 @@
   - in flight mode, a far, never-visited location shows `Sunshine unknown` and a dotted line;
   - changing the date at the same location updates the row without `…`;
   - the logged timings are within the design's performance budget, or the misses are recorded in design.md.
+
+  Result (2026-09-27): all functional checks passed; timings not measured, recorded in design.md ("Performance budget").
