@@ -180,6 +180,10 @@ about 1 m.
   also an estimate to be measured.
 - **Cold network:** 3–7 MB download, limited by the connection. The panel shows `…`.
 - **Periods for a date:** ≤ 50 ms (8,640 sun positions and profile lookups).
+- **Result of task 6.2 (2026-09-27):** the device check passed, but the timings were not measured
+  on the phone; responsiveness was judged acceptable by feel. Desktop JVM: ~250 ms per profile in
+  a valley, ~0.8 s in the worst case (flat plain, no early termination). The budgets above remain
+  unverified on a phone; the debug log (`adb logcat -s Sunshine`) measures them when needed.
 - **Sunshine state at a new time:** ≤ 1 ms.
 - **Memory:** tile cache ≤ 32 MiB, plus 4 profiles × 1440 × 5 bytes.
 - **Threading:** all computation runs on `Dispatchers.Default`. Downloads run on OkHttp's threads
