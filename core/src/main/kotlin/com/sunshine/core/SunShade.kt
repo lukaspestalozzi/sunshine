@@ -323,7 +323,7 @@ class SunShadeSweep(
      * eye at most 4812 m high over ground at least 1000 m below sea level sees no horizon lower than
      * −2.81°, so below [NIGHT_EDGE] every cell with known ground is shade.
      */
-    val isNight: Boolean get() = upperEdge < NIGHT_EDGE
+    val isNight: Boolean get() = isNight(sun)
 
     /**
      * The grid while [isNight], from the [ground] tiles alone (`null` = unavailable): shade where a
@@ -633,6 +633,10 @@ class SunShadeSweep(
 
         /** Upper-edge elevation below which every cell is shade (design D12). */
         const val NIGHT_EDGE = -3.5
+
+        /** Whether [sun] is a night sun, see [SunShadeSweep.isNight]. */
+        fun isNight(sun: SunPosition): Boolean = sun.elevation + SUN_UPPER_LIMB < NIGHT_EDGE
+
         private const val INITIAL_HULL = 1024
 
         // Lowest height a HeightTile can hold.
