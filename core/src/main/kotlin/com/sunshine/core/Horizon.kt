@@ -95,7 +95,7 @@ class HorizonTracer(
                 val y0 = floor(minOf(knots.y[j], knots.y[j + 1])).toLong()
                 val y1 = floor(maxOf(knots.y[j], knots.y[j + 1])).toLong() + 1
                 for (gx in longArrayOf(x0, x1)) {
-                    for (gy in longArrayOf(y0, y1)) keys += tileKey(zoom, gx, gy)
+                    for (gy in longArrayOf(y0, y1)) keys += tileKey(zoom, tileSize, gx, gy)
                 }
             }
         }
@@ -203,82 +203,6 @@ class HorizonTracer(
 
     private fun pixelSize(zoom: Int): Double = 2 * PI * EARTH_RADIUS * cosLat / ((1L shl zoom).toDouble() * tileSize)
 
-    private fun tileKey(
-        zoom: Int,
-        gx: Long,
-        gy: Long,
-    ): TileKey {
-        val worldPixels = (1L shl zoom) * tileSize
-        return TileKey(zoom, (Math.floorMod(gx, worldPixels) / tileSize).toInt(), (gy / tileSize).toInt())
-    }
-
-    /** Bilinear heights from a band's tiles, remembering the last tile used. */
-    private class TileGrid(
-        private val zoom: Int,
-        private val tileSize: Int,
-        private val tiles: Map<TileKey, HeightTile?>,
-    ) {
-        private val worldPixels = (1L shl zoom) * tileSize
-        private var lastX = Long.MIN_VALUE
-        private var lastY = Long.MIN_VALUE
-        private var lastTile: HeightTile? = null
-
-        // Global pixel of the cached tile's top-left pixel; its tile is [lastTile].
-        private var originX = Long.MIN_VALUE
-        private var originY = Long.MIN_VALUE
-
-        fun bilinear(
-            x: Double,
-            y: Double,
-        ): Double {
-            val x0 = floor(x).toLong()
-            val y0 = floor(y).toLong()
-            val fx = x - x0
-            val fy = y - y0
-            val column = x0 - originX
-            val row = y0 - originY
-            if (column >= 0 && column < tileSize - 1 && row >= 0 && row < tileSize - 1) {
-                // Fast path: all four neighbours lie in the cached tile.
-                val tile = lastTile ?: return Double.NaN
-                val c = column.toInt()
-                val r = row.toInt()
-                val nw = tile.height(r, c)
-                val sw = tile.height(r + 1, c)
-                val north = nw + (tile.height(r, c + 1) - nw) * fx
-                val south = sw + (tile.height(r + 1, c + 1) - sw) * fx
-                return north + (south - north) * fy
-            }
-            val nw = at(x0, y0)
-            val ne = at(x0 + 1, y0)
-            val sw = at(x0, y0 + 1)
-            val se = at(x0 + 1, y0 + 1)
-            val north = nw + (ne - nw) * fx
-            val south = sw + (se - sw) * fx
-            // Cache the tile of the north-west neighbour for the fast path.
-            at(x0, y0)
-            originX = x0 - Math.floorMod(x0, tileSize.toLong())
-            originY = y0 - Math.floorMod(y0, tileSize.toLong())
-            return north + (south - north) * fy
-        }
-
-        private fun at(
-            gx: Long,
-            gy: Long,
-        ): Double {
-            if (gy < 0 || gy >= worldPixels) return Double.NaN
-            val wx = Math.floorMod(gx, worldPixels)
-            val tx = wx / tileSize
-            val ty = gy / tileSize
-            if (tx != lastX || ty != lastY) {
-                lastTile = tiles[TileKey(zoom, tx.toInt(), ty.toInt())]
-                lastX = tx
-                lastY = ty
-            }
-            val tile = lastTile ?: return Double.NaN
-            return tile.height((gy % tileSize).toInt(), (wx % tileSize).toInt())
-        }
-    }
-
     private class Band(
         val start: Double,
         val end: Double,
@@ -305,6 +229,84 @@ class HorizonTracer(
     }
 }
 
+/** Bilinear heights from a band's tiles, remembering the last tile used. */
+internal class TileGrid(
+    private val zoom: Int,
+    private val tileSize: Int,
+    private val tiles: Map<TileKey, HeightTile?>,
+) {
+    private val worldPixels = (1L shl zoom) * tileSize
+    private var lastX = Long.MIN_VALUE
+    private var lastY = Long.MIN_VALUE
+    private var lastTile: HeightTile? = null
+
+    // Global pixel of the cached tile's top-left pixel; its tile is [lastTile].
+    private var originX = Long.MIN_VALUE
+    private var originY = Long.MIN_VALUE
+
+    fun bilinear(
+        x: Double,
+        y: Double,
+    ): Double {
+        val x0 = floor(x).toLong()
+        val y0 = floor(y).toLong()
+        val fx = x - x0
+        val fy = y - y0
+        val column = x0 - originX
+        val row = y0 - originY
+        if (column >= 0 && column < tileSize - 1 && row >= 0 && row < tileSize - 1) {
+            // Fast path: all four neighbours lie in the cached tile.
+            val tile = lastTile ?: return Double.NaN
+            val c = column.toInt()
+            val r = row.toInt()
+            val nw = tile.height(r, c)
+            val sw = tile.height(r + 1, c)
+            val north = nw + (tile.height(r, c + 1) - nw) * fx
+            val south = sw + (tile.height(r + 1, c + 1) - sw) * fx
+            return north + (south - north) * fy
+        }
+        val nw = at(x0, y0)
+        val ne = at(x0 + 1, y0)
+        val sw = at(x0, y0 + 1)
+        val se = at(x0 + 1, y0 + 1)
+        val north = nw + (ne - nw) * fx
+        val south = sw + (se - sw) * fx
+        // Cache the tile of the north-west neighbour for the fast path.
+        at(x0, y0)
+        originX = x0 - Math.floorMod(x0, tileSize.toLong())
+        originY = y0 - Math.floorMod(y0, tileSize.toLong())
+        return north + (south - north) * fy
+    }
+
+    private fun at(
+        gx: Long,
+        gy: Long,
+    ): Double {
+        if (gy < 0 || gy >= worldPixels) return Double.NaN
+        val wx = Math.floorMod(gx, worldPixels)
+        val tx = wx / tileSize
+        val ty = gy / tileSize
+        if (tx != lastX || ty != lastY) {
+            lastTile = tiles[TileKey(zoom, tx.toInt(), ty.toInt())]
+            lastX = tx
+            lastY = ty
+        }
+        val tile = lastTile ?: return Double.NaN
+        return tile.height((gy % tileSize).toInt(), (wx % tileSize).toInt())
+    }
+}
+
+/** The tile holding global pixel ([gx], [gy]) at [zoom]; x wraps around the world. */
+internal fun tileKey(
+    zoom: Int,
+    tileSize: Int,
+    gx: Long,
+    gy: Long,
+): TileKey {
+    val worldPixels = (1L shl zoom) * tileSize
+    return TileKey(zoom, (Math.floorMod(gx, worldPixels) / tileSize).toInt(), (gy / tileSize).toInt())
+}
+
 /**
  * Highest terrain that can lie within 150 km of [point] (design D3): Mont Blanc (4810 m) in Europe
  * west of the Caucasus (35–72° N, 25° W–35° E; the nearest higher peak, Elbrus, is at 42.4° E),
@@ -319,5 +321,5 @@ const val AZIMUTH_COUNT = 1440
 /** Eye height above the ground in metres. */
 const val EYE_HEIGHT = 1.7
 
-private const val EARTH_RADIUS = 6_371_000.0
-private const val REFRACTION = 0.13
+internal const val EARTH_RADIUS = 6_371_000.0
+internal const val REFRACTION = 0.13
