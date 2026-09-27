@@ -94,17 +94,18 @@ sealed interface OverlayUiState {
     data object ZoomedOut : OverlayUiState
 
     /**
-     * A new grid is being computed. [kept] is the previous grid after a camera move (still right for
-     * its area), and `null` after a change of time or date, whose previous grid would be wrong.
+     * A new grid is being computed. [kept] is the previous overlay after a camera move (still right
+     * for its area), and `null` after a change of time or date, whose previous overlay would be wrong.
      */
     data class Computing(
-        val kept: ShadeGrid?,
+        val kept: Ready?,
     ) : OverlayUiState
 
-    /** The grid of the visible area at [time]. */
+    /** The grid of the visible area at [time], and its [image] (rendered off the main thread). */
     data class Ready(
         val grid: ShadeGrid,
         val time: ZonedDateTime,
+        val image: OverlayImage,
     ) : OverlayUiState
 }
 
@@ -232,17 +233,18 @@ class MapViewModel(
                 val timeChanged = requestedTime != null && requestedTime != input.time
                 requestedTime = input.time
                 lookup?.cancelAndJoin()
-                val kept = current?.takeIf { it.time == input.time }?.grid
-                send(OverlayUiState.Computing(kept))
+                send(OverlayUiState.Computing(kept = current?.takeIf { it.time == input.time }))
                 lookup =
                     launch {
                         if (!timeChanged) delay(SETTLE_MILLIS)
                         val sun = sunPosition(area.center, input.time.toInstant())
-                        val (grid, duration) = measureTimedValue { overlayGrid(area, sun) }
+                        val (grid, computing) = measureTimedValue { overlayGrid(area, sun) }
+                        val (image, rendering) = measureTimedValue { renderOverlay(grid) }
                         log(
-                            "Overlay ${area.widthDp.toInt()}×${area.heightDp.toInt()} dp at zoom ${area.zoom}: ${duration.inWholeMilliseconds} ms",
+                            "Overlay ${area.widthDp.toInt()}×${area.heightDp.toInt()} dp at zoom ${area.zoom}: " +
+                                "grid ${computing.inWholeMilliseconds} ms, image ${rendering.inWholeMilliseconds} ms",
                         )
-                        val ready = OverlayUiState.Ready(grid, input.time)
+                        val ready = OverlayUiState.Ready(grid, input.time, image)
                         shown = ready
                         send(ready)
                     }

@@ -3,8 +3,10 @@ package com.sunshine.app.map
 import android.content.ComponentCallbacks
 import android.content.Context
 import android.content.res.Configuration
+import android.graphics.Bitmap
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -17,19 +19,26 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.sunshine.core.GeoPoint
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.geometry.LatLngQuad
 import org.maplibre.android.maps.MapLibreMapOptions
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.layers.Property
+import org.maplibre.android.style.layers.PropertyFactory
+import org.maplibre.android.style.layers.RasterLayer
+import org.maplibre.android.style.sources.ImageSource
 
 /**
  * Full MapLibre map showing OpenTopoMap tiles. Starts at [initialCamera] and reports every camera
- * movement through [onCameraMoved].
+ * movement through [onCameraMoved]. [overlay] is drawn on the terrain, directly above the map tiles;
+ * `null` removes it.
  */
 @Composable
 fun MapLibreMap(
     initialCamera: CameraState,
     onCameraMoved: (CameraState) -> Unit,
     modifier: Modifier = Modifier,
+    overlay: OverlayImage? = null,
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -57,7 +66,41 @@ fun MapLibreMap(
         onDispose { context.unregisterComponentCallbacks(callbacks) }
     }
 
+    LaunchedEffect(mapView, overlay) {
+        mapView.getMapAsync { map -> map.getStyle { style -> style.showOverlay(overlay) } }
+    }
+
     AndroidView(factory = { mapView }, modifier = modifier)
+}
+
+/**
+ * Shows [image] as a georeferenced raster right above the map tiles (design D9 of
+ * add-sun-shade-overlay), or removes the overlay when [image] is `null`.
+ */
+private fun Style.showOverlay(image: OverlayImage?) {
+    if (image == null) {
+        getLayer(OVERLAY_ID)?.let { removeLayer(it) }
+        getSource(OVERLAY_ID)?.let { removeSource(it) }
+        return
+    }
+    val bitmap = Bitmap.createBitmap(image.pixels, image.width, image.height, Bitmap.Config.ARGB_8888)
+    val (northWest, northEast, southEast, southWest) = image.corners.map { LatLng(it.latitude, it.longitude) }
+    val quad = LatLngQuad(northWest, northEast, southEast, southWest)
+    val source = getSourceAs<ImageSource>(OVERLAY_ID)
+    if (source == null) {
+        addSource(ImageSource(OVERLAY_ID, quad, bitmap))
+        addLayerAbove(
+            RasterLayer(OVERLAY_ID, OVERLAY_ID).withProperties(
+                // Nearest keeps cell edges and the hatching crisp; no fade between overlays.
+                PropertyFactory.rasterResampling(Property.RASTER_RESAMPLING_NEAREST),
+                PropertyFactory.rasterFadeDuration(0f),
+            ),
+            TOPO_LAYER_ID,
+        )
+    } else {
+        source.setCoordinates(quad)
+        source.setImage(bitmap)
+    }
 }
 
 private fun mapOptions(
@@ -109,6 +152,8 @@ private class LowMemoryForwarder(
 }
 
 private const val MIN_ZOOM = 5.0
+private const val OVERLAY_ID = "sun-shade-overlay"
+private const val TOPO_LAYER_ID = "opentopomap"
 private const val MAX_ZOOM = 17.0
 
 // Missing tiles leave the background visible: blank, never substitute imagery.
