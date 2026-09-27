@@ -16,6 +16,7 @@ import com.sunshine.core.SunPosition
 import com.sunshine.core.SunShadeSweep
 import com.sunshine.core.Sunshine
 import com.sunshine.core.TileKey
+import com.sunshine.core.sunPosition
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -30,9 +31,11 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -630,6 +633,122 @@ class MapViewModelTest {
             assertTrue(logged.any { it.startsWith("Overlay agreement with the point tracer: 200 of 200") }, "$logged")
         }
 
+    @Test
+    fun `after the selected time is ready, the day continues in the background`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val viewModel = dayViewModel(suns)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+
+            assertEquals(ZonedDateTime.of(2025, 12, 21, 12, 0, 0, 0, ZURICH), (viewModel.overlay.value as OverlayUiState.Ready).time)
+            assertEquals(listOf(sunAt(12, 0), sunAt(12, 5), sunAt(11, 55)), suns.take(3))
+            assertEquals(288, suns.size)
+        }
+
+    @Test
+    fun `a time change to a computed step is ready at once, while the day is still computed`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val gate = MutableStateFlow(false)
+            // 12:00, 12:05 and 11:55 are computed; 12:10 waits.
+            val viewModel = dayViewModel(suns, before = { if (suns.size == 3) gate.first { it } })
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            assertEquals(3, suns.size)
+
+            viewModel.onSliderMoved(11 * 60f + 55)
+
+            assertEquals(ZonedDateTime.of(2025, 12, 21, 11, 55, 0, 0, ZURICH), (viewModel.overlay.value as OverlayUiState.Ready).time)
+            assertEquals(3, suns.size)
+            gate.value = true
+            advanceUntilIdle()
+            assertEquals(288, suns.size)
+        }
+
+    @Test
+    fun `a camera rest starts the day over for the new area, with the selected time first`() =
+        runTest {
+            val areas = mutableListOf<MapArea>()
+            val suns = mutableListOf<SunPosition>()
+            val viewModel = dayViewModel(suns, areas)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            suns.clear()
+            areas.clear()
+
+            viewModel.onCameraMoved(CameraState(center = GeoPoint(46.69, 7.87), zoom = 12.0))
+            advanceTimeBy(SETTLE_MILLIS)
+
+            assertEquals(288, suns.size)
+            assertEquals(sunPosition(GeoPoint(46.69, 7.87), ZonedDateTime.of(2025, 12, 21, 12, 0, 0, 0, ZURICH).toInstant()), suns.first())
+            assertEquals(setOf(MapArea(GeoPoint(46.69, 7.87), 12.0, MAP_WIDTH, MAP_HEIGHT)), areas.toSet())
+        }
+
+    @Test
+    fun `a date change starts the day over for the new date`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val viewModel = dayViewModel(suns)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            suns.clear()
+
+            viewModel.onDateSelected(LocalDate.of(2025, 12, 22))
+            advanceTimeBy(SETTLE_MILLIS)
+
+            assertEquals(ZonedDateTime.of(2025, 12, 22, 12, 0, 0, 0, ZURICH), (viewModel.overlay.value as OverlayUiState.Ready).time)
+            assertEquals(sunPosition(INTERLAKEN, ZonedDateTime.of(2025, 12, 22, 12, 0, 0, 0, ZURICH).toInstant()), suns.first())
+            assertEquals(288, suns.size)
+        }
+
+    @Test
+    fun `a reconnect with unknown cells starts the day over`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val viewModel = dayViewModel(suns)
+            isOnline.value = false
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            assertTrue((viewModel.overlay.value as OverlayUiState.Ready).grid.hasUnknown)
+            suns.clear()
+
+            isOnline.value = true
+            advanceTimeBy(SETTLE_MILLIS)
+
+            assertFalse((viewModel.overlay.value as OverlayUiState.Ready).grid.hasUnknown)
+            assertEquals(sunAt(12, 0), suns.first())
+            assertEquals(288, suns.size)
+            viewModel.onSliderMoved(15 * 60f)
+            assertFalse((viewModel.overlay.value as OverlayUiState.Ready).grid.hasUnknown)
+        }
+
+    @Test
+    fun `switching the overlay off stops the day`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val gate = MutableStateFlow(true)
+            val viewModel = dayViewModel(suns, before = { if (suns.isNotEmpty()) gate.first { it } })
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            gate.value = false
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            assertEquals(1, suns.size)
+
+            viewModel.onOverlayToggled()
+            gate.value = true
+            advanceUntilIdle()
+
+            assertEquals(OverlayUiState.Off, viewModel.overlay.value)
+            assertEquals(1, suns.size)
+        }
+
     /**
      * A view model whose overlay grids come from flat 568 m terrain, or from no terrain at all while
      * offline. [before] runs before each grid, [areas] and [suns] record the requests.
@@ -654,6 +773,47 @@ class MapViewModelTest {
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.overlay.collect {} }
         return viewModel
     }
+
+    /**
+     * A view model that computes the whole day, the background steps on the test scheduler. Its grids
+     * are cheap: shade over flat terrain, unknown while offline. [before] runs before each grid, [suns]
+     * and [areas] record the requests.
+     */
+    private fun TestScope.dayViewModel(
+        suns: MutableList<SunPosition>,
+        areas: MutableList<MapArea> = mutableListOf(),
+        before: suspend () -> Unit = {},
+        log: (String) -> Unit = {},
+    ): MapViewModel {
+        val viewModel =
+            MapViewModel(
+                SavedStateHandle(),
+                isOnline,
+                clock,
+                repository { heightBytes(568) },
+                { null },
+                { area, sun ->
+                    before()
+                    areas += area
+                    suns += sun
+                    val sweep = SunShadeSweep(area, SunPosition(0.0, -30.0, false))
+                    val online = isOnline.value
+                    sweep.night(sweep.groundTiles().associateWith { if (online) FLAT else null })
+                },
+                UnconfinedTestDispatcher(testScheduler),
+                dayDispatcher = StandardTestDispatcher(testScheduler),
+                log = log,
+            )
+        viewModel.onMapSizeChanged(MAP_WIDTH, MAP_HEIGHT)
+        viewModel.onSliderMoved(12 * 60f)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.overlay.collect {} }
+        return viewModel
+    }
+
+    private fun sunAt(
+        hour: Int,
+        minute: Int,
+    ) = sunPosition(INTERLAKEN, ZonedDateTime.of(2025, 12, 21, hour, minute, 0, 0, ZURICH).toInstant())
 
     private fun flatGrid(
         area: MapArea,

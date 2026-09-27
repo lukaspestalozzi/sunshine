@@ -110,6 +110,7 @@ private val mapViewModelFactory =
                 horizonProfile = application.sunshineRepository::profile,
                 overlayGrid = application.overlayRepository::grid,
                 computeDispatcher = Dispatchers.Default,
+                dayDispatcher = dayDispatcher(),
                 log = ::debugLog,
                 checkOverlayAgreement = BuildConfig.DEBUG,
             )

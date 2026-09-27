@@ -126,6 +126,7 @@ class MapViewModel(
     private val horizonProfile: suspend (GeoPoint) -> HorizonProfile?,
     private val overlayGrid: suspend (MapArea, SunPosition) -> ShadeGrid,
     computeDispatcher: CoroutineDispatcher,
+    private val dayDispatcher: CoroutineDispatcher? = null,
     private val log: (String) -> Unit = {},
     checkOverlayAgreement: Boolean = false,
 ) : ViewModel() {
@@ -213,10 +214,14 @@ class MapViewModel(
     // The overlay of the visible area at the selected time (design D8 of add-sun-shade-overlay).
     // Latest wins, as for the horizon. A camera move waits [SETTLE_MILLIS]; a time change starts at
     // once. Both keep the previous grid meanwhile. A reconnect recomputes only a grid with unknown
-    // cells.
+    // cells. With [dayDispatcher], the other steps of the day follow in the background (design D11):
+    // a camera rest, a date change or such a reconnect starts the day over, and a time change within
+    // the day takes its grid from the day when it is there.
     val overlay: StateFlow<OverlayUiState> =
         channelFlow {
             var lookup: Job? = null
+            var day: DayOverlay? = null
+            var dayJob: Job? = null
             var shown: OverlayUiState.Ready? = null
             var requestedTime: ZonedDateTime? = null
             combine(camera, selectedTime, mutableOverlayOn, mapSize, isOnline) { camera, time, on, size, online ->
@@ -228,6 +233,8 @@ class MapViewModel(
                     val area = input.area()
                     if (area == null) {
                         lookup?.cancelAndJoin()
+                        dayJob?.cancelAndJoin()
+                        day = null
                         shown = null
                         requestedTime = null
                         send(if (input.on && input.camera.zoom < MIN_OVERLAY_ZOOM) OverlayUiState.ZoomedOut else OverlayUiState.Off)
@@ -240,12 +247,26 @@ class MapViewModel(
                     val timeChanged = requestedTime != null && requestedTime != input.time
                     requestedTime = input.time
                     lookup?.cancelAndJoin()
+                    val sameDay = day?.let { it.area == area && it.date == input.time.toLocalDate() } == true && !unchanged
+                    val known = if (sameDay) day?.gridAt(input.time) else null
+                    if (known != null) {
+                        val ready = OverlayUiState.Ready(known, input.time, renderOverlay(known))
+                        shown = ready
+                        send(ready)
+                        return@collect
+                    }
+                    if (!sameDay) {
+                        dayJob?.cancelAndJoin()
+                        val newDay = DayOverlay(area, input.time.toLocalDate(), zone, overlayGrid, dayDispatcher ?: computeDispatcher)
+                        day = newDay
+                        dayJob = dayDispatcher?.let { launch { newDay.computeRest { mutableSelectedTime.value } } }
+                    }
+                    val selectedDay = checkNotNull(day)
                     send(OverlayUiState.Computing(kept = current))
                     lookup =
                         launch {
                             if (!timeChanged) delay(SETTLE_MILLIS)
-                            val sun = sunPosition(area.center, input.time.toInstant())
-                            val (grid, computing) = measureTimedValue { overlayGrid(area, sun) }
+                            val (grid, computing) = measureTimedValue { selectedDay.compute(input.time) }
                             val (image, rendering) = measureTimedValue { renderOverlay(grid) }
                             log(
                                 "Overlay ${area.widthDp.toInt()}×${area.heightDp.toInt()} dp at zoom ${area.zoom}: " +
