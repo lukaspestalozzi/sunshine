@@ -99,7 +99,7 @@
 
 ## 7. Integration
 
-- [ ] 7.1 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, all unit tests and the debug APK pass, and validation reports no failures.
+- [x] 7.1 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, all unit tests and the debug APK pass, and validation reports no failures.
 - [ ] 7.2 On-device check with the CI APK. Expected:
   - off at launch;
   - at Interlaken, zoom 12, 2025-12-21 12:00 the crosshair's cell is untinted (sun) and at 15:00 tinted (shade);
