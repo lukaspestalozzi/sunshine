@@ -25,6 +25,7 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.random.Random
 import kotlin.time.measureTimedValue
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
@@ -36,6 +37,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -125,6 +127,7 @@ class MapViewModel(
     private val overlayGrid: suspend (MapArea, SunPosition) -> ShadeGrid,
     computeDispatcher: CoroutineDispatcher,
     private val log: (String) -> Unit = {},
+    checkOverlayAgreement: Boolean = false,
 ) : ViewModel() {
     private val zone: ZoneId = clock.zone
 
@@ -252,6 +255,33 @@ class MapViewModel(
         }.flowOn(computeDispatcher)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), initialValue = OverlayUiState.Off)
 
+    init {
+        // Debug builds: once an overlay has stayed for a while, log how many cells agree with the
+        // point tracer (spec: ≥ 99.5 % at zoom ≥ 12). Cancelled by the next overlay state.
+        if (checkOverlayAgreement) {
+            viewModelScope.launch(computeDispatcher) {
+                overlay.collectLatest { state ->
+                    if (state is OverlayUiState.Ready) {
+                        delay(AGREEMENT_DELAY_MILLIS)
+                        log(overlayAgreement(state))
+                    }
+                }
+            }
+        }
+    }
+
+    // The cells' states against the point tracer at their sample points, with the map centre's sun.
+    private suspend fun overlayAgreement(state: OverlayUiState.Ready): String {
+        var agree = 0
+        var checked = 0
+        for ((point, shown) in state.grid.sampleCells(AGREEMENT_CELLS, Random(0))) {
+            val profile = horizonProfile(point) ?: continue
+            checked++
+            if (sunshineAt(profile, state.grid.area.center, state.time.toInstant()) == shown) agree++
+        }
+        return "Overlay agreement with the point tracer: $agree of $checked cells (${if (checked > 0) agree * 100 / checked else 0} %)"
+    }
+
     private class OverlayInput(
         val camera: CameraState,
         val time: ZonedDateTime,
@@ -370,5 +400,7 @@ class MapViewModel(
         const val KEY_ZOOM = "camera_zoom"
         const val KEY_SELECTED_TIME = "selected_time_epoch_millis"
         const val KEY_OVERLAY_ON = "overlay_on"
+        const val AGREEMENT_DELAY_MILLIS = 3_000L
+        const val AGREEMENT_CELLS = 200
     }
 }

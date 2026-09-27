@@ -22,6 +22,7 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.sunshine.app.BuildConfig
 import com.sunshine.app.SunshineApp
 import com.sunshine.app.network.NetworkMonitor
 import com.sunshine.app.sunshine.debugLog
@@ -110,6 +111,7 @@ private val mapViewModelFactory =
                 overlayGrid = application.overlayRepository::grid,
                 computeDispatcher = Dispatchers.Default,
                 log = ::debugLog,
+                checkOverlayAgreement = BuildConfig.DEBUG,
             )
         }
     }
