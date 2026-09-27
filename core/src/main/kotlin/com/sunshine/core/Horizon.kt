@@ -24,10 +24,10 @@ class HorizonProfile(
         return angles[i] + (angles[j] - angles[i]) * f
     }
 
-    /** Whether both bins around [azimuth] are complete. */
+    /** Whether the bins that [angleAt] uses at [azimuth] are complete. */
     fun isCompleteAt(azimuth: Double): Boolean {
-        val (i, j, _) = bins(azimuth)
-        return complete[i] && complete[j]
+        val (i, j, f) = bins(azimuth)
+        return complete[i] && (f == 0.0 || complete[j])
     }
 
     private fun bins(azimuth: Double): Triple<Int, Int, Double> {
@@ -133,9 +133,12 @@ class HorizonTracer(
     }
 
     /**
-     * Exact early termination (design D3): terrain at distance d or beyond cannot appear steeper
-     * than (heightBound - eye - drop(d)) / d, which falls strictly with d. Once that is below the
-     * ray's largest slope, no further sample can change the ray.
+     * Exact early termination (design D3): terrain at distance d cannot appear steeper than
+     * bound(d) = (heightBound - eye - drop(d)) / d. Beyond its maximum, bound(d) falls with d, so once
+     * it is below the ray's largest slope, no further sample can change the ray. Before that maximum
+     * (only when the eye is above heightBound, e.g. on the highest summit), bound(d) rises; as every
+     * sample so far was at most its own bound, the ray's largest slope is then at most bound(d) and
+     * the ray is never ended there.
      */
     private fun cannotRise(
         ray: Int,

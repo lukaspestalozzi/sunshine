@@ -23,6 +23,27 @@ class HorizonTerminationTest {
     }
 
     @Test
+    fun `early termination stays exact for an eye above the height bound`() {
+        // A summit at the bound, so the eye is 1.7 m above it, with a lower ridge 3 km to the south.
+        val summit = { lat: Double, lon: Double ->
+            val d = SyntheticTerrain.distance(OBSERVER.latitude, OBSERVER.longitude, lat, lon)
+            val south = Math.toRadians(OBSERVER.latitude - lat) * SyntheticTerrain.EARTH_RADIUS
+            if (d < 30.0) {
+                3000.0
+            } else if (south in 3000.0..3200.0) {
+                2995.0
+            } else {
+                2000.0
+            }
+        }
+
+        val withTermination = SyntheticTerrain(height = summit).run(HorizonTracer(OBSERVER, heightBound = 3000.0))!!
+        val without = SyntheticTerrain(height = summit).run(HorizonTracer(OBSERVER, heightBound = Double.POSITIVE_INFINITY))!!
+
+        assertArrayEquals(without.angles, withTermination.angles, 1e-9)
+    }
+
+    @Test
     fun `a high near ridge ends the rays before the far bands`() {
         val terrain = SyntheticTerrain(height = VALLEY)
 
