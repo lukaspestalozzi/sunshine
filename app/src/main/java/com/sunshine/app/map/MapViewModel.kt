@@ -8,6 +8,8 @@ import com.sunshine.app.elevation.ElevationRepository
 import com.sunshine.core.DEFAULT_LOCATION
 import com.sunshine.core.GeoPoint
 import com.sunshine.core.HorizonProfile
+import com.sunshine.core.MapArea
+import com.sunshine.core.ShadeGrid
 import com.sunshine.core.SunDay
 import com.sunshine.core.SunPeriods
 import com.sunshine.core.SunPosition
@@ -83,6 +85,32 @@ sealed interface SunshineUiState {
     fun at(center: GeoPoint): SunshineUiState = if (this is Ready && point != center) Loading else this
 }
 
+/** The sun-shade overlay as shown on screen (sun-shade-overlay spec). */
+sealed interface OverlayUiState {
+    /** Switched off: nothing is computed. */
+    data object Off : OverlayUiState
+
+    /** Switched on below zoom [MIN_OVERLAY_ZOOM]: not shown. */
+    data object ZoomedOut : OverlayUiState
+
+    /**
+     * A new grid is being computed. [kept] is the previous grid after a camera move (still right for
+     * its area), and `null` after a change of time or date, whose previous grid would be wrong.
+     */
+    data class Computing(
+        val kept: ShadeGrid?,
+    ) : OverlayUiState
+
+    /** The grid of the visible area at [time]. */
+    data class Ready(
+        val grid: ShadeGrid,
+        val time: ZonedDateTime,
+    ) : OverlayUiState
+}
+
+/** Lowest map zoom with an overlay (user decision, design D8 of add-sun-shade-overlay). */
+const val MIN_OVERLAY_ZOOM = 11.0
+
 /**
  * State of the map screen. Times are in the zone of [clock] as it is when the view model is created
  * (the device time zone in production).
@@ -93,6 +121,7 @@ class MapViewModel(
     private val clock: Clock,
     private val elevationRepository: ElevationRepository,
     private val horizonProfile: suspend (GeoPoint) -> HorizonProfile?,
+    private val overlayGrid: suspend (MapArea, SunPosition) -> ShadeGrid,
     computeDispatcher: CoroutineDispatcher,
     private val log: (String) -> Unit = {},
 ) : ViewModel() {
@@ -171,6 +200,70 @@ class MapViewModel(
             .flowOn(computeDispatcher)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), initialValue = SunshineUiState.Loading)
 
+    private val mutableOverlayOn = MutableStateFlow(savedState.get<Boolean>(KEY_OVERLAY_ON) ?: false)
+    val isOverlayOn: StateFlow<Boolean> = mutableOverlayOn.asStateFlow()
+
+    // Size of the map in dp; `null` until the screen reports it.
+    private val mapSize = MutableStateFlow<Pair<Double, Double>?>(null)
+
+    // The overlay of the visible area at the selected time (design D8 of add-sun-shade-overlay).
+    // Latest wins, as for the horizon. A camera move waits [SETTLE_MILLIS] and keeps the previous
+    // grid meanwhile; a time change starts at once and drops it. A reconnect recomputes only a grid
+    // with unknown cells.
+    val overlay: StateFlow<OverlayUiState> =
+        channelFlow {
+            var lookup: Job? = null
+            var shown: OverlayUiState.Ready? = null
+            var requestedTime: ZonedDateTime? = null
+            combine(camera, selectedTime, mutableOverlayOn, mapSize, isOnline) { camera, time, on, size, online ->
+                OverlayInput(camera, time, on, size, online)
+            }.collect { input ->
+                val area = input.area()
+                if (area == null) {
+                    lookup?.cancelAndJoin()
+                    shown = null
+                    requestedTime = null
+                    send(if (input.on && input.camera.zoom < MIN_OVERLAY_ZOOM) OverlayUiState.ZoomedOut else OverlayUiState.Off)
+                    return@collect
+                }
+                val current = shown
+                val unchanged = current != null && current.grid.area == area && current.time == input.time && requestedTime == input.time
+                if (unchanged && (!input.online || !current!!.grid.hasUnknown)) return@collect
+                val timeChanged = requestedTime != null && requestedTime != input.time
+                requestedTime = input.time
+                lookup?.cancelAndJoin()
+                val kept = current?.takeIf { it.time == input.time }?.grid
+                send(OverlayUiState.Computing(kept))
+                lookup =
+                    launch {
+                        if (!timeChanged) delay(SETTLE_MILLIS)
+                        val sun = sunPosition(area.center, input.time.toInstant())
+                        val (grid, duration) = measureTimedValue { overlayGrid(area, sun) }
+                        log(
+                            "Overlay ${area.widthDp.toInt()}×${area.heightDp.toInt()} dp at zoom ${area.zoom}: ${duration.inWholeMilliseconds} ms",
+                        )
+                        val ready = OverlayUiState.Ready(grid, input.time)
+                        shown = ready
+                        send(ready)
+                    }
+            }
+        }.flowOn(computeDispatcher)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), initialValue = OverlayUiState.Off)
+
+    private class OverlayInput(
+        val camera: CameraState,
+        val time: ZonedDateTime,
+        val on: Boolean,
+        val size: Pair<Double, Double>?,
+        val online: Boolean,
+    ) {
+        // The area to compute, or null when the overlay is off, zoomed out or the size unknown.
+        fun area(): MapArea? {
+            if (!on || camera.zoom < MIN_OVERLAY_ZOOM || size == null) return null
+            return MapArea(camera.center, camera.zoom, size.first, size.second)
+        }
+    }
+
     // The monitor emits the current state as soon as it is collected; `false` only covers the
     // moment before that first emission.
     val isOffline: StateFlow<Boolean> =
@@ -184,6 +277,20 @@ class MapViewModel(
         savedState[KEY_LATITUDE] = camera.center.latitude
         savedState[KEY_LONGITUDE] = camera.center.longitude
         savedState[KEY_ZOOM] = camera.zoom
+    }
+
+    /** The map's size in dp, which with the camera gives the visible area. */
+    fun onMapSizeChanged(
+        widthDp: Double,
+        heightDp: Double,
+    ) {
+        mapSize.value = widthDp to heightDp
+    }
+
+    /** Switches the overlay on or off; saved like the camera, so it survives rotation. */
+    fun onOverlayToggled() {
+        mutableOverlayOn.value = !mutableOverlayOn.value
+        savedState[KEY_OVERLAY_ON] = mutableOverlayOn.value
     }
 
     /** Keeps the wall-clock time of day (design D3). */
@@ -260,5 +367,6 @@ class MapViewModel(
         const val KEY_LONGITUDE = "camera_longitude"
         const val KEY_ZOOM = "camera_zoom"
         const val KEY_SELECTED_TIME = "selected_time_epoch_millis"
+        const val KEY_OVERLAY_ON = "overlay_on"
     }
 }

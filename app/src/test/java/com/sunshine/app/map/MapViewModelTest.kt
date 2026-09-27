@@ -7,8 +7,13 @@ import com.sunshine.app.elevation.TileCache
 import com.sunshine.core.AZIMUTH_COUNT
 import com.sunshine.core.DEFAULT_LOCATION
 import com.sunshine.core.GeoPoint
+import com.sunshine.core.HeightTile
 import com.sunshine.core.HorizonProfile
+import com.sunshine.core.MapArea
+import com.sunshine.core.ShadeGrid
 import com.sunshine.core.SunPeriods
+import com.sunshine.core.SunPosition
+import com.sunshine.core.SunShadeSweep
 import com.sunshine.core.Sunshine
 import com.sunshine.core.TileKey
 import java.time.Clock
@@ -22,7 +27,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
@@ -415,12 +422,189 @@ class MapViewModelTest {
         assertEquals(SunshineUiState.Loading, SunshineUiState.Loading.at(INTERLAKEN))
     }
 
+    @Test
+    fun `the overlay is off at start and nothing is computed`() =
+        runTest {
+            val areas = mutableListOf<MapArea>()
+            val viewModel = overlayViewModel(areas)
+
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            advanceTimeBy(SETTLE_MILLIS)
+
+            assertEquals(OverlayUiState.Off, viewModel.overlay.value)
+            assertEquals(emptyList<MapArea>(), areas)
+        }
+
+    @Test
+    fun `below zoom 11 the overlay is zoomed out and nothing is computed`() =
+        runTest {
+            val areas = mutableListOf<MapArea>()
+            val viewModel = overlayViewModel(areas)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 10.5))
+
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+
+            assertEquals(OverlayUiState.ZoomedOut, viewModel.overlay.value)
+            assertEquals(emptyList<MapArea>(), areas)
+        }
+
+    @Test
+    fun `switching the overlay on computes the visible area`() =
+        runTest {
+            val grid = CompletableDeferred<Unit>()
+            val areas = mutableListOf<MapArea>()
+            val viewModel = overlayViewModel(areas, before = { grid.await() })
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+
+            viewModel.onOverlayToggled()
+            assertEquals(OverlayUiState.Computing(kept = null), viewModel.overlay.value)
+
+            advanceTimeBy(SETTLE_MILLIS)
+            grid.complete(Unit)
+            val ready = viewModel.overlay.value as OverlayUiState.Ready
+            assertEquals(listOf(MapArea(INTERLAKEN, 12.0, MAP_WIDTH, MAP_HEIGHT)), areas)
+            assertEquals(viewModel.selectedTime.value, ready.time)
+        }
+
+    @Test
+    fun `after a pan the previous overlay is kept until the camera has rested`() =
+        runTest {
+            val areas = mutableListOf<MapArea>()
+            val viewModel = overlayViewModel(areas)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            val previous = (viewModel.overlay.value as OverlayUiState.Ready).grid
+
+            viewModel.onCameraMoved(CameraState(center = GeoPoint(46.69, 7.87), zoom = 12.0))
+            assertEquals(OverlayUiState.Computing(kept = previous), viewModel.overlay.value)
+            advanceTimeBy(SETTLE_MILLIS - 2)
+            assertEquals(1, areas.size)
+
+            advanceTimeBy(2)
+            assertEquals(GeoPoint(46.69, 7.87), (viewModel.overlay.value as OverlayUiState.Ready).grid.area.center)
+            assertEquals(2, areas.size)
+        }
+
+    @Test
+    fun `a time change drops the previous overlay at once`() =
+        runTest {
+            val gate = MutableStateFlow(true)
+            val viewModel = overlayViewModel(mutableListOf(), before = { gate.first { it } })
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            gate.value = false
+
+            viewModel.onSliderMoved(15 * 60f)
+
+            assertEquals(OverlayUiState.Computing(kept = null), viewModel.overlay.value)
+            gate.value = true
+            assertEquals(ZonedDateTime.of(2025, 12, 21, 15, 0, 0, 0, ZURICH), (viewModel.overlay.value as OverlayUiState.Ready).time)
+        }
+
+    @Test
+    fun `slider positions during a computation are dropped and the last one is computed`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val gate = MutableStateFlow(true)
+            val viewModel = overlayViewModel(mutableListOf(), suns, before = { gate.first { it } })
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            gate.value = false
+            suns.clear()
+
+            for (minutes in listOf(600f, 660f, 720f, 780f)) viewModel.onSliderMoved(minutes)
+            gate.value = true
+
+            val ready = viewModel.overlay.value as OverlayUiState.Ready
+            assertEquals(ZonedDateTime.of(2025, 12, 21, 13, 0, 0, 0, ZURICH), ready.time)
+            assertEquals(ready.grid.sun, suns.last())
+        }
+
+    @Test
+    fun `the overlay is computed again when the network returns only if some cell is unknown`() =
+        runTest {
+            val areas = mutableListOf<MapArea>()
+            val viewModel = overlayViewModel(areas)
+            isOnline.value = false
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            assertTrue((viewModel.overlay.value as OverlayUiState.Ready).grid.hasUnknown)
+
+            isOnline.value = true
+            advanceTimeBy(SETTLE_MILLIS)
+            assertEquals(2, areas.size)
+            assertFalse((viewModel.overlay.value as OverlayUiState.Ready).grid.hasUnknown)
+
+            isOnline.value = false
+            isOnline.value = true
+            advanceTimeBy(SETTLE_MILLIS)
+            assertEquals(2, areas.size)
+        }
+
+    @Test
+    fun `the overlay switch is restored from saved state, as after a rotation`() {
+        val savedState = SavedStateHandle()
+        newViewModel(savedState).onOverlayToggled()
+
+        assertTrue(newViewModel(savedState).isOverlayOn.value)
+        assertFalse(newViewModel().isOverlayOn.value)
+    }
+
+    /**
+     * A view model whose overlay grids come from flat 568 m terrain, or from no terrain at all while
+     * offline. [before] runs before each grid, [areas] and [suns] record the requests.
+     */
+    private fun TestScope.overlayViewModel(
+        areas: MutableList<MapArea>,
+        suns: MutableList<SunPosition> = mutableListOf(),
+        before: suspend () -> Unit = {},
+    ): MapViewModel {
+        val viewModel =
+            newViewModel(
+                overlayGrid = { area, sun ->
+                    before()
+                    areas += area
+                    suns += sun
+                    flatGrid(area, sun, available = isOnline.value)
+                },
+                computeDispatcher = UnconfinedTestDispatcher(testScheduler),
+            )
+        viewModel.onMapSizeChanged(MAP_WIDTH, MAP_HEIGHT)
+        viewModel.onSliderMoved(12 * 60f)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.overlay.collect {} }
+        return viewModel
+    }
+
+    private fun flatGrid(
+        area: MapArea,
+        sun: SunPosition,
+        available: Boolean,
+    ): ShadeGrid {
+        val sweep = SunShadeSweep(area, sun)
+        val tiles =
+            object : AbstractMap<TileKey, HeightTile?>() {
+                override val entries: Set<Map.Entry<TileKey, HeightTile?>> get() = throw UnsupportedOperationException()
+
+                override fun get(key: TileKey): HeightTile? = if (available) FLAT else null
+
+                override fun containsKey(key: TileKey) = true
+            }
+        sweep.tiles(sweep.groundTiles().associateWith { tiles[it] })
+        return sweep.assemble(listOf(sweep.compute(tiles)))
+    }
+
     private fun newViewModel(
         savedState: SavedStateHandle = SavedStateHandle(),
         repository: ElevationRepository = repository { heightBytes(568) },
         horizon: suspend (GeoPoint) -> HorizonProfile? = { null },
+        overlayGrid: suspend (MapArea, SunPosition) -> ShadeGrid = { _, _ -> awaitCancellation() },
         computeDispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(),
-    ) = MapViewModel(savedState, isOnline, clock, repository, horizon, computeDispatcher)
+    ) = MapViewModel(savedState, isOnline, clock, repository, horizon, overlayGrid, computeDispatcher)
 
     private fun horizonOf(
         angle: Double,
@@ -463,5 +647,9 @@ class MapViewModelTest {
 
         // Just past the 300 ms the camera must rest before a horizon is computed (design D8).
         const val SETTLE_MILLIS = 301L
+
+        const val MAP_WIDTH = 60.0
+        const val MAP_HEIGHT = 80.0
+        val FLAT: HeightTile = HeightTile.fromMetres(512, FloatArray(512 * 512) { 568f })
     }
 }

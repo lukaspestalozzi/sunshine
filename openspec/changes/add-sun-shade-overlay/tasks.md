@@ -56,7 +56,7 @@
 
 ## 4. app: view-model state
 
-- [ ] 4.1 Write the `MapViewModel` overlay tests first (test dispatcher, fake repository):
+- [x] 4.1 Write the `MapViewModel` overlay tests first (test dispatcher, fake repository):
   - off at start → `Off` and no repository call;
   - toggle on at zoom 10.5 → `ZoomedOut`, no call;
   - toggle on at zoom 12 → `Computing(null)`, then `Ready`;
