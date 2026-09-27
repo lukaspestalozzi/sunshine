@@ -25,11 +25,13 @@
   - a grid computed with the cut equals one computed over the full 150 km on two synthetic landscapes.
 
   Then implement `SunShadeSweep.groundTiles()` and `tiles(ground)` with the exact upwind cut (design D4, D7). Verify: `./gradlew :core:test --tests "*SunShadePlanTest*"` passes.
-- [ ] 2.2 Write `SunShadeBundlingTest` first:
+- [x] 2.2 Write `SunShadeBundlingTest` first:
   - the chosen bundle size m satisfies `m · spacing / 2 ≤ d_band_start · tan(0.125°)` for spacings of 13, 26 and 52 m;
-  - on synthetic ridges 8–40 km upwind, the bundled grid equals the unbundled one in ≥ 99.9 % of cells.
+  - ridges 10–40 km upwind that do not vary sideways give exactly the unbundled grid;
+  - with sideways variation, bundling moves a cell's horizon by at most (largest offset from the bundle's centre line) × (sideways slope) / 25 km. A cell that is sun (shade) bundled is sun (shade) unbundled with the sun δ higher (lower);
+  - computing the lines in `chunks` gives the same grid as all at once.
 
-  Then implement far-field bundling (design D5). Verify: `./gradlew :core:test --tests "*SunShadeBundlingTest*"` passes.
+  (A fixed "≥ 99.9 % equal" was dropped during apply: the share depends on how many cells lie within δ of the sun; 0.014 % on the spike's real data, 3.8 % on a synthetic valley.) Then implement far-field bundling (design D5). Verify: `./gradlew :core:test --tests "*SunShadeBundlingTest*"` passes.
 - [ ] 2.3 Write `SunShadeUnknownTest` first, with the spec's three scenarios (eye 500 m, local horizon 2°, tile 20 km upwind missing):
   - sun at 5° → UNKNOWN;
   - 20° → SUN;
