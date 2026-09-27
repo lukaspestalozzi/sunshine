@@ -187,6 +187,18 @@ Spot sensitivity: moving 100 m N/S/E/W changes the season by −18 to +26 days a
 −26 to +41 days at Bristen. Oracles therefore need exact spots. The Viganella church and the
 Bristen centre match to within 3 days. Coordinates are from OpenStreetMap (Nominatim).
 
+### Cross-check: commons-suncalc vs astral (2026-09-27)
+Oracle for `SunPeriodsTest`: Interlaken (46.6863° N, 7.8632° E), 2025-12-21, times at which the
+sun's upper edge (apparent elevation + 0.266°) is above 10°, scanned at 1 s:
+
+| Source | First second above | First second below again |
+|--------|--------------------|--------------------------|
+| commons-suncalc (`sunPosition`) | 09:32:52 UTC+1 | 15:20:40 UTC+1 |
+| astral 3.2, `with_refraction=True` | 09:32:53 UTC+1 | 15:20:36 UTC+1 |
+| `sunPeriods` with a constant 10° horizon (10 s steps) | 09:32:55 | 15:20:35 |
+
+The two libraries agree within 4 s; the test tolerance is ±20 s. Script: `cross_astral.py` below.
+
 ## Implications for `add-terrain-horizon`
 
 To be decided in the proposal; these are recommendations, not decisions.
@@ -845,4 +857,18 @@ for name in sys.argv[1:]:
     out[name] = res
     print(name, res, flush=True)
 json.dump(out, open("season_report.json", "w"), indent=1)
+```
+
+### cross_astral.py
+```python
+"""Cross-check: times at which the sun's upper edge crosses 10 deg, Interlaken 2025-12-21 (UTC+1)."""
+import datetime as dt
+from astral import Observer
+from astral.sun import elevation
+
+obs = Observer(latitude=46.6863, longitude=7.8632, elevation=0)
+tz = dt.timezone(dt.timedelta(hours=1))
+start = dt.datetime(2025, 12, 21, tzinfo=tz)
+above = [s for s in range(0, 86400) if elevation(obs, start + dt.timedelta(seconds=s), with_refraction=True) + 0.266 > 10.0]
+print((start + dt.timedelta(seconds=above[0])).time(), (start + dt.timedelta(seconds=above[-1] + 1)).time())
 ```
