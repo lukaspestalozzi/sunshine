@@ -43,7 +43,7 @@ class ElevationInterpolationTest {
         longitude: Double,
         expected: Double,
     ) {
-        val tile = HeightTile(size = 2, heights = floatArrayOf(0f, 10f, 20f, 30f))
+        val tile = HeightTile.fromMetres(size = 2, metres = floatArrayOf(0f, 10f, 20f, 30f))
 
         val elevation = interpolateElevation(GeoPoint(latitude, longitude), 0, 2, mapOf(TileKey(0, 0, 0) to tile))
 
@@ -63,7 +63,7 @@ class ElevationInterpolationTest {
             ELEVATION_FIXTURE_SAMPLES.groupBy { TileKey(ZOOM, it.x, it.y) }.mapValues { (_, samples) ->
                 val heights = FloatArray(SIZE * SIZE) { Float.NaN }
                 samples.forEach { heights[it.row * SIZE + it.column] = terrariumHeights(intArrayOf(it.argb))[0] }
-                HeightTile(SIZE, heights)
+                HeightTile.fromMetres(SIZE, heights)
             }
         return interpolateElevation(point, ZOOM, SIZE, tiles)
     }
