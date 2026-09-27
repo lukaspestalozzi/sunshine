@@ -19,12 +19,12 @@
 
 ## 2. core: tile plan, upwind cut, bundling, missing data
 
-- [ ] 2.1 Write `SunShadePlanTest` first:
-  - `tiles()` contains every tile holding a sampled pixel or its bilinear neighbour, checked by brute-force enumeration on a small area;
+- [x] 2.1 Write `SunShadePlanTest` first:
+  - `tiles(ground)` contains every tile the computation reads (recorded on a small area, four azimuths) and the ground tiles;
   - with the sun at 20° the plan reaches ≤ 12 km upwind (d_max), and at −5° it reaches 150 km;
   - a grid computed with the cut equals one computed over the full 150 km on two synthetic landscapes.
 
-  Then implement `SunShadeSweep.tiles()` with the exact upwind cut (design D4, D7). Verify: `./gradlew :core:test --tests "*SunShadePlanTest*"` passes.
+  Then implement `SunShadeSweep.groundTiles()` and `tiles(ground)` with the exact upwind cut (design D4, D7). Verify: `./gradlew :core:test --tests "*SunShadePlanTest*"` passes.
 - [ ] 2.2 Write `SunShadeBundlingTest` first:
   - the chosen bundle size m satisfies `m · spacing / 2 ≤ d_band_start · tan(0.125°)` for spacings of 13, 26 and 52 m;
   - on synthetic ridges 8–40 km upwind, the bundled grid equals the unbundled one in ≥ 99.9 % of cells.
