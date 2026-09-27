@@ -32,7 +32,7 @@
   - computing the lines in `chunks` gives the same grid as all at once.
 
   (A fixed "≥ 99.9 % equal" was dropped during apply: the share depends on how many cells lie within δ of the sun; 0.014 % on the spike's real data, 3.8 % on a synthetic valley.) Then implement far-field bundling (design D5). Verify: `./gradlew :core:test --tests "*SunShadeBundlingTest*"` passes.
-- [ ] 2.3 Write `SunShadeUnknownTest` first, with the spec's three scenarios (eye 500 m, local horizon 2°, tile 20 km upwind missing):
+- [x] 2.3 Write `SunShadeUnknownTest` first, with the spec's three scenarios (eye 500 m, local horizon 2°, tile 20 km upwind missing):
   - sun at 5° → UNKNOWN;
   - 20° → SUN;
   - 1.5° → SHADE;

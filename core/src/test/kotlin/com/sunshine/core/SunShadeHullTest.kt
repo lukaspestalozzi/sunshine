@@ -94,13 +94,14 @@ class SunShadeHullTest {
     }
 }
 
-/** The whole grid of [area], with every tile built on demand. */
+/** The whole grid of [area] as the app computes it: ground tiles, plan, then every tile on demand. */
 internal fun SyntheticTerrain.grid(
     area: MapArea,
     sun: SunPosition,
     missing: (TileKey) -> Boolean = { false },
 ): ShadeGrid {
     val sweep = SunShadeSweep(area, sun)
+    sweep.tiles(sweep.groundTiles().associateWith { if (missing(it)) null else tile(it) })
     val tiles =
         object : AbstractMap<TileKey, HeightTile?>() {
             override val entries: Set<Map.Entry<TileKey, HeightTile?>> get() = throw UnsupportedOperationException()
