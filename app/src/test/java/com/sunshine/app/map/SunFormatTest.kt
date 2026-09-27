@@ -1,5 +1,6 @@
 package com.sunshine.app.map
 
+import com.sunshine.core.GeoPoint
 import com.sunshine.core.SunPeriod
 import com.sunshine.core.SunPeriods
 import com.sunshine.core.Sunshine
@@ -174,7 +175,7 @@ class SunFormatTest {
         assertEquals("01:00 UTC+1–03:30", formatSunshine(ready(SunPeriods.Known(listOf(period))), zurich("2025-03-30T12:00")))
     }
 
-    private fun ready(periods: SunPeriods) = SunshineUiState.Ready(periods, Sunshine.SUN)
+    private fun ready(periods: SunPeriods) = SunshineUiState.Ready(GeoPoint(46.6863, 7.8632), periods, Sunshine.SUN)
 
     private fun zurich(time: String): ZonedDateTime = LocalDateTime.parse(time).atZone(ZoneId.of("Europe/Zurich"))
 }

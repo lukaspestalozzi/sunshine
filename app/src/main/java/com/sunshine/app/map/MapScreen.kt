@@ -34,7 +34,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel(factory = mapViewModelFactory)
     val selectedTime by viewModel.selectedTime.collectAsStateWithLifecycle()
     val sun by viewModel.sun.collectAsStateWithLifecycle()
     val elevation by viewModel.elevation.collectAsStateWithLifecycle()
-    val sunshine by viewModel.sunshine.collectAsStateWithLifecycle()
+    val computedSunshine by viewModel.sunshine.collectAsStateWithLifecycle()
+    val sunshine = computedSunshine.at(camera.center)
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val startInset = WindowInsets.safeDrawing.asPaddingValues().calculateStartPadding(LocalLayoutDirection.current)

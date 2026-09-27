@@ -69,11 +69,18 @@ sealed interface SunshineUiState {
     /** The horizon is being computed. */
     data object Loading : SunshineUiState
 
-    /** The sun periods of the selected day and the sunshine state at the selected time. */
+    /** At [point]: the sun periods of the selected day and the sunshine state at the selected time. */
     data class Ready(
+        val point: GeoPoint,
         val periods: SunPeriods,
         val atSelectedTime: Sunshine,
     ) : SunshineUiState
+
+    /**
+     * This state if it belongs to [center], else [Loading]: right after a camera move, the state may
+     * still be the previous location's until the new computation starts (point-sunshine spec).
+     */
+    fun at(center: GeoPoint): SunshineUiState = if (this is Ready && point != center) Loading else this
 }
 
 /**
@@ -213,7 +220,7 @@ class MapViewModel(
         horizon: HorizonState.Computed,
         time: ZonedDateTime,
     ): SunshineUiState {
-        val profile = horizon.profile ?: return SunshineUiState.Ready(SunPeriods.Unknown, Sunshine.UNKNOWN)
+        val profile = horizon.profile ?: return SunshineUiState.Ready(horizon.point, SunPeriods.Unknown, Sunshine.UNKNOWN)
         val date = time.toLocalDate()
         val memo = periodsOfDay
         val periods =
@@ -224,7 +231,7 @@ class MapViewModel(
                 log("Sun periods of $date: ${duration.inWholeMilliseconds} ms")
                 periods.also { periodsOfDay = Triple(horizon, date, it) }
             }
-        return SunshineUiState.Ready(periods, sunshineAt(profile, horizon.point, time.toInstant()))
+        return SunshineUiState.Ready(horizon.point, periods, sunshineAt(profile, horizon.point, time.toInstant()))
     }
 
     private sealed interface HorizonState {
