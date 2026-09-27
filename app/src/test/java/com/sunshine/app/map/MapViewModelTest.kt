@@ -1,7 +1,9 @@
 package com.sunshine.app.map
 
 import androidx.lifecycle.SavedStateHandle
+import com.sunshine.app.elevation.DemTile
 import com.sunshine.app.elevation.ElevationRepository
+import com.sunshine.app.elevation.TileCache
 import com.sunshine.core.DEFAULT_LOCATION
 import com.sunshine.core.GeoPoint
 import com.sunshine.core.TileKey
@@ -263,7 +265,12 @@ class MapViewModelTest {
 
     /** Tiles whose bytes are the height of every pixel, as decimal text. */
     private fun repository(fetch: suspend (TileKey) -> ByteArray?) =
-        ElevationRepository(fetch = fetch, decode = { bytes -> IntArray(512 * 512) { terrarium(bytes.decodeToString().toInt()) } })
+        ElevationRepository(
+            TileCache(
+                fetch = { key -> fetch(key)?.let { DemTile.Found(it) } ?: DemTile.Unavailable },
+                decode = { bytes -> IntArray(512 * 512) { terrarium(bytes.decodeToString().toInt()) } },
+            ),
+        )
 
     private fun heightBytes(metres: Int) = metres.toString().encodeToByteArray()
 

@@ -31,20 +31,35 @@ fun demHttpClient(
         .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .build()
 
-/** Loads DEM tile bytes; `null` when the tile cannot be obtained (elevation-data "Unknown elevation"). */
+/** The outcome of fetching a DEM tile. */
+sealed interface DemTile {
+    class Found(
+        val bytes: ByteArray,
+    ) : DemTile
+
+    /** The server does not publish this tile (404): no data at this zoom. */
+    data object Missing : DemTile
+
+    /** The tile cannot be obtained now: network or server failure, and no cached copy. */
+    data object Unavailable : DemTile
+}
+
+/** Loads DEM tile bytes (elevation-data "Unknown elevation"). */
 class DemTileFetcher(
     private val client: OkHttpClient,
 ) {
     /**
      * The tile from the network or the cache. After a network failure or a server error, a cached
-     * copy is served even if stale, so tiles seen before also work offline. A missing tile (404)
-     * gives `null`. Cancelling the calling coroutine cancels the HTTP call.
+     * copy is served even if stale, so tiles seen before also work offline. Cancelling the calling
+     * coroutine cancels the HTTP call.
      */
-    suspend fun fetch(key: TileKey): ByteArray? =
+    suspend fun fetch(key: TileKey): DemTile =
         when (val result = request(key, cacheControl = null)) {
-            is Result.Tile -> result.bytes
-            Result.Missing -> null
-            Result.Failed -> (request(key, CacheControl.FORCE_CACHE) as? Result.Tile)?.bytes
+            is Result.Tile -> DemTile.Found(result.bytes)
+            Result.Missing -> DemTile.Missing
+            Result.Failed ->
+                (request(key, CacheControl.FORCE_CACHE) as? Result.Tile)?.let { DemTile.Found(it.bytes) }
+                    ?: DemTile.Unavailable
         }
 
     private suspend fun request(
