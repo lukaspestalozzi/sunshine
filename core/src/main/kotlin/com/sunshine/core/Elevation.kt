@@ -15,7 +15,7 @@ data class TileKey(
 
 /**
  * A square height tile: [size] × [size] heights, row-major, one per pixel centre. Stored as 16 bits
- * per height in steps of 0.25 m from −1000 m (range −999.75 … 15,383.75 m, error ≤ 0.125 m), so a
+ * per height in steps of 0.25 m from −1000 m (range −1000 … 15,383.5 m, error ≤ 0.125 m), so a
  * 512 px tile takes 512 KiB (design D6 of add-terrain-horizon). A height may be absent ([Double.NaN]).
  */
 class HeightTile private constructor(
@@ -54,9 +54,11 @@ class HeightTile private constructor(
         private const val STEP = 0.25
         private const val LOWEST = -1000.0
         private const val OFFSET = 32768
-        private const val NO_VALUE = Short.MIN_VALUE
-        private const val MIN_METRES = -999.75f
-        private const val MAX_METRES = 15_383.75f
+
+        // The highest code is reserved for "no value", so -1000 m (code -32768) stays representable.
+        private const val NO_VALUE = Short.MAX_VALUE
+        private const val MIN_METRES = -1000f
+        private const val MAX_METRES = 15_383.5f
     }
 }
 
