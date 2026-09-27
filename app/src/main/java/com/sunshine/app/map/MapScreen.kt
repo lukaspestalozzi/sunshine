@@ -23,6 +23,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.sunshine.app.SunshineApp
 import com.sunshine.app.network.NetworkMonitor
+import com.sunshine.app.sunshine.debugLog
 import java.time.Clock
 import kotlinx.coroutines.Dispatchers
 
@@ -95,6 +96,7 @@ private val mapViewModelFactory =
                 elevationRepository = (application as SunshineApp).elevationRepository,
                 horizonProfile = application.sunshineRepository::profile,
                 computeDispatcher = Dispatchers.Default,
+                log = ::debugLog,
             )
         }
     }

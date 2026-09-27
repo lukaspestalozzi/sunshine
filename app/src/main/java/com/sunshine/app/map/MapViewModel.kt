@@ -23,6 +23,7 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.time.measureTimedValue
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -86,6 +87,7 @@ class MapViewModel(
     private val elevationRepository: ElevationRepository,
     private val horizonProfile: suspend (GeoPoint) -> HorizonProfile?,
     computeDispatcher: CoroutineDispatcher,
+    private val log: (String) -> Unit = {},
 ) : ViewModel() {
     private val zone: ZoneId = clock.zone
 
@@ -218,7 +220,9 @@ class MapViewModel(
             if (memo != null && memo.first === horizon && memo.second == date) {
                 memo.third
             } else {
-                sunPeriods(profile, horizon.point, date, zone).also { periodsOfDay = Triple(horizon, date, it) }
+                val (periods, duration) = measureTimedValue { sunPeriods(profile, horizon.point, date, zone) }
+                log("Sun periods of $date: ${duration.inWholeMilliseconds} ms")
+                periods.also { periodsOfDay = Triple(horizon, date, it) }
             }
         return SunshineUiState.Ready(periods, sunshineAt(profile, horizon.point, time.toInstant()))
     }
