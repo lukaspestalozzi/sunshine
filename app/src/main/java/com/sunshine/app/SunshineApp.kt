@@ -8,6 +8,7 @@ import com.sunshine.app.elevation.TileCache
 import com.sunshine.app.elevation.decodeArgb
 import com.sunshine.app.elevation.demHttpClient
 import com.sunshine.app.network.UserAgentInterceptor
+import com.sunshine.app.sunshine.OverlayRepository
 import com.sunshine.app.sunshine.SunshineRepository
 import com.sunshine.app.sunshine.debugLog
 import java.io.File
@@ -29,6 +30,8 @@ class SunshineApp : Application() {
     val elevationRepository: ElevationRepository by lazy { ElevationRepository(tileCache) }
 
     val sunshineRepository: SunshineRepository by lazy { SunshineRepository(tile = tileCache::tile, log = ::debugLog) }
+
+    val overlayRepository: OverlayRepository by lazy { OverlayRepository(tile = tileCache::tile) }
 
     override fun onCreate() {
         super.onCreate()

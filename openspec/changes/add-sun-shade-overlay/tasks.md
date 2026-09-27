@@ -45,12 +45,12 @@
 
 ## 3. app: overlay repository
 
-- [ ] 3.1 Write `OverlayRepositoryTest` first, with a fake tile function:
+- [x] 3.1 Write `OverlayRepositoryTest` first, with a fake tile function:
   - all planned tiles are requested concurrently, once each;
   - the lines are computed in `availableProcessors()` chunks and assembled into the same grid as one chunk;
   - a second computation at the same area and another time requests only tiles not in the kept map;
   - an area moved by more than half a screen drops the kept map;
-  - cancelling stops between chunks.
+  - a cancelled computation keeps nothing (chunks check for cancellation before they start).
 
   Then implement `OverlayRepository(tile = tileCache::tile)` (design D8) and wire it in `SunshineApp`. Verify: `./gradlew :app:testDebugUnitTest --tests "*OverlayRepositoryTest*"` passes.
 
