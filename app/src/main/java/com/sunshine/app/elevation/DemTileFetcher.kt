@@ -4,6 +4,7 @@ import com.sunshine.core.TileKey
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.Cache
@@ -44,10 +45,22 @@ sealed interface DemTile {
     data object Unavailable : DemTile
 }
 
+/** How many DEM tiles were served from the network and from the disk cache so far. */
+data class TileLoads(
+    val network: Int,
+    val disk: Int,
+)
+
 /** Loads DEM tile bytes (elevation-data "Unknown elevation"). */
 class DemTileFetcher(
     private val client: OkHttpClient,
 ) {
+    private val fromNetwork = AtomicInteger()
+    private val fromDisk = AtomicInteger()
+
+    /** Tiles served so far, for the debug timing logs (task 6.2 of add-sun-shade-overlay). */
+    fun loads(): TileLoads = TileLoads(fromNetwork.get(), fromDisk.get())
+
     /**
      * The tile from the network or the cache. After a network failure or a server error, a cached
      * copy is served even if stale, so tiles seen before also work offline. Cancelling the calling
@@ -102,7 +115,11 @@ class DemTileFetcher(
 
     private fun toResult(response: Response): Result =
         when {
-            response.isSuccessful -> Result.Tile(response.body!!.bytes())
+            response.isSuccessful -> {
+                // A response OkHttp answered from its disk cache has no network response.
+                (if (response.networkResponse != null) fromNetwork else fromDisk).incrementAndGet()
+                Result.Tile(response.body!!.bytes())
+            }
             response.code == NOT_FOUND -> Result.Missing
             else -> Result.Failed
         }

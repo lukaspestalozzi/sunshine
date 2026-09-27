@@ -1,9 +1,12 @@
 package com.sunshine.app.elevation
 
+import com.sun.net.httpserver.HttpServer
 import com.sunshine.app.network.UserAgentInterceptor
 import com.sunshine.core.TileKey
 import java.io.File
 import java.io.IOException
+import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
@@ -107,6 +110,44 @@ class DemTileFetcherTest {
             fetch.cancel()
 
             assertTrue(callCanceled.await(5, TimeUnit.SECONDS), "the HTTP call was not cancelled")
+        }
+
+    // For the debug timing logs (task 6.2 of add-sun-shade-overlay): network and disk are told apart.
+    // A local server stands in for Mapterhorn, so that OkHttp's disk cache really answers the repeat.
+    @Test
+    fun `counts tiles served from the network and from the disk cache`() =
+        runTest {
+            val server = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0)
+            server.createContext("/") { exchange ->
+                exchange.responseHeaders.add("Cache-Control", "max-age=600")
+                exchange.sendResponseHeaders(200, TILE_BYTES.size.toLong())
+                exchange.responseBody.use { it.write(TILE_BYTES) }
+            }
+            server.start()
+            try {
+                val local = "http://127.0.0.1:${server.address.port}"
+                val client =
+                    demHttpClient(cacheDirectory, UserAgentInterceptor(versionName = "0.1.0", applicationId = "com.sunshine.app"))
+                        .newBuilder()
+                        .addInterceptor { chain ->
+                            chain.proceed(
+                                chain
+                                    .request()
+                                    .newBuilder()
+                                    .url("$local/${KEY.zoom}.webp")
+                                    .build(),
+                            )
+                        }.build()
+                val fetcher = DemTileFetcher(client)
+
+                fetcher.fetch(KEY)
+                assertEquals(TileLoads(network = 1, disk = 0), fetcher.loads())
+
+                fetcher.fetch(KEY)
+                assertEquals(TileLoads(network = 1, disk = 1), fetcher.loads())
+            } finally {
+                server.stop(0)
+            }
         }
 
     // Stands in for the network behind the production client.
