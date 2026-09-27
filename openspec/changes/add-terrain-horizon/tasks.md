@@ -36,7 +36,7 @@
 
 ## 4. app: tiles, cache and repository
 
-- [ ] 4.1 Replace `ElevationRepository`'s LRU with an app-wide `TileCache`: 64 tiles of `HeightTile`, zooms 10–14, and fallback above zoom 12 by upsampling the parent quadrant (design D6, D7). Write `TileCacheTest` first, with a fake fetcher:
+- [x] 4.1 Replace `ElevationRepository`'s LRU with an app-wide `TileCache`: 64 tiles of `HeightTile`, zooms 10–14, and fallback above zoom 12 by upsampling the parent quadrant (design D6, D7). Write `TileCacheTest` first, with a fake fetcher:
   - LRU eviction at 65 tiles;
   - a z14 404 falls back to z13, then to z12 (one parent fetch);
   - a z12 404 → `null`;

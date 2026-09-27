@@ -78,27 +78,17 @@ class ElevationRepositoryTest {
             assertEquals(Elevation.Known(568.0), repository.cachedElevation(INTERLAKEN))
         }
 
-    @Test
-    fun `at most eight tiles stay in memory`() =
-        runTest {
-            val repository = repository()
-            val points = (0 until 9).map { GeoPoint(46.6863, 7.8632 + it * 0.1) } // 0.1° apart: a new tile each
-
-            points.forEach { repository.elevation(it) }
-
-            assertNull(repository.cachedElevation(points.first()))
-            assertEquals(Elevation.Known(568.0), repository.cachedElevation(points.last()))
-        }
-
     private fun repository(
         fetch: (TileKey) -> ByteArray? = { TILE_BYTES },
         decode: (ByteArray) -> IntArray? = { IntArray(512 * 512) { INTERLAKEN_ARGB } },
     ) = ElevationRepository(
-        fetch = { key ->
-            fetched += key
-            fetch(key)
-        },
-        decode = decode,
+        TileCache(
+            fetch = { key ->
+                fetched += key
+                fetch(key)?.let { DemTile.Found(it) } ?: DemTile.Unavailable
+            },
+            decode = decode,
+        ),
     )
 
     private companion object {

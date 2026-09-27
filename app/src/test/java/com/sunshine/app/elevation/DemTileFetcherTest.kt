@@ -17,7 +17,6 @@ import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -31,42 +30,48 @@ class DemTileFetcherTest {
     @Test
     fun `requests the Mapterhorn tile with the app User-Agent`() =
         runTest {
-            val bytes = fetcher { respond(it, 200) }.fetch(TileKey(12, 2137, 1445))
+            val tile = fetcher { respond(it, 200) }.fetch(TileKey(12, 2137, 1445))
 
-            assertArrayEquals(TILE_BYTES, bytes)
+            assertArrayEquals(TILE_BYTES, (tile as DemTile.Found).bytes)
             assertEquals("https://tiles.mapterhorn.com/12/2137/1445.webp", requests.single().url.toString())
             assertEquals("Sunshine/0.1.0 (Android; com.sunshine.app)", requests.single().header("User-Agent"))
         }
 
     @Test
-    fun `a missing tile gives null without asking the cache`() =
+    fun `a missing tile is reported as missing without asking the cache`() =
         runTest {
-            assertNull(fetcher { respond(it, 404) }.fetch(KEY))
+            assertEquals(DemTile.Missing, fetcher { respond(it, 404) }.fetch(KEY))
             assertEquals(1, requests.size)
         }
 
     @Test
     fun `a server error falls back to the cache`() =
         runTest {
-            val bytes = fetcher { if (it.request().isForcedCache()) respond(it, 200) else respond(it, 500) }.fetch(KEY)
+            val tile = fetcher { if (it.request().isForcedCache()) respond(it, 200) else respond(it, 500) }.fetch(KEY)
 
-            assertArrayEquals(TILE_BYTES, bytes)
+            assertArrayEquals(TILE_BYTES, (tile as DemTile.Found).bytes)
         }
 
     @Test
     fun `a network failure falls back to the cache`() =
         runTest {
-            val bytes = fetcher { if (it.request().isForcedCache()) respond(it, 200) else throw IOException("offline") }.fetch(KEY)
+            val tile = fetcher { if (it.request().isForcedCache()) respond(it, 200) else throw IOException("offline") }.fetch(KEY)
 
-            assertArrayEquals(TILE_BYTES, bytes)
+            assertArrayEquals(TILE_BYTES, (tile as DemTile.Found).bytes)
         }
 
     // OkHttp answers 504 to a forced-cache request when the cache has no entry.
     @Test
-    fun `failure and cache miss give null`() =
+    fun `failure and cache miss give unavailable`() =
         runTest {
-            assertNull(fetcher { if (it.request().isForcedCache()) respond(it, 504) else respond(it, 500) }.fetch(KEY))
-            assertNull(fetcher { if (it.request().isForcedCache()) respond(it, 504) else throw IOException("offline") }.fetch(KEY))
+            assertEquals(
+                DemTile.Unavailable,
+                fetcher { if (it.request().isForcedCache()) respond(it, 504) else respond(it, 500) }.fetch(KEY),
+            )
+            assertEquals(
+                DemTile.Unavailable,
+                fetcher { if (it.request().isForcedCache()) respond(it, 504) else throw IOException("offline") }.fetch(KEY),
+            )
         }
 
     @Test

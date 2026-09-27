@@ -4,6 +4,7 @@ import android.app.Application
 import com.sunshine.app.elevation.DemTileFetcher
 import com.sunshine.app.elevation.ElevationRepository
 import com.sunshine.app.elevation.MapterhornTiles
+import com.sunshine.app.elevation.TileCache
 import com.sunshine.app.elevation.decodeArgb
 import com.sunshine.app.elevation.demHttpClient
 import com.sunshine.app.network.UserAgentInterceptor
@@ -14,14 +15,16 @@ import org.maplibre.android.MapLibre
 import org.maplibre.android.module.http.HttpRequestUtil
 
 class SunshineApp : Application() {
-    /** Shared by all screens, so decoded tiles and the HTTP cache are shared too (design D8). */
-    val elevationRepository: ElevationRepository by lazy {
+    /** Shared by all screens and features, so decoded tiles and the HTTP cache are shared too (design D6). */
+    private val tileCache: TileCache by lazy {
         val client = demHttpClient(File(cacheDir, "dem-tiles"), userAgent())
-        ElevationRepository(
+        TileCache(
             fetch = DemTileFetcher(client)::fetch,
             decode = { bytes -> decodeArgb(bytes, MapterhornTiles.TILE_SIZE) },
         )
     }
+
+    val elevationRepository: ElevationRepository by lazy { ElevationRepository(tileCache) }
 
     override fun onCreate() {
         super.onCreate()
