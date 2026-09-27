@@ -52,9 +52,9 @@ private const val MAP_TILE_DP = 512.0
 private const val TRANSPARENT = 0
 
 // #455A64 at alpha 0.45: dark blue-grey that keeps the topographic map readable.
-private const val SHADE_ARGB = 0x73455A64
+internal const val SHADE_ARGB = 0x73455A64
 
 // #9E9E9E at alpha 0.6, in diagonal stripes 2 dp wide every 8 dp.
-private const val UNKNOWN_ARGB = 0x999E9E9E.toInt()
-private const val HATCH_PERIOD = 8
-private const val HATCH_WIDTH = 2
+internal const val UNKNOWN_ARGB = 0x999E9E9E.toInt()
+internal const val HATCH_PERIOD = 8
+internal const val HATCH_WIDTH = 2

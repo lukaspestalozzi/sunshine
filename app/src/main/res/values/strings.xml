@@ -16,4 +16,9 @@
     <string name="sun_panel_day_length">Day length</string>
     <string name="sun_panel_altitude">Altitude</string>
     <string name="sun_panel_sunshine">Sunshine</string>
+    <string name="overlay_toggle">Sun &amp; shade</string>
+    <string name="overlay_legend_shade">Shade</string>
+    <string name="overlay_legend_unknown">Unknown</string>
+    <string name="overlay_zoom_in">Zoom in to see sun and shade</string>
+    <string name="overlay_computing">Computing sun and shade …</string>
 </resources>

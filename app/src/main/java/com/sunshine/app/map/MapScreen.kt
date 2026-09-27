@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,11 +37,14 @@ fun MapScreen(viewModel: MapViewModel = viewModel(factory = mapViewModelFactory)
     val elevation by viewModel.elevation.collectAsStateWithLifecycle()
     val computedSunshine by viewModel.sunshine.collectAsStateWithLifecycle()
     val overlay by viewModel.overlay.collectAsStateWithLifecycle()
+    val isOverlayOn by viewModel.isOverlayOn.collectAsStateWithLifecycle()
     val sunshine = computedSunshine.at(camera.center)
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val startInset = WindowInsets.safeDrawing.asPaddingValues().calculateStartPadding(LocalLayoutDirection.current)
         val panelMaxWidth = sunPanelMaxWidth(maxWidth, maxHeight, startInset)
+        // The map fills this box: its size and the camera give the overlay's visible area.
+        LaunchedEffect(maxWidth, maxHeight) { viewModel.onMapSizeChanged(maxWidth.value.toDouble(), maxHeight.value.toDouble()) }
         MapLibreMap(
             initialCamera = camera,
             onCameraMoved = viewModel::onCameraMoved,
@@ -49,7 +53,12 @@ fun MapScreen(viewModel: MapViewModel = viewModel(factory = mapViewModelFactory)
         )
         sun?.let { SunLine(it.position, (sunshine as? SunshineUiState.Ready)?.atSelectedTime) }
         Crosshair(Modifier.align(Alignment.Center))
-        MapLabels(camera = camera, isOffline = isOffline) {
+        MapLabels(
+            camera = camera,
+            isOffline = isOffline,
+            notice = overlayNotice(overlay),
+            topEnd = { OverlayControl(isOn = isOverlayOn, onToggle = viewModel::onOverlayToggled) },
+        ) {
             SunPanel(
                 selectedTime = selectedTime,
                 sun = sun,
