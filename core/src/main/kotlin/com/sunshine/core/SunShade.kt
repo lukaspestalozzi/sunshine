@@ -195,11 +195,18 @@ class SunShadeSweep(
     /** How far upwind the lines start, in metres. */
     internal var reach: Double = MAX_RANGE
 
+    /** Lines per bundle sharing the z10 band, and the z11 band (design D5). */
+    internal val farBundle: Int = bundleSize(FAR_BAND)
+    internal val middleBundle: Int = bundleSize(MIDDLE_BAND)
+
+    /** Whether bundles of lines share their far bands; switched off only to measure its effect. */
+    internal var bundling = true
+
     /** The tiles of the samples inside the area, from which [tiles] learns the lowest ground. */
     fun groundTiles(): Set<TileKey> {
         val keys = HashSet<TileKey>()
         for (k in 0 until lineCount) {
-            if (lineCells[k] > 0) addTiles(keys, k, lineStart[k], viewStep, lineCells[k] * sub, viewZoom)
+            if (lineCells[k] > 0) addTiles(keys, lineW(k), lineStart[k], viewStep, lineCells[k] * sub, viewZoom)
         }
         return keys
     }
@@ -211,16 +218,28 @@ class SunShadeSweep(
     fun tiles(ground: Map<TileKey, HeightTile?>): Set<TileKey> {
         reach = reachAbove(lowestGround(ground))
         val keys = HashSet<TileKey>(ground.keys)
-        for (k in 0 until lineCount) {
-            if (lineCells[k] == 0) continue
-            val start = lineStart[k]
-            for (band in upwindBands()) {
-                val count = ((band.far - band.near) / band.step).toInt()
-                addTiles(keys, k, start - band.near - count * band.step, band.step, count, band.zoom)
-            }
-            addTiles(keys, k, start, viewStep, lineCells[k] * sub, viewZoom)
-        }
+        walk(
+            0 until lineCount,
+            object : Walk {
+                override fun run(
+                    w: Double,
+                    from: Double,
+                    step: Double,
+                    count: Int,
+                    zoom: Int,
+                ) = addTiles(keys, w, from, step, count, zoom)
+
+                override fun area(k: Int) = addTiles(keys, lineW(k), lineStart[k], viewStep, lineCells[k] * sub, viewZoom)
+            },
+        )
         return keys
+    }
+
+    /** About [count] ranges of lines covering every line once, split between bundles (for threads). */
+    fun chunks(count: Int): List<IntRange> {
+        val bundles = (lineCount + farBundle - 1) / farBundle
+        val perChunk = max(1, (bundles + count - 1) / count)
+        return (0 until bundles step perChunk).map { b -> b * farBundle until min((b + perChunk) * farBundle, lineCount) }
     }
 
     // The lowest height in the available ground tiles; the tile range's floor if there is none.
@@ -253,25 +272,48 @@ class SunShadeSweep(
     ): ShadeGridPart {
         val grids = HashMap<Int, TileGrid>()
         val grid = { zoom: Int -> grids.getOrPut(zoom) { TileGrid(zoom, tileSize, tiles) } }
-        val hull = SunShadeHull(INITIAL_HULL)
-        val states =
-            Array(lines.count()) { index ->
-                val k = lines.first + index
-                val cells = ByteArray(lineCells[k])
-                if (cells.isNotEmpty()) {
-                    hull.clear()
-                    val start = lineStart[k]
-                    for (band in upwindBands()) {
-                        sampleBand(grid(band.zoom), k, start - band.far, start - band.near, band.step) { s, h -> hull.push(s, h) }
-                    }
+        val states = Array(lines.count()) { ByteArray(lineCells[lines.first + it]) }
+        walk(
+            lines,
+            object : Walk {
+                val farHull = SunShadeHull(INITIAL_HULL)
+                val middleHull = SunShadeHull(INITIAL_HULL)
+                val hull = SunShadeHull(INITIAL_HULL)
+                var target = farHull
+
+                override fun bundle() {
+                    farHull.clear()
+                    target = farHull
+                }
+
+                override fun subBundle() {
+                    middleHull.copyFrom(farHull)
+                    target = middleHull
+                }
+
+                override fun line(k: Int) {
+                    hull.copyFrom(middleHull)
+                    target = hull
+                }
+
+                override fun run(
+                    w: Double,
+                    from: Double,
+                    step: Double,
+                    count: Int,
+                    zoom: Int,
+                ) = sample(grid(zoom), w, from, step, count) { s, h -> target.push(s, h) }
+
+                override fun area(k: Int) {
+                    val cells = states[k - lines.first]
                     var i = 0
-                    sample(grid(viewZoom), k, start, viewStep, cells.size * sub) { s, h ->
+                    sample(grid(viewZoom), lineW(k), lineStart[k], viewStep, cells.size * sub) { s, h ->
                         if (i % sub == sub / 2) cells[i / sub] = state(hull, s, h) else hull.push(s, h)
                         i++
                     }
                 }
-                cells
-            }
+            },
+        )
         return ShadeGridPart(lines, states)
     }
 
@@ -306,49 +348,123 @@ class SunShadeSweep(
         }
     }
 
-    /** Upwind bands, farthest first, cut at [reach] (design D3, D4). */
-    private fun upwindBands(): List<Band> =
-        listOf(
-            Band(FAR_BAND, MAX_RANGE, 10),
-            Band(MIDDLE_BAND, FAR_BAND, 11),
-            Band(NEAR_BAND, MIDDLE_BAND, 12),
-            Band(0.0, NEAR_BAND, viewZoom),
-        ).filter { it.near < reach }
-            .map { Band(it.near, min(it.far, reach), it.zoom, halfPixel(it.zoom)) }
+    /** What [walk] visits, in order: bundles, their sub-bundles, their lines, and upwind sample runs. */
+    private interface Walk {
+        /** A far bundle starts with no samples. */
+        fun bundle() {}
 
-    private class Band(
-        val near: Double,
-        val far: Double,
-        val zoom: Int,
-        val step: Double = 0.0,
-    )
+        /** A middle bundle starts from its far bundle's samples. */
+        fun subBundle() {}
 
-    /** Samples every [step] from [from] up to (excluding) [to] on line [k], nearest the sun first. */
-    private inline fun sampleBand(
-        grid: TileGrid,
-        k: Int,
-        from: Double,
-        to: Double,
-        step: Double,
-        action: (s: Double, h: Double) -> Unit,
-    ) {
-        val count = ((to - from) / step).toInt()
-        sample(grid, k, to - count * step, step, count, action)
+        /** Line [k] starts from its middle bundle's samples. */
+        fun line(k: Int) {}
+
+        /** Upwind samples `from + i · step` (i < [count]) at [zoom] on the line at [w]. */
+        fun run(
+            w: Double,
+            from: Double,
+            step: Double,
+            count: Int,
+            zoom: Int,
+        )
+
+        /** The samples inside the area on line [k]. */
+        fun area(k: Int)
     }
 
     /**
-     * Heights at `s = from + i · step` (i < [count]) on line [k]: exact positions at knots every
-     * [KNOT_EVERY] samples, linear in between, as in [HorizonTracer].
+     * Visits the samples of [lines] from the sun downwind. The z10 band is sampled once per bundle of
+     * [farBundle] lines on its centre line, the z11 band once per [middleBundle] lines, the rest per
+     * line (design D3, D5). Bands are measured from the bundle's or line's first sample in the area
+     * and end at [reach]. Bundles are fixed by line index, so any split into [chunks] gives the same
+     * result.
+     */
+    private fun walk(
+        lines: IntRange,
+        visit: Walk,
+    ) {
+        val far = if (bundling) farBundle else 1
+        val middle = if (bundling) middleBundle else 1
+        var b0 = lines.first / far * far
+        while (b0 <= lines.last) {
+            val b1 = min(b0 + far, lineCount)
+            val s0 = anchor(b0, b1)
+            if (s0 != null) {
+                visit.bundle()
+                if (reach > FAR_BAND) band(visit, centreW(b0, b1), s0 - reach, s0 - FAR_BAND, 10)
+                for (m0 in b0 until b1 step middle) {
+                    val m1 = min(m0 + middle, b1)
+                    val s1 = anchor(m0, m1) ?: continue
+                    if (m1 - 1 < lines.first || m0 > lines.last) continue
+                    visit.subBundle()
+                    if (reach > MIDDLE_BAND) {
+                        band(visit, centreW(m0, m1), if (reach > FAR_BAND) s0 - FAR_BAND else s1 - reach, s1 - MIDDLE_BAND, 11)
+                    }
+                    for (k in max(m0, lines.first)..min(m1 - 1, lines.last)) {
+                        if (lineCells[k] == 0) continue
+                        val sk = lineStart[k]
+                        visit.line(k)
+                        if (reach > NEAR_BAND) {
+                            band(visit, lineW(k), if (reach > MIDDLE_BAND) s1 - MIDDLE_BAND else sk - reach, sk - NEAR_BAND, 12)
+                        }
+                        band(visit, lineW(k), if (reach > NEAR_BAND) sk - NEAR_BAND else sk - reach, sk, viewZoom)
+                        visit.area(k)
+                    }
+                }
+            }
+            b0 = b1
+        }
+    }
+
+    /** Samples every half pixel of [zoom] from [from] up to (excluding) [to], aligned to [to]. */
+    private fun band(
+        visit: Walk,
+        w: Double,
+        from: Double,
+        to: Double,
+        zoom: Int,
+    ) {
+        val step = halfPixel(zoom)
+        val count = ((to - from) / step).toInt()
+        if (count > 0) visit.run(w, to - count * step, step, count, zoom)
+    }
+
+    // The first sample in the area of the lines [from, to) nearest the sun, or null if none has cells.
+    private fun anchor(
+        from: Int,
+        to: Int,
+    ): Double? {
+        var s: Double? = null
+        for (k in from until to) if (lineCells[k] > 0) s = min(s ?: lineStart[k], lineStart[k])
+        return s
+    }
+
+    private fun centreW(
+        from: Int,
+        to: Int,
+    ): Double = wMin + (from + to) / 2.0 * spacing
+
+    // The largest power of two m with m · spacing / 2 ≤ start · tan(0.125°) (design D5).
+    private fun bundleSize(start: Double): Int {
+        val bound = start * kotlin.math.tan(Math.toRadians(LATERAL_BOUND_DEGREES))
+        var m = 1
+        while (2 * m * spacing / 2 <= bound) m *= 2
+        return m
+    }
+
+    /**
+     * Heights at `s = from + i · step` (i < [count]) on the line at [w]: exact positions at knots
+     * every [KNOT_EVERY] samples, linear in between, as in [HorizonTracer].
      */
     private inline fun sample(
         grid: TileGrid,
-        k: Int,
+        w: Double,
         from: Double,
         step: Double,
         count: Int,
         action: (s: Double, h: Double) -> Unit,
     ) {
-        forEachKnotPair(k, from, step, count, grid.zoom) { a, b, i0, stop, span ->
+        forEachKnotPair(w, from, step, count, grid.zoom) { a, b, i0, stop, span ->
             for (i in i0 until stop) {
                 val f = (i - i0).toDouble() / span
                 action(from + i * step, grid.bilinear(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f))
@@ -357,11 +473,11 @@ class SunShadeSweep(
     }
 
     /**
-     * For the samples `from + i · step` (i < [count]) of line [k], the pixel positions [a] and [b] at
-     * [zoom] of consecutive knots `i0` and `i0 + span`; samples `i0 until stop` lie between them.
+     * For the samples `from + i · step` (i < [count]) of the line at [w], the pixel positions [a] and
+     * [b] at [zoom] of consecutive knots `i0` and `i0 + span`; samples `i0 until stop` lie between.
      */
     private inline fun forEachKnotPair(
-        k: Int,
+        w: Double,
         from: Double,
         step: Double,
         count: Int,
@@ -373,8 +489,8 @@ class SunShadeSweep(
         var i0 = 0
         while (i0 < count) {
             val i1 = min(i0 + KNOT_EVERY, count - 1)
-            pixelOnLine(k, from + i0 * step, zoom, a)
-            pixelOnLine(k, from + i1 * step, zoom, b)
+            pixelOnLine(w, from + i0 * step, zoom, a)
+            pixelOnLine(w, from + i1 * step, zoom, b)
             val stop = min(i0 + KNOT_EVERY, count)
             action(a, b, i0, stop, max(i1 - i0, 1))
             i0 = stop
@@ -384,12 +500,12 @@ class SunShadeSweep(
     /** Adds the tiles of every sample on the knot-to-knot segments of a run of samples. */
     private fun addTiles(
         keys: MutableSet<TileKey>,
-        k: Int,
+        w: Double,
         from: Double,
         step: Double,
         count: Int,
         zoom: Int,
-    ) = forEachKnotPair(k, from, step, count, zoom) { a, b, _, _, _ ->
+    ) = forEachKnotPair(w, from, step, count, zoom) { a, b, _, _, _ ->
         // The samples and their bilinear neighbours lie in the pixel rectangle spanned by both knots.
         val x0 = floor(min(a[0], b[0])).toLong()
         val x1 = floor(max(a[0], b[0])).toLong() + 1
@@ -406,14 +522,14 @@ class SunShadeSweep(
         }
     }
 
-    /** Global pixel coordinates (pixel centres) at [zoom] of position [s] on line [k]. */
+    /** Global pixel coordinates (pixel centres) at [zoom] of position [s] on the line at [w]. */
     private fun pixelOnLine(
-        k: Int,
+        w: Double,
         s: Double,
         zoom: Int,
         out: DoubleArray,
     ) {
-        pointOnLine(k, s, out)
+        frame.inverse(-s * ux + w * uy, -s * uy - w * ux, out)
         val worldPixels = (1L shl zoom).toDouble() * tileSize
         val sinLat = sin(Math.toRadians(out[0]))
         out[0] = (out[1] + 180.0) / 360.0 * worldPixels - 0.5
@@ -478,6 +594,7 @@ class SunShadeSweep(
         private const val MIDDLE_BAND = 6_000.0
         private const val FAR_BAND = 25_000.0
         private const val KNOT_EVERY = 32
+        private const val LATERAL_BOUND_DEGREES = 0.125
         private const val INITIAL_HULL = 1024
 
         // Lowest height a HeightTile can hold.
@@ -508,14 +625,20 @@ class ShadeGrid internal constructor(
         longitude: Double,
     ): Sunshine? {
         val (k, j) = sweep.cellOf(latitude, longitude) ?: return null
-        return when (states[k][j]) {
+        return cellState(k, j)
+    }
+
+    fun stateAt(point: GeoPoint): Sunshine? = stateAt(point.latitude, point.longitude)
+
+    internal fun cellState(
+        line: Int,
+        cell: Int,
+    ): Sunshine =
+        when (states[line][cell]) {
             SunShadeSweep.SUN -> Sunshine.SUN
             SunShadeSweep.SHADE -> Sunshine.SHADE
             else -> Sunshine.UNKNOWN
         }
-    }
-
-    fun stateAt(point: GeoPoint): Sunshine? = stateAt(point.latitude, point.longitude)
 }
 
 /**
@@ -537,6 +660,18 @@ internal class SunShadeHull(
     fun clear() {
         n = 0
         lastGap = Double.NEGATIVE_INFINITY
+    }
+
+    /** Becomes a copy of [other]: the samples a bundle shares with its lines (design D5). */
+    fun copyFrom(other: SunShadeHull) {
+        if (s.size < other.n) {
+            s = DoubleArray(other.s.size)
+            g = DoubleArray(other.g.size)
+        }
+        other.s.copyInto(s, endIndex = other.n)
+        other.g.copyInto(g, endIndex = other.n)
+        n = other.n
+        lastGap = other.lastGap
     }
 
     /** Adds terrain sample ([position], height [h]); NaN records a gap. */
