@@ -33,6 +33,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel(factory = mapViewModelFactory)
     val selectedTime by viewModel.selectedTime.collectAsStateWithLifecycle()
     val sun by viewModel.sun.collectAsStateWithLifecycle()
     val elevation by viewModel.elevation.collectAsStateWithLifecycle()
+    val sunshine by viewModel.sunshine.collectAsStateWithLifecycle()
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val startInset = WindowInsets.safeDrawing.asPaddingValues().calculateStartPadding(LocalLayoutDirection.current)
@@ -42,13 +43,14 @@ fun MapScreen(viewModel: MapViewModel = viewModel(factory = mapViewModelFactory)
             onCameraMoved = viewModel::onCameraMoved,
             modifier = Modifier.fillMaxSize(),
         )
-        sun?.let { SunLine(it.position) }
+        sun?.let { SunLine(it.position, (sunshine as? SunshineUiState.Ready)?.atSelectedTime) }
         Crosshair(Modifier.align(Alignment.Center))
         MapLabels(camera = camera, isOffline = isOffline) {
             SunPanel(
                 selectedTime = selectedTime,
                 sun = sun,
                 elevation = elevation,
+                sunshine = sunshine,
                 onDateSelected = viewModel::onDateSelected,
                 onSliderMoved = viewModel::onSliderMoved,
                 onNowClicked = viewModel::onNowClicked,

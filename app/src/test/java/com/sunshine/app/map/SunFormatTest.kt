@@ -1,7 +1,12 @@
 package com.sunshine.app.map
 
+import com.sunshine.core.SunPeriod
+import com.sunshine.core.SunPeriods
+import com.sunshine.core.Sunshine
 import com.sunshine.core.WholeDay
 import java.time.Duration
+import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.Locale
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -136,4 +141,40 @@ class SunFormatTest {
         assertEquals("…", formatAltitude(ElevationState.Loading))
         assertEquals("unknown", formatAltitude(ElevationState.Unknown))
     }
+
+    // point-sunshine spec, "Sunshine in the information panel".
+    @Test
+    fun `lists every sun period in chronological order`() {
+        val periods =
+            listOf(
+                SunPeriod(zurich("2025-12-21T10:08:50"), zurich("2025-12-21T14:51:10")),
+                SunPeriod(zurich("2025-12-21T15:11:20"), zurich("2025-12-21T15:52:10")),
+            )
+
+        assertEquals(
+            "10:09–14:51, 15:11–15:52",
+            formatSunshine(ready(SunPeriods.Known(periods)), zurich("2025-12-21T12:00")),
+        )
+    }
+
+    @Test
+    fun `shows a day without sun, an unknown day and a horizon being computed explicitly`() {
+        val selected = zurich("2025-12-21T12:00")
+
+        assertEquals("none this day", formatSunshine(ready(SunPeriods.Known(emptyList())), selected))
+        assertEquals("unknown", formatSunshine(ready(SunPeriods.Unknown), selected))
+        assertEquals("…", formatSunshine(SunshineUiState.Loading, selected))
+    }
+
+    @Test
+    fun `appends the offset of a period time that differs from the selected time's`() {
+        // 2025-03-30, Europe/Zurich: clocks go from UTC+1 to UTC+2 at 02:00.
+        val period = SunPeriod(zurich("2025-03-30T01:00"), zurich("2025-03-30T03:30"))
+
+        assertEquals("01:00 UTC+1–03:30", formatSunshine(ready(SunPeriods.Known(listOf(period))), zurich("2025-03-30T12:00")))
+    }
+
+    private fun ready(periods: SunPeriods) = SunshineUiState.Ready(periods, Sunshine.SUN)
+
+    private fun zurich(time: String): ZonedDateTime = LocalDateTime.parse(time).atZone(ZoneId.of("Europe/Zurich"))
 }

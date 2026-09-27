@@ -1,5 +1,6 @@
 package com.sunshine.app.map
 
+import com.sunshine.core.SunPeriods
 import com.sunshine.core.WholeDay
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -45,6 +46,22 @@ fun formatEventTime(
     val rounded = event.plusSeconds(HALF_MINUTE_SECONDS).truncatedTo(ChronoUnit.MINUTES)
     val time = rounded.format(TIME)
     return if (rounded.offset == selected.offset) time else "$time ${formatUtcOffset(rounded.offset)}"
+}
+
+/**
+ * The sun periods (point-sunshine spec), e.g. `10:09–14:51, 15:11–15:52`, with times as in
+ * [formatEventTime]; `none this day`, `…` while the horizon is computed, and `unknown`.
+ */
+fun formatSunshine(
+    sunshine: SunshineUiState,
+    selected: ZonedDateTime,
+): String {
+    val periods = (sunshine as? SunshineUiState.Ready)?.periods ?: return "…"
+    return when {
+        periods !is SunPeriods.Known -> "unknown"
+        periods.periods.isEmpty() -> "none this day"
+        else -> periods.periods.joinToString(", ") { "${formatEventTime(it.start, selected)}–${formatEventTime(it.end, selected)}" }
+    }
 }
 
 /** E.g. `8 h 33 min`, rounded to the nearest minute. */
