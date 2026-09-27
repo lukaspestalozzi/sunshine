@@ -175,7 +175,7 @@ about 1 m.
 - **Trigger:** the camera coming to rest (300 ms), a reconnect with an incomplete profile, and
   changes of date or time (periods only).
 - **Horizon with tiles in the memory cache:** 2–4 M bilinear samples. Budget ≤ 300 ms on a
-  mid-range phone, estimated from the sample count and not yet measured; task 5.2 measures it.
+  mid-range phone, estimated from the sample count and not yet measured; task 6.2 measures it.
 - **With tiles only in the disk cache:** plus the decoding of up to 53 WebP tiles. Budget ≤ 2 s,
   also an estimate to be measured.
 - **Cold network:** 3–7 MB download, limited by the connection. The panel shows `…`.
@@ -218,7 +218,7 @@ about 1 m.
   is chosen with more than 500 km of margin to the nearest higher terrain.
 - [Refraction limitation on summits: 3–5 min] → User decision; stated in the spec.
 - [32 MiB tile cache on low-memory phones] → Accepted. The LRU size is one constant.
-- [Performance estimates not measured on a phone] → Task 5.2 measures them and records them in
+- [Performance estimates not measured on a phone] → Task 6.2 measures them and records them in
   the roadmap. If a budget is missed, the band sizes or azimuth count can be tuned without spec
   change: 0.25° is not required by the ±5 min tolerance.
 
