@@ -76,24 +76,26 @@ The bound never changes the result, only the work.
 *Alternative:* a max-mipmap per tile. Mapterhorn's coarser zooms are averages, not maxima, so
 they would not be conservative.
 
-### D4. Year clamp (spike, trick 4)
-For the location's latitude and longitude, the app computes once the upper-limb apparent
-elevation of the sun over a year at 5-minute steps. Per 0.25° azimuth bin it keeps `s_min(A)`
-and `s_max(A)`. A ray also stops:
-- once its running maximum is ≥ `s_max(A)`: the sun is always blocked there, so the stored
-  maximum decides shade for every date;
-- once no further terrain can rise above `max(running max, s_min(A))`: the sun is always higher
-  there, so the stored maximum decides correctly.
+### D4. Year clamp (spike, trick 4): dropped (user decision, 2026-09-27)
+The spike's clamp stops a ray once the sun's yearly envelope at that azimuth can no longer change
+the result. It was dropped during apply, for two measured reasons:
+- **Cost:** the envelope from a year of commons-suncalc positions at 5-minute steps (105 k calls)
+  takes ~125 ms per location on a desktop JVM. By the spike's sample counts, it saves only
+  ~0.8 M samples (~56 ms) of tracing, so with tiles in memory it is a net loss. It saves 9–45 %
+  of the tiles on the cold path.
+- **Exactness:** the clamp is exact per 0.25° bin, but `angleAt` interpolates between bins, so a
+  bin that stopped early can move a crossing within the neighbouring cell (≤ ~1.5 min).
 
-Azimuths the sun never reaches above −2° get no ray. The spike measured 9–45 % fewer tiles. The
-spec allows this ("may stop early").
+Only the exact `H_max` termination (D3) remains. If task 6.2 shows the cold path over its budget,
+a cheap envelope (from latitude and the declination range, with a safety margin) can be proposed
+separately.
 
 ### D5. `core` API: a stepwise tracer, with no I/O
 `core` cannot fetch tiles, and a profile needs different tiles depending on where rays stop. The
 tracer therefore works in distance bands and asks for the tiles of each band:
 
 ```kotlin
-class HorizonTracer(observer: GeoPoint, bound: Double /* H_max */, envelope: SunEnvelope) {
+class HorizonTracer(observer: GeoPoint, bound: Double /* H_max */) {
     fun groundTiles(): Set<TileKey>                           // zoom-14 tiles at the observer
     fun start(tiles: Map<TileKey, HeightTile?>)               // sets h_eye; null tile -> unknown
     fun nextTiles(): Set<TileKey>                             // tiles of the next band, active rays only
@@ -104,9 +106,8 @@ class HorizonTracer(observer: GeoPoint, bound: Double /* H_max */, envelope: Sun
 class HorizonProfile(val angles: FloatArray /* 1440 */, val complete: BooleanArray)
 enum class Sunshine { SUN, SHADE, UNKNOWN }
 fun sunshineAt(profile: HorizonProfile, point: GeoPoint, instant: Instant): Sunshine
-sealed interface SunPeriods { data class Known(val periods: List<Period>); data object Unknown }
+sealed interface SunPeriods { data class Known(val periods: List<SunPeriod>); data object Unknown }
 fun sunPeriods(profile: HorizonProfile, point: GeoPoint, date: LocalDate, zone: ZoneId): SunPeriods
-fun sunEnvelope(point: GeoPoint): SunEnvelope                  // D4, depends on latitude/longitude
 ```
 
 - **Bands:** 0–0.375, 0.375–0.75 and 0.75–1.5 km (z14); 1.5–3 and 3–6 km (z12); 6–12.5 and
