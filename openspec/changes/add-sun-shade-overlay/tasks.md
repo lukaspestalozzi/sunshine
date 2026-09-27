@@ -40,7 +40,7 @@
   - no tiles at all → every cell UNKNOWN.
 
   Then implement the gap bound per line (design D6). Verify: `./gradlew :core:test --tests "*SunShadeUnknownTest*"` passes.
-- [ ] 2.4 Write `SunShadeOracleTest` first: on two synthetic landscapes (parallel ridges; a cirque), at 200 random cells and three sun positions, compare the state with `sunshineAt` of a `HorizonTracer` profile at the cell's sample point with the same sun. Expect ≥ 99.5 % agreement; disagreements only within one cell of a shadow edge. Then implement `compute(tiles, lines)`, `ShadeGrid.assemble` and `ShadeGrid.stateAt` (design D7), fixing any mismatch. Verify: `./gradlew :core:test --tests "*SunShadeOracleTest*"` passes.
+- [x] 2.4 Write `SunShadeOracleTest` first: on two synthetic landscapes (parallel ridges; a cirque), at 200 random cells and three sun positions, compare the state with `sunshineAt` of a `HorizonTracer` profile at the cell's sample point with the same sun. Expect ≥ 99.5 % agreement; disagreements only within one cell of a shadow edge. Then implement `compute(tiles, lines)`, `ShadeGrid.assemble` and `ShadeGrid.stateAt` (design D7), fixing any mismatch. Verify: `./gradlew :core:test --tests "*SunShadeOracleTest*"` passes.
 - [ ] 2.5 Add `SunShade.kt` to the `core` row of `CLAUDE.md`'s "Where things are" table (sun-shade grid by hull sweep, no I/O). Verify: `grep -n "SunShade" CLAUDE.md` shows the entry.
 
 ## 3. app: overlay repository

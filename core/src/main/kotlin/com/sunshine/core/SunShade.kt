@@ -552,6 +552,13 @@ class SunShadeSweep(
         frame.inverse(-s * ux + w * uy, -s * uy - w * ux, out)
     }
 
+    /** Latitude and longitude into [out] of the sample point of cell [j] on line [k]. */
+    internal fun samplePoint(
+        k: Int,
+        j: Int,
+        out: DoubleArray,
+    ) = pointOnLine(k, lineStart[k] + (j + 0.5) * spacing, out)
+
     /** The (line, cell) whose square contains the point, or `null` outside the grid. */
     internal fun cellOf(
         latitude: Double,
