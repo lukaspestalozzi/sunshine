@@ -20,6 +20,8 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 class DemTileFetcherTest {
     @TempDir
@@ -48,6 +50,16 @@ class DemTileFetcherTest {
     fun `a server error falls back to the cache`() =
         runTest {
             val tile = fetcher { if (it.request().isForcedCache()) respond(it, 200) else respond(it, 500) }.fetch(KEY)
+
+            assertArrayEquals(TILE_BYTES, (tile as DemTile.Found).bytes)
+        }
+
+    // Only a 404 means "not published"; a refusal such as 403 or 429 is a failure.
+    @ParameterizedTest
+    @ValueSource(ints = [401, 403, 429])
+    fun `a client error other than 404 falls back to the cache`(code: Int) =
+        runTest {
+            val tile = fetcher { if (it.request().isForcedCache()) respond(it, 200) else respond(it, code) }.fetch(KEY)
 
             assertArrayEquals(TILE_BYTES, (tile as DemTile.Found).bytes)
         }

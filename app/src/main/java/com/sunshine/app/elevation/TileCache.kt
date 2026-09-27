@@ -20,8 +20,14 @@ class TileCache(
             override fun removeEldestEntry(eldest: MutableMap.MutableEntry<TileKey, HeightTile>) = size > MEMORY_TILES
         }
 
-    // One lock per tile being loaded, so that concurrent requests fetch it once.
-    private val loading = HashMap<TileKey, Mutex>()
+    // One lock per tile being loaded, so that concurrent requests fetch it once. It stays until all
+    // its users are done, so a later caller cannot create a second lock for the same tile.
+    private val loading = HashMap<TileKey, Loading>()
+
+    private class Loading {
+        val lock = Mutex()
+        var users = 0
+    }
 
     /** The tile if it is in memory, else `null`. */
     fun cached(key: TileKey): HeightTile? = synchronized(tiles) { tiles[key] }
@@ -33,11 +39,11 @@ class TileCache(
      */
     suspend fun tile(key: TileKey): HeightTile? {
         cached(key)?.let { return it }
-        val lock = synchronized(loading) { loading.getOrPut(key) { Mutex() } }
+        val entry = synchronized(loading) { loading.getOrPut(key) { Loading() }.also { it.users++ } }
         return try {
-            lock.withLock { cached(key) ?: load(key)?.also { synchronized(tiles) { tiles[key] = it } } }
+            entry.lock.withLock { cached(key) ?: load(key)?.also { synchronized(tiles) { tiles[key] = it } } }
         } finally {
-            synchronized(loading) { if (!lock.isLocked) loading.remove(key, lock) }
+            synchronized(loading) { if (--entry.users == 0) loading.remove(key) }
         }
     }
 
