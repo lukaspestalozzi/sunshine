@@ -53,7 +53,7 @@
 
 ## 5. app: ViewModel, panel and sun line
 
-- [ ] 5.1 Write the `MapViewModel` sunshine tests first (test dispatcher, fake repository):
+- [x] 5.1 Write the `MapViewModel` sunshine tests first (test dispatcher, fake repository):
   - `Sunshine …` then the periods;
   - a new location never shows the previous location's periods;
   - no computation starts while the camera moves more often than every 300 ms;

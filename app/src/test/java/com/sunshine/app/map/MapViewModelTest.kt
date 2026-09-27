@@ -4,8 +4,12 @@ import androidx.lifecycle.SavedStateHandle
 import com.sunshine.app.elevation.DemTile
 import com.sunshine.app.elevation.ElevationRepository
 import com.sunshine.app.elevation.TileCache
+import com.sunshine.core.AZIMUTH_COUNT
 import com.sunshine.core.DEFAULT_LOCATION
 import com.sunshine.core.GeoPoint
+import com.sunshine.core.HorizonProfile
+import com.sunshine.core.SunPeriods
+import com.sunshine.core.Sunshine
 import com.sunshine.core.TileKey
 import java.time.Clock
 import java.time.Instant
@@ -20,6 +24,7 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -257,11 +262,165 @@ class MapViewModelTest {
             assertEquals(ElevationState.Known(1000.0), viewModel.elevation.value)
         }
 
+    @Test
+    fun `sunshine shows loading until the horizon is computed, then the periods`() =
+        runTest {
+            val profile = CompletableDeferred<HorizonProfile?>()
+            val viewModel = newViewModel(horizon = { profile.await() }, computeDispatcher = UnconfinedTestDispatcher(testScheduler))
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.sunshine.collect {} }
+
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            advanceTimeBy(SETTLE_MILLIS)
+            assertEquals(SunshineUiState.Loading, viewModel.sunshine.value)
+
+            profile.complete(horizonOf(10.0))
+            val ready = viewModel.sunshine.value as SunshineUiState.Ready
+            assertEquals(1, (ready.periods as SunPeriods.Known).periods.size)
+        }
+
+    @Test
+    fun `a previous location's periods are never shown for the new location`() =
+        runTest {
+            val interlaken = CompletableDeferred<HorizonProfile?>()
+            val viewModel =
+                newViewModel(
+                    horizon = { point -> if (point == INTERLAKEN) interlaken.await() else horizonOf(90.0) },
+                    computeDispatcher = UnconfinedTestDispatcher(testScheduler),
+                )
+            val states = mutableListOf<SunshineUiState>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.sunshine.collect { states += it } }
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            advanceTimeBy(SETTLE_MILLIS)
+
+            viewModel.onCameraMoved(CameraState(center = GeoPoint(46.0, 9.0), zoom = 12.0))
+            interlaken.complete(horizonOf(10.0))
+            advanceTimeBy(SETTLE_MILLIS)
+
+            assertFalse(states.any { it is SunshineUiState.Ready && it.periods != SunPeriods.Known(emptyList()) })
+            assertEquals(SunPeriods.Known(emptyList()), (viewModel.sunshine.value as SunshineUiState.Ready).periods)
+        }
+
+    @Test
+    fun `no horizon is computed while the camera moves more often than every 300 ms`() =
+        runTest {
+            val requested = mutableListOf<GeoPoint>()
+            val viewModel =
+                newViewModel(
+                    horizon = { point ->
+                        requested += point
+                        horizonOf(10.0)
+                    },
+                    computeDispatcher = UnconfinedTestDispatcher(testScheduler),
+                )
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.sunshine.collect {} }
+
+            repeat(10) {
+                viewModel.onCameraMoved(CameraState(center = GeoPoint(46.6863, 7.8632 + it * 0.001), zoom = 12.0))
+                advanceTimeBy(200)
+            }
+            assertEquals(emptyList<GeoPoint>(), requested)
+
+            advanceTimeBy(SETTLE_MILLIS)
+            assertEquals(listOf(GeoPoint(46.6863, 7.8632 + 9 * 0.001)), requested)
+        }
+
+    @Test
+    fun `a date change recomputes the periods but not the horizon`() =
+        runTest {
+            var computed = 0
+            val viewModel =
+                newViewModel(
+                    horizon = {
+                        computed++
+                        horizonOf(10.0)
+                    },
+                    computeDispatcher = UnconfinedTestDispatcher(testScheduler),
+                )
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.sunshine.collect {} }
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            advanceTimeBy(SETTLE_MILLIS)
+            val winter = (viewModel.sunshine.value as SunshineUiState.Ready).periods
+
+            viewModel.onDateSelected(LocalDate.of(2025, 6, 21))
+
+            val summer = (viewModel.sunshine.value as SunshineUiState.Ready).periods
+            assertNotEquals(winter, summer)
+            assertEquals(1, computed)
+        }
+
+    @Test
+    fun `an incomplete horizon is computed again when the network returns, a complete one is not`() =
+        runTest {
+            var complete = false
+            var computed = 0
+            val viewModel =
+                newViewModel(
+                    horizon = {
+                        computed++
+                        horizonOf(10.0, complete)
+                    },
+                    computeDispatcher = UnconfinedTestDispatcher(testScheduler),
+                )
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.sunshine.collect {} }
+            isOnline.value = false
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            advanceTimeBy(SETTLE_MILLIS)
+            assertEquals(SunPeriods.Unknown, (viewModel.sunshine.value as SunshineUiState.Ready).periods)
+
+            complete = true
+            isOnline.value = true
+            advanceTimeBy(SETTLE_MILLIS)
+            assertEquals(2, computed)
+            assertEquals(1, ((viewModel.sunshine.value as SunshineUiState.Ready).periods as SunPeriods.Known).periods.size)
+
+            isOnline.value = false
+            isOnline.value = true
+            advanceTimeBy(SETTLE_MILLIS)
+            assertEquals(2, computed)
+        }
+
+    @Test
+    fun `the sunshine state follows the selected time`() =
+        runTest {
+            val viewModel = newViewModel(horizon = { horizonOf(10.0) }, computeDispatcher = UnconfinedTestDispatcher(testScheduler))
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.sunshine.collect {} }
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            advanceTimeBy(SETTLE_MILLIS)
+
+            viewModel.onSliderMoved(12 * 60f)
+            assertEquals(Sunshine.SUN, (viewModel.sunshine.value as SunshineUiState.Ready).atSelectedTime)
+
+            viewModel.onSliderMoved(16 * 60f)
+            assertEquals(Sunshine.SHADE, (viewModel.sunshine.value as SunshineUiState.Ready).atSelectedTime)
+        }
+
+    @Test
+    fun `an unknown ground height makes the sunshine unknown`() =
+        runTest {
+            val viewModel = newViewModel(horizon = { null }, computeDispatcher = UnconfinedTestDispatcher(testScheduler))
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.sunshine.collect {} }
+
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            advanceTimeBy(SETTLE_MILLIS)
+
+            assertEquals(SunshineUiState.Ready(SunPeriods.Unknown, Sunshine.UNKNOWN), viewModel.sunshine.value)
+        }
+
     private fun newViewModel(
         savedState: SavedStateHandle = SavedStateHandle(),
         repository: ElevationRepository = repository { heightBytes(568) },
+        horizon: suspend (GeoPoint) -> HorizonProfile? = { null },
         computeDispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(),
-    ) = MapViewModel(savedState, isOnline, clock, repository, computeDispatcher)
+    ) = MapViewModel(savedState, isOnline, clock, repository, horizon, computeDispatcher)
+
+    private fun horizonOf(
+        angle: Double,
+        complete: Boolean = true,
+    ) = HorizonProfile(
+        eyeHeight = 568.0,
+        angles = DoubleArray(AZIMUTH_COUNT) { angle },
+        complete = BooleanArray(AZIMUTH_COUNT) { complete },
+    )
 
     /** Tiles whose bytes are the height of every pixel, as decimal text. */
     private fun repository(fetch: suspend (TileKey) -> ByteArray?) =
@@ -292,5 +451,8 @@ class MapViewModelTest {
         val ZURICH: ZoneId = ZoneId.of("Europe/Zurich")
         val INTERLAKEN = GeoPoint(46.6863, 7.8632)
         val INTERLAKEN_TILE = TileKey(12, 2137, 1445)
+
+        // Just past the 300 ms the camera must rest before a horizon is computed (design D8).
+        const val SETTLE_MILLIS = 301L
     }
 }
