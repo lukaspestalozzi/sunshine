@@ -43,7 +43,7 @@
   - the upsampled child equals bilinear sampling of the parent at 4 points (±0.125 m).
 
   Keep `ElevationRepositoryTest` green. Verify: `./gradlew :app:testDebugUnitTest --tests "*TileCacheTest*" --tests "*ElevationRepositoryTest*"` passes.
-- [ ] 4.2 Write `SunshineRepositoryTest` first, with a fake `TileCache` built from synthetic terrain:
+- [x] 4.2 Write `SunshineRepositoryTest` first, with a fake `TileCache` built from synthetic terrain:
   - a profile for a location;
   - the bands' tiles are requested concurrently;
   - a missing tile → incomplete bins;

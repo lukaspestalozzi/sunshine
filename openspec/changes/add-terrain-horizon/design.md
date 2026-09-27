@@ -150,8 +150,9 @@ fun sunPeriods(profile: HorizonProfile, point: GeoPoint, date: LocalDate, zone: 
 #3's behaviour is unchanged.
 
 ### D8. `app`: computing on location changes; time and date are cheap
-`SunshineRepository(tileCache, dispatcher)` runs the tracer. It fetches each band's tiles
-concurrently and caches the last 4 profiles by location, rounded to 1 m.
+`SunshineRepository(tile = tileCache::tile)` runs the tracer on the caller's dispatcher. It fetches
+each band's tiles concurrently and caches the last 4 complete profiles by location, rounded to
+about 1 m.
 
 `MapViewModel` gains `sunshine: StateFlow<SunshineUiState>`:
 - **Profile:** a latest-wins `channelFlow`, as for `elevation`, over
