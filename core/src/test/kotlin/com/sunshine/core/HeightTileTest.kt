@@ -9,7 +9,7 @@ import org.junit.jupiter.params.provider.ValueSource
 
 class HeightTileTest {
     @ParameterizedTest
-    @ValueSource(floats = [-430f, 0f, 568.0f, 1634.43f, 8849f])
+    @ValueSource(floats = [-1000f, -430f, 0f, 568.0f, 1634.43f, 8849f, 15_383f])
     fun `heights round-trip within an eighth of a metre`(metres: Float) {
         val tile = HeightTile.fromMetres(size = 1, metres = floatArrayOf(metres))
 
