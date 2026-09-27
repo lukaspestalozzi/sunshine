@@ -102,7 +102,8 @@ of the spec comes from.
 Terrain farther than d_max cannot shade any cell, where d_max solves
 `(H_max − z_min − c·d²)/d = tan(e)`:
 - e: the sun's upper-edge elevation;
-- z_min: the lowest ground in the visible area, or 0 m if unknown;
+- z_min: the lowest height in the area's available ground tiles (a conservative lower bound of
+  every eye), or −1000 m (the lowest height a `HeightTile` holds) if none is available;
 - H_max: `heightBoundAt(centre)`.
 
 So lines start at min(150 km, d_max) upwind: 12 km at 20°, 47 km at 5°. When e ≤ 0 or d_max
@@ -128,20 +129,22 @@ The upwind cut (D4) is known up front, so a grid needs no band-by-band stepping,
 `HorizonTracer`:
 
 ```kotlin
-class SunShadeSweep(area: MapArea, sun: SunPosition, mapZoom: Double, heightBound: Double = heightBoundAt(area.center)) {
-    fun tiles(): Set<TileKey>                                   // every tile any line samples
+class SunShadeSweep(area: MapArea, sun: SunPosition, heightBound: Double = heightBoundAt(area.center)) {
+    fun groundTiles(): Set<TileKey>                             // z_v tiles of the samples inside the area
+    fun tiles(ground: Map<TileKey, HeightTile?>): Set<TileKey>  // z_min from ground -> cut -> every tile read
     val lineCount: Int
     fun compute(tiles: Map<TileKey, HeightTile?>, lines: IntRange = 0 until lineCount): ShadeGridPart
+    fun assemble(parts: List<ShadeGridPart>): ShadeGrid
 }
 data class MapArea(val center: GeoPoint, val zoom: Double, val widthDp: Double, val heightDp: Double)
 class ShadeGrid(/* frame, lineCount, cellsPerLine, states: ByteArray (SUN/SHADE/UNKNOWN/OUTSIDE) */) {
     fun stateAt(point: GeoPoint): Sunshine?                     // nearest cell; null outside the area
 }
-fun ShadeGrid.Companion.assemble(parts: List<ShadeGridPart>): ShadeGrid
 ```
 
-- `z_min` for D4 comes from the visible area's tiles. `tiles()` loads z_v first, then the upwind
-  plan (`tiles()` is two-phase internally; the caller sees one set).
+- `z_min` for D4 comes from the area's own tiles, which `core` cannot load. So the plan has two
+  calls, like `HorizonTracer`'s `start`: the app loads `groundTiles()`, then `tiles(ground)`.
+  (Changed during apply: the first draft promised one `tiles()` call, which needs I/O.)
 - Lines are independent, so `compute` takes a line range. The app splits the lines over cores.
 
 *Alternative:* the band stepping of `HorizonTracer`. That is not needed without per-ray early

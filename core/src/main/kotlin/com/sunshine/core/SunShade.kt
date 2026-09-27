@@ -195,6 +195,57 @@ class SunShadeSweep(
     /** How far upwind the lines start, in metres. */
     internal var reach: Double = MAX_RANGE
 
+    /** The tiles of the samples inside the area, from which [tiles] learns the lowest ground. */
+    fun groundTiles(): Set<TileKey> {
+        val keys = HashSet<TileKey>()
+        for (k in 0 until lineCount) {
+            if (lineCells[k] > 0) addTiles(keys, k, lineStart[k], viewStep, lineCells[k] * sub, viewZoom)
+        }
+        return keys
+    }
+
+    /**
+     * Every tile [compute] reads, given the [ground] tiles (`null` = unavailable). Sets how far
+     * upwind the lines start: terrain farther away cannot rise above the sun (design D4).
+     */
+    fun tiles(ground: Map<TileKey, HeightTile?>): Set<TileKey> {
+        reach = reachAbove(lowestGround(ground))
+        val keys = HashSet<TileKey>(ground.keys)
+        for (k in 0 until lineCount) {
+            if (lineCells[k] == 0) continue
+            val start = lineStart[k]
+            for (band in upwindBands()) {
+                val count = ((band.far - band.near) / band.step).toInt()
+                addTiles(keys, k, start - band.near - count * band.step, band.step, count, band.zoom)
+            }
+            addTiles(keys, k, start, viewStep, lineCells[k] * sub, viewZoom)
+        }
+        return keys
+    }
+
+    // The lowest height in the available ground tiles; the tile range's floor if there is none.
+    private fun lowestGround(ground: Map<TileKey, HeightTile?>): Double {
+        var lowest = Double.POSITIVE_INFINITY
+        for (tile in ground.values) {
+            if (tile == null) continue
+            for (row in 0 until tile.size) {
+                for (column in 0 until tile.size) {
+                    val h = tile.height(row, column)
+                    if (h < lowest) lowest = h
+                }
+            }
+        }
+        return if (lowest.isFinite()) lowest else LOWEST_HEIGHT
+    }
+
+    /** Distance beyond which terrain up to [heightBound] cannot rise above the sun's upper edge for eyes above [lowest]. */
+    private fun reachAbove(lowest: Double): Double {
+        if (upperEdge <= 0.0) return MAX_RANGE
+        val t = kotlin.math.tan(Math.toRadians(upperEdge))
+        val d = (-t + sqrt(t * t + 4 * CURVATURE * (heightBound - lowest))) / (2 * CURVATURE)
+        return min(MAX_RANGE, d)
+    }
+
     /** The states of [lines], from the [tiles] they sample (`null` = unavailable). */
     fun compute(
         tiles: Map<TileKey, HeightTile?>,
@@ -297,20 +348,61 @@ class SunShadeSweep(
         count: Int,
         action: (s: Double, h: Double) -> Unit,
     ) {
+        forEachKnotPair(k, from, step, count, grid.zoom) { a, b, i0, stop, span ->
+            for (i in i0 until stop) {
+                val f = (i - i0).toDouble() / span
+                action(from + i * step, grid.bilinear(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f))
+            }
+        }
+    }
+
+    /**
+     * For the samples `from + i · step` (i < [count]) of line [k], the pixel positions [a] and [b] at
+     * [zoom] of consecutive knots `i0` and `i0 + span`; samples `i0 until stop` lie between them.
+     */
+    private inline fun forEachKnotPair(
+        k: Int,
+        from: Double,
+        step: Double,
+        count: Int,
+        zoom: Int,
+        action: (a: DoubleArray, b: DoubleArray, i0: Int, stop: Int, span: Int) -> Unit,
+    ) {
         val a = DoubleArray(2)
         val b = DoubleArray(2)
         var i0 = 0
         while (i0 < count) {
             val i1 = min(i0 + KNOT_EVERY, count - 1)
-            pixelOnLine(k, from + i0 * step, grid.zoom, a)
-            pixelOnLine(k, from + i1 * step, grid.zoom, b)
-            val span = max(i1 - i0, 1)
+            pixelOnLine(k, from + i0 * step, zoom, a)
+            pixelOnLine(k, from + i1 * step, zoom, b)
             val stop = min(i0 + KNOT_EVERY, count)
-            for (i in i0 until stop) {
-                val f = (i - i0).toDouble() / span
-                action(from + i * step, grid.bilinear(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f))
-            }
+            action(a, b, i0, stop, max(i1 - i0, 1))
             i0 = stop
+        }
+    }
+
+    /** Adds the tiles of every sample on the knot-to-knot segments of a run of samples. */
+    private fun addTiles(
+        keys: MutableSet<TileKey>,
+        k: Int,
+        from: Double,
+        step: Double,
+        count: Int,
+        zoom: Int,
+    ) = forEachKnotPair(k, from, step, count, zoom) { a, b, _, _, _ ->
+        // The samples and their bilinear neighbours lie in the pixel rectangle spanned by both knots.
+        val x0 = floor(min(a[0], b[0])).toLong()
+        val x1 = floor(max(a[0], b[0])).toLong() + 1
+        val y0 = floor(min(a[1], b[1])).toLong()
+        val y1 = floor(max(a[1], b[1])).toLong() + 1
+        for (x in x0 / tileSize - 1..x1 / tileSize + 1) {
+            for (y in y0 / tileSize - 1..y1 / tileSize + 1) {
+                val left = x * tileSize
+                val top = y * tileSize
+                if (left <= x1 && left + tileSize > x0 && top <= y1 && top + tileSize > y0 && y >= 0) {
+                    keys += tileKey(zoom, tileSize, left, top)
+                }
+            }
         }
     }
 
@@ -387,6 +479,9 @@ class SunShadeSweep(
         private const val FAR_BAND = 25_000.0
         private const val KNOT_EVERY = 32
         private const val INITIAL_HULL = 1024
+
+        // Lowest height a HeightTile can hold.
+        private const val LOWEST_HEIGHT = -1000.0
     }
 }
 
