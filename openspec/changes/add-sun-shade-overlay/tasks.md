@@ -104,7 +104,7 @@
 
 ## 8. core: night grid and packed states (revision 2026-09-27)
 
-- [ ] 8.1 Write `SunShadeNightTest` first:
+- [x] 8.1 Write `SunShadeNightTest` first:
   - with the sun's upper edge at −3.6°, `night(ground)` gives SHADE in every cell whose ground tile is available and UNKNOWN where it is missing;
   - it needs only `groundTiles()` (no upwind tile is read, checked with a recording tile map);
   - on two synthetic landscapes, it equals the full sweep at −3.6°, the sweep being made to reach 150 km.
