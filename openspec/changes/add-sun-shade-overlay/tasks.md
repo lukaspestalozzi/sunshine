@@ -94,7 +94,7 @@
 
   Verify: `./gradlew :app:assembleDebug` succeeds. `adb logcat -s Sunshine` shows both on a device (checked in 7.2).
 
-  Status (apply): code done — `OverlayRepository` logs tiles (kept / in memory / else) and sweep time, `MapViewModel` logs grid and image time, and in debug builds the agreement over 200 cells once an overlay has stayed 3 s (unit-tested); `assembleDebug` passes. The logcat part is open until 7.2.
+  Status (apply): code done — `OverlayRepository` logs tiles (kept / from disk / from network, counted by `DemTileFetcher.loads()` / rest in memory or unavailable) and sweep time, `MapViewModel` logs grid and image time, and in debug builds the agreement over 200 cells once an overlay has stayed 3 s (unit-tested); `assembleDebug` passes. The logcat part is open until 7.2.
 - [x] 6.3 Update `docs/roadmap.md` entry #5 (decisions resolved in its design.md, spike reference) and the `app` row of `CLAUDE.md` (overlay repository, rendering). Verify: `grep -n "add-sun-shade-overlay" docs/roadmap.md` shows "resolved in its design.md".
 
 ## 7. Integration

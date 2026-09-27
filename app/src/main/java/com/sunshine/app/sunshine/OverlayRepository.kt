@@ -1,5 +1,6 @@
 package com.sunshine.app.sunshine
 
+import com.sunshine.app.elevation.TileLoads
 import com.sunshine.core.HeightTile
 import com.sunshine.core.MapArea
 import com.sunshine.core.ShadeGrid
@@ -24,7 +25,7 @@ import kotlinx.coroutines.ensureActive
 class OverlayRepository(
     private val tile: suspend (TileKey) -> HeightTile?,
     private val chunks: Int = Runtime.getRuntime().availableProcessors(),
-    private val inMemory: (TileKey) -> Boolean = { false },
+    private val loads: () -> TileLoads = { TileLoads(0, 0) },
     private val log: (String) -> Unit = {},
 ) {
     private var kept: Kept? = null
@@ -43,9 +44,8 @@ class OverlayRepository(
             val start = TimeSource.Monotonic.markNow()
             val sweep = SunShadeSweep(area, sun)
             val reusable = kept?.takeIf { it.area.isNear(area) }?.tiles.orEmpty()
-            val planned = sweep.groundTiles()
-            val memory = planned.count { it !in reusable && inMemory(it) }
-            val ground = load(planned, reusable)
+            val before = loads()
+            val ground = load(sweep.groundTiles(), reusable)
             val upwind = sweep.tiles(ground) - ground.keys
             val tiles = ground + load(upwind, reusable)
             val loaded = start.elapsedNow()
@@ -58,10 +58,13 @@ class OverlayRepository(
                 }
             val grid = sweep.assemble(parts.awaitAll())
             val reused = tiles.keys.count { it in reusable }
+            // Other features loading tiles at the same time can inflate the disk and network counts.
+            val disk = loads().disk - before.disk
+            val network = loads().network - before.network
             log(
-                "Overlay tiles: ${tiles.size} ($reused kept, ≥ $memory in memory, ${tiles.size - reused - memory} else) " +
-                    "in ${loaded.inWholeMilliseconds} ms; sweep ${(start.elapsedNow() - loaded).inWholeMilliseconds} ms " +
-                    "on ${sweep.chunks(chunks).size} chunks",
+                "Overlay tiles: ${tiles.size} ($reused kept, $disk from disk, $network from network, " +
+                    "${tiles.size - reused - disk - network} in memory or unavailable) in ${loaded.inWholeMilliseconds} ms; " +
+                    "sweep ${(start.elapsedNow() - loaded).inWholeMilliseconds} ms on ${sweep.chunks(chunks).size} chunks",
             )
             // Unavailable tiles are not kept: the network may be back next time.
             kept = Kept(area, tiles.mapNotNull { (key, tile) -> tile?.let { key to it } }.toMap())

@@ -19,10 +19,11 @@ import org.maplibre.android.module.http.HttpRequestUtil
 
 class SunshineApp : Application() {
     /** Shared by all screens and features, so decoded tiles and the HTTP cache are shared too (design D6). */
+    private val demTileFetcher: DemTileFetcher by lazy { DemTileFetcher(demHttpClient(File(cacheDir, "dem-tiles"), userAgent())) }
+
     private val tileCache: TileCache by lazy {
-        val client = demHttpClient(File(cacheDir, "dem-tiles"), userAgent())
         TileCache(
-            fetch = DemTileFetcher(client)::fetch,
+            fetch = demTileFetcher::fetch,
             decode = { bytes -> decodeArgb(bytes, MapterhornTiles.TILE_SIZE) },
         )
     }
@@ -32,7 +33,7 @@ class SunshineApp : Application() {
     val sunshineRepository: SunshineRepository by lazy { SunshineRepository(tile = tileCache::tile, log = ::debugLog) }
 
     val overlayRepository: OverlayRepository by lazy {
-        OverlayRepository(tile = tileCache::tile, inMemory = { tileCache.cached(it) != null }, log = ::debugLog)
+        OverlayRepository(tile = tileCache::tile, loads = demTileFetcher::loads, log = ::debugLog)
     }
 
     override fun onCreate() {
