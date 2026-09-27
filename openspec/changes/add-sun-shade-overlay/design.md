@@ -194,8 +194,13 @@ hatching would rotate with the sun, and MapLibre interpolates quads in Mercator 
 ~350k pixels is a few ms.
 
 ### D10. UI (user decisions)
-- **Toggle:** an icon button at the top end of the map, below the offline notice area, off at
-  launch. While on, a small legend next to it: a shade swatch `Shade` and a hatch swatch `Unknown`.
+- **Toggle:** a Material 3 `FilterChip` labelled `Sun & shade` at the top end of the map, off at
+  launch (the user decisions are the toggle, its default and its place). While on, a small legend
+  below it: a shade swatch `Shade` and a hatch swatch `Unknown`.
+  - *Changed during apply (task 6.1):* the draft said an icon button, but the project has no icon
+    library. A labelled chip needs no new dependency and says what it switches.
+  - *Alternatives:* adding `material-icons-extended` (a large dependency for one icon), or a
+    hand-drawn icon, which would need a content description and a legend anyway.
 - **Notices:** `Zoom in to see sun and shade` below zoom 11, and `Computing sun and shade …` while
   `Computing` with `kept == null`. Both are `Label`s in `MapLabels`' top column.
 - Strings live in `strings.xml`.
