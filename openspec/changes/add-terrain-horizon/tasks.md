@@ -68,7 +68,7 @@
 
 ## 6. Integration
 
-- [ ] 6.1 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, all unit tests and the debug APK pass, and validation reports no failures.
+- [x] 6.1 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, all unit tests and the debug APK pass, and validation reports no failures.
 - [ ] 6.2 On-device check with the CI APK. Expected:
   - Interlaken 2025-12-21 shows `Sunshine 10:09–14:51, 15:11–15:52` (±5 min per boundary), and the sun line is dashed at 15:00 and solid at 12:00;
   - Lauterbrunnen 2025-12-21 shows one period of about 11:47–13:13;
