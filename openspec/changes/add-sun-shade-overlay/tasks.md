@@ -175,7 +175,7 @@
 
 ## 14. Cache of days (revision 2026-09-28)
 
-- [ ] 14.1 Write the `DayOverlayTest` cases first:
+- [x] 14.1 Write the `DayOverlayTest` cases first:
   - `bytes` is the sum of the grids' `stateBytes`, and `hasUnknown` is true once a grid has unknown cells;
   - after `computeRest` is cancelled and started again, only the missing steps are computed, and a selected time that is not yet known comes first.
 

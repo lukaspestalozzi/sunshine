@@ -672,8 +672,8 @@ class ShadeGrid internal constructor(
     /** Whether some cell is unknown. */
     val hasUnknown: Boolean = states.any { line -> line.any { it == SunShadeSweep.UNKNOWN } }
 
-    /** Bytes taken by the packed states. */
-    internal val stateBytes: Int get() = packed.sumOf { it.size }
+    /** Bytes taken by the packed states, e.g. to budget a cache of grids. */
+    val stateBytes: Int = packed.sumOf { it.size }
 
     /** The state of the cell containing the point, or `null` outside the grid. */
     fun stateAt(
