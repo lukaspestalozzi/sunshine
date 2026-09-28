@@ -4,10 +4,14 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -24,21 +28,27 @@ import com.sunshine.app.R
 import java.time.ZonedDateTime
 
 /**
- * The overlay switch and, while it is on, the legend (sun-shade-overlay spec, "Overlay toggle",
- * "Overlay appearance"; design D10 of add-sun-shade-overlay).
+ * The overlay switch, below it the progress of the day's computation while it runs ([dayProgress]
+ * from 0 to 1, or `null`), and while the overlay is on the legend (sun-shade-overlay spec, "Overlay
+ * toggle", "Overlay appearance", "Overlay of the whole day"; design D10 of add-sun-shade-overlay).
  */
 @Composable
 fun OverlayControl(
     isOn: Boolean,
+    dayProgress: Float?,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier, horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        FilterChip(
-            selected = isOn,
-            onClick = onToggle,
-            label = { Text(stringResource(R.string.overlay_toggle)) },
-        )
+        // As wide as the chip, so that the bar spans it.
+        Column(Modifier.width(IntrinsicSize.Max)) {
+            FilterChip(
+                selected = isOn,
+                onClick = onToggle,
+                label = { Text(stringResource(R.string.overlay_toggle)) },
+            )
+            if (dayProgress != null) LinearProgressIndicator(progress = { dayProgress }, modifier = Modifier.fillMaxWidth())
+        }
         if (isOn) {
             Surface(color = MaterialTheme.colorScheme.surface.copy(alpha = LEGEND_ALPHA), shape = MaterialTheme.shapes.small) {
                 Column(Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
