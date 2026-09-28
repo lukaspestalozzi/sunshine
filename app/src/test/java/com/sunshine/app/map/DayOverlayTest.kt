@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -132,6 +133,22 @@ class DayOverlayTest {
             advanceUntilIdle()
 
             assertEquals(listOf(at(12, 5), at(15, 0), at(15, 5), at(14, 55)).map(::sunAt), suns.subList(1, 5))
+        }
+
+    @Test
+    fun `computed counts the finished slider steps, not an off-grid time`() =
+        runTest {
+            val day = DayOverlay(AREA, DECEMBER_21, ZURICH, fakeGrid, StandardTestDispatcher(testScheduler))
+            val counts = mutableListOf<Int>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { day.computed.collect { counts += it } }
+            launch { day.computeRest { at(8, 47) } }
+
+            day.compute(at(8, 47))
+            assertEquals(0, day.computed.value)
+            advanceUntilIdle()
+
+            assertEquals(288, day.computed.value)
+            assertEquals((0..288).toList(), counts)
         }
 
     @Test
