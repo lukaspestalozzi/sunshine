@@ -211,6 +211,10 @@ hatching would rotate with the sun, and MapLibre interpolates quads in Mercator 
     hand-drawn icon, which would need a content description and a legend anyway.
 - **Notices:** `Zoom in to see sun and shade` below zoom 11, and `Computing sun and shade …` while
   `Computing` with `kept` null or of another time than the selected one (D8). Both are `Label`s in `MapLabels`' top column.
+- **Progress of the day (user decision, 2026-09-28):** a determinate `LinearProgressIndicator` as
+  wide as the chip, directly below it and above the legend, shown only while the day's background
+  computation runs (D11). *Alternatives:* a bar drawn along the chip's bottom edge (custom drawing,
+  clipped by the rounded corners) or a small ring as the chip's trailing icon.
 - Strings live in `strings.xml`.
 
 ### D11. The whole day: selected time first, then every slider step in the background (user decisions, 2026-09-27)
@@ -234,6 +238,10 @@ hatching would rotate with the sun, and MapLibre interpolates quads in Mercator 
     collecting. *Alternative:* pause while the app is not visible and resume on return, which
     needs the day kept outside the flow: more code for a cost bounded by one day per area and
     date.
+- **Progress:** `DayOverlay.computed: StateFlow<Int>` counts the finished slider steps (an
+  off-grid selected time does not count). `MapViewModel.dayProgress: StateFlow<Float?>` is
+  computed / total while the day's job runs, and `null` otherwise: before it starts, when it has
+  finished, when it is cancelled (switch-off, restart). It feeds the bar of D10.
 - **Rendering:** only the selected time's grid is rendered (`renderOverlay`, D9). The day keeps
   grids, never bitmaps: ~1.4 MB per bitmap × 190 steps would be too much.
 - **Tiles:** the ground tiles stay in the repository's kept map for the whole day. Upwind tiles

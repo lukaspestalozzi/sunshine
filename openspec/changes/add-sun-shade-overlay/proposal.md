@@ -38,6 +38,8 @@ Roadmap: implements entry #5, `add-sun-shade-overlay`, of `docs/roadmap.md`.
     nearest to the selected time first.
   - Steps with the sun far below every horizon need no terrain work.
   - Moving the slider to a time already computed shows its overlay at once.
+  - A thin progress bar under the toggle shows how much of the day is computed (user decision,
+    2026-09-28).
 
 ## Capabilities
 
@@ -55,7 +57,6 @@ Roadmap: implements entry #5, `add-sun-shade-overlay`, of `docs/roadmap.md`.
 ## Non-goals
 
 - Showing hours of sun per cell (heatmap, roadmap #7), although the day's overlays now exist.
-- A progress display for the day's background computation.
 - Keeping a computed day across app restarts or after the visible area or the date changes.
 - Downloading regions for offline use (roadmap #6). Offline, the overlay depends on the DEM disk
   cache and shows unknown where tiles are missing.

@@ -189,6 +189,9 @@ of the day, over its actual length; time-selection "Choose the time of day"):
   date, or a reconnect while some cell is unknown. A change of the selected time within the day
   SHALL NOT restart it; if that time has not been computed yet, it is computed next. Leaving the
   app SHALL NOT discard the computed steps; the computation continues in the background.
+- **Progress:** while the background computation runs, a determinate progress bar directly below
+  the overlay toggle SHALL show the share of the day's slider positions already computed. It SHALL
+  disappear when every position is computed or the computation stops.
 
 #### Scenario: Scrubbing a computed day
 - **WHEN** the overlay is on at Lauterbrunnen, 46.5935° N, 7.9091° E, map zoom 12, on 2025-12-21 at 12:00, and the day's computation has finished
@@ -205,6 +208,10 @@ of the day, over its actual length; time-selection "Choose the time of day"):
 #### Scenario: Back to the app
 - **WHEN** the day has been computed and the user leaves the app for a minute and returns
 - **THEN** moving the slider to a time of that day shows its overlay within 100 ms, without `Computing sun and shade …`
+
+#### Scenario: Progress of the day
+- **WHEN** the overlay is on and 72 of the day's 288 slider positions are computed
+- **THEN** a progress bar below the toggle shows 25 %, and once all 288 are computed no bar is shown
 
 #### Scenario: Responsive while computing the day
 - **WHEN** the day is being computed in the background
