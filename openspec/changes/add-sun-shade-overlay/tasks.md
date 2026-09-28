@@ -168,4 +168,4 @@
 - [x] 13.1 Write the `DayOverlayTest` cases first: `computed` starts at 0, rises by one per finished slider step, and ignores an off-grid selected time. Then add `DayOverlay.computed` (design D11). Verify: `./gradlew :app:testDebugUnitTest --tests "*DayOverlayTest*"` passes.
 - [x] 13.2 Write the `MapViewModel` tests first: `dayProgress` is `null` before the day starts, computed / total while it runs, and `null` when it has finished, when the overlay is switched off, and between a restart's cancel and its new day. Then add `MapViewModel.dayProgress` (design D11). Verify: `./gradlew :app:testDebugUnitTest --tests "*MapViewModel*"` passes.
 - [x] 13.3 Show `dayProgress` as a determinate bar below the chip in `OverlayControl`, wired in `MapScreen` (design D10). Verify: `./gradlew :app:assembleDebug :app:lintDebug` succeeds; the look is checked in 12.2.
-- [ ] 13.4 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: everything passes.
+- [x] 13.4 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: everything passes.
