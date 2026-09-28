@@ -152,6 +152,59 @@ class DayOverlayTest {
         }
 
     @Test
+    fun `bytes add up the grids' states, and hasUnknown tells whether a grid has unknown cells`() =
+        runTest {
+            val known = DayOverlay(AREA, DECEMBER_21, ZURICH, fakeGrid, StandardTestDispatcher(testScheduler))
+            known.compute(at(12, 0))
+            known.compute(at(12, 5))
+            assertEquals(2L * GRID.stateBytes, known.bytes)
+            assertEquals(false, known.hasUnknown)
+
+            val unknown = DayOverlay(AREA, DECEMBER_21, ZURICH, { _, _ -> UNKNOWN_GRID }, StandardTestDispatcher(testScheduler))
+            unknown.compute(at(12, 0))
+            assertEquals(true, unknown.hasUnknown)
+        }
+
+    @Test
+    fun `resumed, the day computes only its missing steps, a selected time not yet known first`() =
+        runTest {
+            val requested = mutableListOf<SunPosition>()
+            val hold = MutableStateFlow(true)
+            val day =
+                DayOverlay(AREA, DECEMBER_21, ZURICH, { _, sun ->
+                    requested += sun
+                    // The fourth grid waits and cannot be cancelled, like a sweep between chunks.
+                    if (requested.size == 4) withContext(NonCancellable) { hold.first { it } }
+                    GRID
+                }, StandardTestDispatcher(testScheduler))
+            var selected = at(12, 0)
+            hold.value = false
+            val first = launch { day.computeRest { selected } }
+            day.compute(selected)
+            runCurrent()
+            first.cancel()
+            hold.value = true
+            advanceUntilIdle()
+            assertEquals(listOf(at(12, 0), at(12, 5), at(11, 55), at(12, 10)).map(::sunAt), requested)
+            // 12:10 was running when the day was cancelled: its grid is discarded, so it is still missing.
+            assertEquals(3, day.computed.value)
+
+            selected = at(15, 0)
+            launch { day.computeRest { selected } }
+            advanceUntilIdle()
+            assertEquals(4, requested.size, "the resumed day started before the selected time")
+
+            day.compute(selected)
+            advanceUntilIdle()
+
+            assertEquals(listOf(at(15, 0), at(15, 5), at(14, 55)).map(::sunAt), requested.subList(4, 7))
+            val known = listOf(at(12, 0), at(12, 5), at(11, 55)).map(::sunAt)
+            assertTrue(requested.drop(4).none { it in known }, "a known step was computed again")
+            assertEquals(288, day.computed.value)
+            assertEquals(288 + 1, requested.size)
+        }
+
+    @Test
     fun `cancelling stops between steps`() =
         runTest {
             val day = DayOverlay(AREA, DECEMBER_21, ZURICH, fakeGrid, StandardTestDispatcher(testScheduler))
@@ -216,5 +269,7 @@ class DayOverlayTest {
         val FLAT: HeightTile = HeightTile.fromMetres(512, FloatArray(512 * 512) { 568f })
         val GRID: ShadeGrid =
             SunShadeSweep(AREA, SunPosition(0.0, -30.0, false)).let { it.night(it.groundTiles().associateWith { FLAT }) }
+        val UNKNOWN_GRID: ShadeGrid =
+            SunShadeSweep(AREA, SunPosition(0.0, -30.0, false)).let { it.night(it.groundTiles().associateWith { null }) }
     }
 }

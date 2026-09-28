@@ -11,14 +11,15 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.abs
 import kotlin.math.max
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -52,25 +53,34 @@ class DayOverlay(
     /** Steps computed so far; an off-grid selected time does not count (design D11). */
     val computed: StateFlow<Int> = mutableComputed.asStateFlow()
 
+    // Grids stored so far, off-grid times included: what computeRest waits on.
+    private val stored = MutableStateFlow(0)
+
+    private val mutableBytes = AtomicLong()
+
+    /** Bytes of the stored grids' states (design D14). */
+    val bytes: Long get() = mutableBytes.get()
+
+    /** Whether some stored grid has unknown cells (design D14). */
+    @Volatile
+    var hasUnknown: Boolean = false
+        private set
+
     // Fair, so a selected time waiting for it comes before the next background step.
     private val lock = Mutex()
-
-    // The background waits for the first selected time.
-    private val started = CompletableDeferred<Unit>()
 
     /** The grid at [time] if it has been computed. */
     fun gridAt(time: ZonedDateTime): ShadeGrid? = grids[time.toInstant()]
 
     /** The grid at [time], computed on the caller's dispatcher unless it is known. */
-    suspend fun compute(time: ZonedDateTime): ShadeGrid {
-        val known = lock.withLock { gridAt(time) ?: grid(area, sunAt(time)).also { store(time, it) } }
-        started.complete(Unit)
-        return known
-    }
+    suspend fun compute(time: ZonedDateTime): ShadeGrid = lock.withLock { gridAt(time) ?: grid(area, sunAt(time)).also { store(time, it) } }
 
-    /** Computes the remaining steps on [background], nearest to [selected] first; returns when all are known. */
+    /**
+     * Computes the remaining steps on [background], nearest to [selected] first; returns when all
+     * are known. It starts once the selected time is known, also when a cached day resumes (D14).
+     */
     suspend fun computeRest(selected: () -> ZonedDateTime) {
-        started.await()
+        stored.first { gridAt(selected()) != null }
         while (true) {
             val next = nearestUncomputed(selected()) ?: return
             lock.withLock {
@@ -84,7 +94,10 @@ class DayOverlay(
         computed: ShadeGrid,
     ) {
         grids[time.toInstant()] = computed
+        mutableBytes.addAndGet(computed.stateBytes.toLong())
+        if (computed.hasUnknown) hasUnknown = true
         if (time.toInstant() in stepInstants) mutableComputed.update { it + 1 }
+        stored.update { it + 1 }
     }
 
     // Ties go to the later step, so the order alternates later and earlier.
