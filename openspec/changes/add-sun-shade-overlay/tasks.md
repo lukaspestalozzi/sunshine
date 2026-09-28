@@ -79,16 +79,16 @@
   ("Pixels outside the grid" was dropped during apply: the image covers exactly the grid's own area, which the grid covers with a cell of margin.)
 
   Then implement `renderOverlay` (design D9). Verify: `./gradlew :app:testDebugUnitTest --tests "*RenderOverlayTest*"` passes.
-- [ ] 5.2 Add the `overlay: OverlayImage?` parameter to `MapLibreMap`: an `ImageSource` with the bounds' `LatLngQuad` and a `RasterLayer` directly above `opentopomap`; `null` removes it; a new image replaces it. Pass the state from `MapScreen`. Verify: `./gradlew :app:assembleDebug` succeeds. On an emulator or device, with a debug grid of all SHADE, the tint covers exactly the map area and stays on the terrain while panning.
+- [x] 5.2 Add the `overlay: OverlayImage?` parameter to `MapLibreMap`: an `ImageSource` with the bounds' `LatLngQuad` and a `RasterLayer` directly above `opentopomap`; `null` removes it; a new image replaces it. Pass the state from `MapScreen`. Verify: `./gradlew :app:assembleDebug` succeeds. On an emulator or device, with a debug grid of all SHADE, the tint covers exactly the map area and stays on the terrain while panning.
 
   Status (apply): code done, `assembleDebug` and unit tests pass; the device part is open (no emulator in the cloud session) and is checked in 12.2.
 
 ## 6. app: UI and debug checks
 
-- [ ] 6.1 Add the toggle icon button (top end), the legend (`Shade`, `Unknown` swatches) while on, and the notices `Zoom in to see sun and shade` and `Computing sun and shade …` in `MapLabels`' top column. Strings go in `strings.xml`; report the map size in dp from `MapScreen` to `onMapSizeChanged` (design D10). Verify: `./gradlew :app:testDebugUnitTest` and `./gradlew :app:lintDebug` pass. On a device, the toggle, legend and both notices appear as specified, and none covers the crosshair, sun line, panel or attributions.
+- [x] 6.1 Add the toggle icon button (top end), the legend (`Shade`, `Unknown` swatches) while on, and the notices `Zoom in to see sun and shade` and `Computing sun and shade …` in `MapLabels`' top column. Strings go in `strings.xml`; report the map size in dp from `MapScreen` to `onMapSizeChanged` (design D10). Verify: `./gradlew :app:testDebugUnitTest` and `./gradlew :app:lintDebug` pass. On a device, the toggle, legend and both notices appear as specified, and none covers the crosshair, sun line, panel or attributions.
 
   Status (apply): code done (toggle as a `FilterChip` "Sun & shade", no icon library), `overlayNotice` unit-tested, unit tests and lint pass; the device part is open and is checked in 12.2.
-- [ ] 6.2 Add debug-only logs:
+- [x] 6.2 Add debug-only logs:
   - the overlay timings (tile loading, sweep, rendering; tiles in memory / disk / network);
   - an agreement check that, in debug builds, evaluates `HorizonTracer` + `sunshineAt` at 200 random cells of a finished grid and logs the percentage of agreement.
 
@@ -149,7 +149,7 @@
 ## 12. Integration (after the revision)
 
 - [x] 12.1 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, all unit tests and the debug APK pass, and validation reports no failures.
-- [ ] 12.2 On-device check with the CI APK. Expected:
+- [x] 12.2 On-device check with the CI APK. Expected:
   - off at launch;
   - at Interlaken, zoom 12, 2025-12-21 12:00 the crosshair's cell is untinted (sun) and at 15:00 tinted (shade);
   - at Lauterbrunnen, zoom 12, 2025-12-21 15:00 the debug agreement log shows ≥ 99.5 %;
@@ -163,6 +163,14 @@
   - while the day computes, a bar below the `Sun & shade` chip fills, and it disappears when the day is finished;
   - after picking another date and then the first one again, or switching the overlay off and on, the computed day shows at once, without the notice and without a new `Overlay day` log line;
   - the device parts of 5.2, 6.1 and 6.2 (placement and panning, controls, logcat).
+
+  Result (2026-09-28): confirmed on the device by the user ("it works on the device"), after three device rounds whose findings were fixed or deferred:
+  - the day was computed again after leaving the app, fixed in 10.4;
+  - the progress bar was wider than the chip, fixed in 13.3;
+  - switching dates or turning the overlay off discarded the day, fixed in group 14;
+  - a pan computes the day again, deferred to a polishing step (`docs/roadmap.md`).
+
+  The logged timings and the agreement percentage were not recorded here.
 
 ## 13. Progress of the day (revision 2026-09-28)
 
