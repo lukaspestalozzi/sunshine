@@ -161,6 +161,7 @@
   - after the day's log reports it finished, scrubbing shows each overlay at once, without the notice;
   - the logged timings (selected time, day total, night steps) are within the design's performance budget, or the misses are recorded in design.md;
   - while the day computes, a bar below the `Sun & shade` chip fills, and it disappears when the day is finished;
+  - after picking another date and then the first one again, or switching the overlay off and on, the computed day shows at once, without the notice and without a new `Overlay day` log line;
   - the device parts of 5.2, 6.1 and 6.2 (placement and panning, controls, logcat).
 
 ## 13. Progress of the day (revision 2026-09-28)
@@ -171,3 +172,27 @@
 
   Device check, 2026-09-28: the bar was wider than the chip, because `IntrinsicSize.Max` took the bar's default width of 240 dp. A small layout now measures the chip first and gives the bar exactly its width.
 - [x] 13.4 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: everything passes.
+
+## 14. Cache of days (revision 2026-09-28)
+
+- [ ] 14.1 Write the `DayOverlayTest` cases first:
+  - `bytes` is the sum of the grids' `stateBytes`, and `hasUnknown` is true once a grid has unknown cells;
+  - after `computeRest` is cancelled and started again, only the missing steps are computed, and a selected time that is not yet known comes first.
+
+  Then make `ShadeGrid.stateBytes` public, and add `DayOverlay.bytes` and `hasUnknown`. `computeRest` waits until the selected time is known (design D14). Verify: `./gradlew :core:test :app:testDebugUnitTest --tests "*DayOverlayTest*"` passes.
+- [ ] 14.2 Write `DayCacheTest` first:
+  - get and put by (area, date);
+  - access order;
+  - `trim` drops the least recently used days while the bytes exceed the budget, never the given day.
+
+  Then implement `DayCache` (design D14). Verify: `./gradlew :app:testDebugUnitTest --tests "*DayCacheTest*"` passes.
+- [ ] 14.3 Write the `MapViewModel` tests first:
+  - picking another date and then the first one again, or switching the overlay off and on, gives `Ready` without computing again;
+  - only the missing steps of a partly computed day are computed;
+  - a cached day with unknown cells is computed anew when picked online;
+  - a reconnect with unknown cells still starts the day over;
+  - a complete cached day shows no progress;
+  - with a small budget, the least recently used day is dropped.
+
+  Then use `DayCache` in `MapViewModel`, with a budget of a quarter of `ActivityManager.memoryClass` in `MapScreen` (design D14). Verify: `./gradlew :app:testDebugUnitTest --tests "*MapViewModel*"` passes.
+- [ ] 14.4 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: everything passes.

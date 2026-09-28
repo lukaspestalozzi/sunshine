@@ -184,11 +184,17 @@ of the day, over its actual length; time-selection "Choose the time of day"):
   every cell SHALL be shade where its ground height is known and unknown where it is not, without
   terrain computation. Every terrain horizon within 150 km of an eye at most 4812 m high, over
   ground at least 1000 m below sea level, lies above −2.9°, so this is exact.
-- **Stop and restart:** the background computation SHALL stop when the overlay is switched off.
-  It SHALL start over, with the selected time first, after a camera rest, a change of the selected
-  date, or a reconnect while some cell is unknown. A change of the selected time within the day
-  SHALL NOT restart it; if that time has not been computed yet, it is computed next. Leaving the
-  app SHALL NOT discard the computed steps; the computation continues in the background.
+- **Stop and resume:** only the day of the selected date and the visible area SHALL be computed.
+  The computation SHALL stop when the overlay is switched off, another date is selected or the
+  camera rests on another area. When a day is selected again, its computed positions SHALL be shown
+  without being computed again, and only its missing positions SHALL be computed, the selected
+  time first. A change of the selected time within the day SHALL NOT restart it; if that time has
+  not been computed yet, it is computed next. Leaving the app SHALL NOT discard the computed steps;
+  the computation continues in the background.
+- **Cache of days:** computed days SHALL be kept by visible area and date, up to a quarter of the
+  app's heap limit. Beyond it, the least recently used days SHALL be dropped, never the day being
+  shown. A day with unknown cells SHALL be computed anew when it is selected while the network is
+  available, and after a reconnect while it is shown.
 - **Progress:** while the background computation runs, a determinate progress bar directly below
   the overlay toggle SHALL show the share of the day's slider positions already computed. It SHALL
   disappear when every position is computed or the computation stops.
@@ -208,6 +214,22 @@ of the day, over its actual length; time-selection "Choose the time of day"):
 #### Scenario: Back to the app
 - **WHEN** the day has been computed and the user leaves the app for a minute and returns
 - **THEN** moving the slider to a time of that day shows its overlay within 100 ms, without `Computing sun and shade …`
+
+#### Scenario: Switching back to a computed day
+- **WHEN** the day of 2025-12-21 has been computed, and the user picks 2025-12-22 and then 2025-12-21 again
+- **THEN** every time of 2025-12-21 is shown within 100 ms, without `Computing sun and shade …` and without computing it again
+
+#### Scenario: Overlay switched off and on
+- **WHEN** the day has been computed and the user switches the overlay off and on again
+- **THEN** the overlay of the selected time is shown within 100 ms, without computing the day again
+
+#### Scenario: A cached day with unknown cells
+- **WHEN** a day was computed offline with unknown cells, another date is picked, the network returns, and that day is picked again
+- **THEN** the day is computed anew
+
+#### Scenario: Least recently used day dropped
+- **WHEN** the cached days reach a quarter of the app's heap and another day is computed
+- **THEN** the day used least recently is dropped, and the day being shown is kept
 
 #### Scenario: Progress of the day
 - **WHEN** the overlay is on and 72 of the day's 288 slider positions are computed

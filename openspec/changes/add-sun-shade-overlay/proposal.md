@@ -40,6 +40,9 @@ Roadmap: implements entry #5, `add-sun-shade-overlay`, of `docs/roadmap.md`.
   - Moving the slider to a time already computed shows its overlay at once.
   - A thin progress bar under the toggle shows how much of the day is computed (user decision,
     2026-09-28).
+- `app`: computed days are kept in a least-recently-used cache by visible area and date, up to a
+  quarter of the app's heap (user decision, 2026-09-28). Switching back to a day, or turning the
+  overlay off and on, shows its computed times at once and computes only what is missing.
 
 ## Capabilities
 
@@ -57,7 +60,7 @@ Roadmap: implements entry #5, `add-sun-shade-overlay`, of `docs/roadmap.md`.
 ## Non-goals
 
 - Showing hours of sun per cell (heatmap, roadmap #7), although the day's overlays now exist.
-- Keeping a computed day across app restarts or after the visible area or the date changes.
+- Keeping computed days across app restarts.
 - Downloading regions for offline use (roadmap #6). Offline, the overlay depends on the DEM disk
   cache and shows unknown where tiles are missing.
 - The overlay below map zoom 11 (user decision).
@@ -79,8 +82,10 @@ Roadmap: implements entry #5, `add-sun-shade-overlay`, of `docs/roadmap.md`.
     Most of that is z14 in the visible area; the rest lies upwind.
   - While a grid is computed, its tiles stay referenced (≤ about 35 MB), in addition to the
     64-tile cache.
-  - The day adds up to about 5 MB of packed cell states, and the upwind tiles of every sun
-    direction of the day: up to about 50 more z10/z11 tiles (about 5–8 MB) on a cold cache.
+  - A day adds up to about 6.6 MB of packed cell states at map zoom 12 on a phone, and the upwind
+    tiles of every sun direction of the day: up to about 50 more z10/z11 tiles (about 5–8 MB) on
+    a cold cache. Cached days take at most a quarter of the app's heap (32–128 MB, about 5–20
+    days on a phone).
   - Off by default, so users who don't turn it on pay nothing.
 - **CPU and battery:** about 20–110 s of background CPU per area and day on half the cores (an
   estimate from desktop measurements; the phone is unmeasured). It runs only while the overlay is
