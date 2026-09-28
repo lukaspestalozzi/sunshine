@@ -180,7 +180,7 @@
   - after `computeRest` is cancelled and started again, only the missing steps are computed, and a selected time that is not yet known comes first.
 
   Then make `ShadeGrid.stateBytes` public, and add `DayOverlay.bytes` and `hasUnknown`. `computeRest` waits until the selected time is known (design D14). Verify: `./gradlew :core:test :app:testDebugUnitTest --tests "*DayOverlayTest*"` passes.
-- [ ] 14.2 Write `DayCacheTest` first:
+- [x] 14.2 Write `DayCacheTest` first:
   - get and put by (area, date);
   - access order;
   - `trim` drops the least recently used days while the bytes exceed the budget, never the given day.
