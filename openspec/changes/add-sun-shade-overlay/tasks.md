@@ -186,7 +186,7 @@
   - `trim` drops the least recently used days while the bytes exceed the budget, never the given day.
 
   Then implement `DayCache` (design D14). Verify: `./gradlew :app:testDebugUnitTest --tests "*DayCacheTest*"` passes.
-- [ ] 14.3 Write the `MapViewModel` tests first:
+- [x] 14.3 Write the `MapViewModel` tests first:
   - picking another date and then the first one again, or switching the overlay off and on, gives `Ready` without computing again;
   - only the missing steps of a partly computed day are computed;
   - a cached day with unknown cells is computed anew when picked online;

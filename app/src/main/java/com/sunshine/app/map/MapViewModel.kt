@@ -130,6 +130,7 @@ class MapViewModel(
     private val overlayGrid: suspend (MapArea, SunPosition) -> ShadeGrid,
     computeDispatcher: CoroutineDispatcher,
     private val dayDispatcher: CoroutineDispatcher? = null,
+    private val dayCache: DayCache = DayCache(DEFAULT_DAY_CACHE_BYTES),
     private val log: (String) -> Unit = {},
     checkOverlayAgreement: Boolean = false,
 ) : ViewModel() {
@@ -222,9 +223,10 @@ class MapViewModel(
     // The overlay of the visible area at the selected time (design D8 of add-sun-shade-overlay).
     // Latest wins, as for the horizon. A camera move waits [SETTLE_MILLIS]; a time change starts at
     // once. Both keep the previous grid meanwhile. A reconnect recomputes only a grid with unknown
-    // cells. With [dayDispatcher], the other steps of the day follow in the background (design D11):
-    // a camera rest, a date change or such a reconnect starts the day over, and a time change within
-    // the day takes its grid from the day when it is there.
+    // cells. With [dayDispatcher], the other steps of the day follow in the background (design D11).
+    // Days are kept in [dayCache] (design D14): a camera rest, a date change or switching off stops
+    // the day, and coming back to it resumes it; a day with unknown cells is computed anew while
+    // online. A time change within the day takes its grid from the day when it is there.
     val overlay: StateFlow<OverlayUiState> =
         channelFlow {
             var lookup: Job? = null
@@ -255,24 +257,29 @@ class MapViewModel(
                     val timeChanged = requestedTime != null && requestedTime != input.time
                     requestedTime = input.time
                     lookup?.cancelAndJoin()
-                    val sameDay = day?.let { it.area == area && it.date == input.time.toLocalDate() } == true && !unchanged
-                    val known = if (sameDay) day?.gridAt(input.time) else null
-                    if (known != null) {
-                        val ready = OverlayUiState.Ready(known, input.time, renderOverlay(known))
-                        shown = ready
-                        send(ready)
-                        return@collect
-                    }
+                    val date = input.time.toLocalDate()
+                    val sameDay = day?.let { it.area == area && it.date == date } == true && !unchanged
                     if (!sameDay) {
                         dayJob?.cancelAndJoin()
-                        val newDay = DayOverlay(area, input.time.toLocalDate(), zone, overlayGrid, dayDispatcher ?: computeDispatcher)
+                        var cached = dayCache.get(area, date)
+                        // A day with unknown cells is computed anew while online, as after a reconnect (D14).
+                        if (cached != null && input.online && cached.hasUnknown) {
+                            dayCache.remove(cached)
+                            cached = null
+                        }
+                        val newDay = cached ?: DayOverlay(area, date, zone, overlayGrid, dayDispatcher ?: computeDispatcher)
                         day = newDay
                         dayJob =
-                            dayDispatcher?.let {
+                            dayDispatcher?.takeIf { newDay.computed.value < newDay.steps.size }?.let {
                                 launch {
                                     val progress =
                                         launch {
                                             newDay.computed.collect {
+                                                // Cached once it has a grid; each step may push older days out.
+                                                if (it > 0) {
+                                                    dayCache.put(newDay)
+                                                    dayCache.trim(keep = newDay)
+                                                }
                                                 mutableDayProgress.value =
                                                     it.toFloat() / newDay.steps.size
                                             }
@@ -292,6 +299,13 @@ class MapViewModel(
                             }
                     }
                     val selectedDay = checkNotNull(day)
+                    val known = selectedDay.gridAt(input.time)
+                    if (known != null) {
+                        val ready = OverlayUiState.Ready(known, input.time, renderOverlay(known))
+                        shown = ready
+                        send(ready)
+                        return@collect
+                    }
                     send(OverlayUiState.Computing(kept = current))
                     lookup =
                         launch {
@@ -451,6 +465,9 @@ class MapViewModel(
     private companion object {
         const val DEFAULT_ZOOM = 10.0
         const val STOP_TIMEOUT_MILLIS = 5_000L
+
+        // Tests; the app passes a quarter of its heap limit (design D14).
+        const val DEFAULT_DAY_CACHE_BYTES = 64L shl 20
         const val SETTLE_MILLIS = 300L
         const val KEY_LATITUDE = "camera_latitude"
         const val KEY_LONGITUDE = "camera_longitude"

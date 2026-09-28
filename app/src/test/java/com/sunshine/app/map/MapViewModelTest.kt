@@ -820,6 +820,113 @@ class MapViewModelTest {
         }
 
     @Test
+    fun `picking another date and then the first again shows the first day at once, without computing it again`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val viewModel = dayViewModel(suns)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            viewModel.onDateSelected(LocalDate.of(2025, 12, 22))
+            advanceTimeBy(SETTLE_MILLIS)
+            assertEquals(2 * 288, suns.size)
+            suns.clear()
+
+            viewModel.onDateSelected(LocalDate.of(2025, 12, 21))
+
+            assertEquals(ZonedDateTime.of(2025, 12, 21, 12, 0, 0, 0, ZURICH), (viewModel.overlay.value as OverlayUiState.Ready).time)
+            advanceUntilIdle()
+            assertEquals(emptyList<SunPosition>(), suns)
+            assertEquals(null, viewModel.dayProgress.value)
+        }
+
+    @Test
+    fun `switching the overlay off and on shows the day at once, without computing it again`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val logged = mutableListOf<String>()
+            val viewModel = dayViewModel(suns, log = { logged += it })
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            suns.clear()
+            logged.clear()
+
+            viewModel.onOverlayToggled()
+            viewModel.onOverlayToggled()
+
+            assertEquals(ZonedDateTime.of(2025, 12, 21, 12, 0, 0, 0, ZURICH), (viewModel.overlay.value as OverlayUiState.Ready).time)
+            advanceUntilIdle()
+            assertEquals(emptyList<SunPosition>(), suns)
+            assertEquals(null, viewModel.dayProgress.value)
+            assertTrue(logged.none { it.startsWith("Overlay day") }, "$logged")
+        }
+
+    @Test
+    fun `only the missing steps of a partly computed day are computed`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val gate = MutableStateFlow(false)
+            // 12:00, 12:05 and 11:55 are computed; 12:10 waits.
+            val viewModel = dayViewModel(suns, before = { if (suns.size == 3) gate.first { it } })
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            viewModel.onOverlayToggled()
+            runCurrent()
+            gate.value = true
+
+            viewModel.onOverlayToggled()
+            assertEquals(ZonedDateTime.of(2025, 12, 21, 12, 0, 0, 0, ZURICH), (viewModel.overlay.value as OverlayUiState.Ready).time)
+            advanceUntilIdle()
+
+            assertEquals(288, suns.size)
+            assertEquals(288, suns.toSet().size)
+        }
+
+    @Test
+    fun `a cached day with unknown cells is computed anew when picked online`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val viewModel = dayViewModel(suns)
+            isOnline.value = false
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            viewModel.onDateSelected(LocalDate.of(2025, 12, 22))
+            advanceTimeBy(SETTLE_MILLIS)
+            isOnline.value = true
+            advanceUntilIdle()
+            suns.clear()
+
+            viewModel.onDateSelected(LocalDate.of(2025, 12, 21))
+            advanceUntilIdle()
+
+            assertEquals(288, suns.size)
+            assertFalse((viewModel.overlay.value as OverlayUiState.Ready).grid.hasUnknown)
+        }
+
+    @Test
+    fun `with a small budget the least recently used day is dropped`() =
+        runTest {
+            val area = MapArea(INTERLAKEN, 12.0, MAP_WIDTH, MAP_HEIGHT)
+            val dayBytes = 288L * cheapGrid(area, online = true).stateBytes
+            val suns = mutableListOf<SunPosition>()
+            val viewModel = dayViewModel(suns, dayCache = DayCache(maxBytes = dayBytes * 3 / 2))
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            viewModel.onDateSelected(LocalDate.of(2025, 12, 22))
+            advanceTimeBy(SETTLE_MILLIS)
+            suns.clear()
+
+            viewModel.onDateSelected(LocalDate.of(2025, 12, 21))
+            advanceUntilIdle()
+
+            assertEquals(288, suns.size, "21 December was not dropped")
+        }
+
+    @Test
     fun `switching the overlay off stops the day`() =
         runTest {
             val suns = mutableListOf<SunPosition>()
@@ -874,6 +981,7 @@ class MapViewModelTest {
         areas: MutableList<MapArea> = mutableListOf(),
         before: suspend () -> Unit = {},
         log: (String) -> Unit = {},
+        dayCache: DayCache = DayCache(maxBytes = Long.MAX_VALUE),
     ): MapViewModel {
         val viewModel =
             MapViewModel(
@@ -886,18 +994,26 @@ class MapViewModelTest {
                     before()
                     areas += area
                     suns += sun
-                    val sweep = SunShadeSweep(area, SunPosition(0.0, -30.0, false))
-                    val online = isOnline.value
-                    sweep.night(sweep.groundTiles().associateWith { if (online) FLAT else null })
+                    cheapGrid(area, isOnline.value)
                 },
                 UnconfinedTestDispatcher(testScheduler),
                 dayDispatcher = StandardTestDispatcher(testScheduler),
                 log = log,
+                dayCache = dayCache,
             )
         viewModel.onMapSizeChanged(MAP_WIDTH, MAP_HEIGHT)
         viewModel.onSliderMoved(12 * 60f)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.overlay.collect {} }
         return viewModel
+    }
+
+    // Shade over flat terrain, unknown while offline: cheap, as no sweep runs.
+    private fun cheapGrid(
+        area: MapArea,
+        online: Boolean,
+    ): ShadeGrid {
+        val sweep = SunShadeSweep(area, SunPosition(0.0, -30.0, false))
+        return sweep.night(sweep.groundTiles().associateWith { if (online) FLAT else null })
     }
 
     private fun sunAt(
