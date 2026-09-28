@@ -39,6 +39,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel(factory = mapViewModelFactory)
     val computedSunshine by viewModel.sunshine.collectAsStateWithLifecycle()
     val overlay by viewModel.overlay.collectAsStateWithLifecycle()
     val isOverlayOn by viewModel.isOverlayOn.collectAsStateWithLifecycle()
+    val dayProgress by viewModel.dayProgress.collectAsStateWithLifecycle()
     val sunshine = computedSunshine.at(camera.center)
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -58,7 +59,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel(factory = mapViewModelFactory)
             camera = camera,
             isOffline = isOffline,
             notice = overlayNotice(overlay, selectedTime),
-            topEnd = { OverlayControl(isOn = isOverlayOn, onToggle = viewModel::onOverlayToggled) },
+            topEnd = { OverlayControl(isOn = isOverlayOn, dayProgress = dayProgress, onToggle = viewModel::onOverlayToggled) },
         ) {
             SunPanel(
                 selectedTime = selectedTime,
