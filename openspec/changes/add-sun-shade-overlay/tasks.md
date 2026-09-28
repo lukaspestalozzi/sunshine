@@ -160,4 +160,12 @@
   - moving the slider to a time not yet computed keeps the previous overlay with `Computing sun and shade …`;
   - after the day's log reports it finished, scrubbing shows each overlay at once, without the notice;
   - the logged timings (selected time, day total, night steps) are within the design's performance budget, or the misses are recorded in design.md;
+  - while the day computes, a bar below the `Sun & shade` chip fills, and it disappears when the day is finished;
   - the device parts of 5.2, 6.1 and 6.2 (placement and panning, controls, logcat).
+
+## 13. Progress of the day (revision 2026-09-28)
+
+- [ ] 13.1 Write the `DayOverlayTest` cases first: `computed` starts at 0, rises by one per finished slider step, and ignores an off-grid selected time. Then add `DayOverlay.computed` (design D11). Verify: `./gradlew :app:testDebugUnitTest --tests "*DayOverlayTest*"` passes.
+- [ ] 13.2 Write the `MapViewModel` tests first: `dayProgress` is `null` before the day starts, computed / total while it runs, and `null` when it has finished, when the overlay is switched off, and between a restart's cancel and its new day. Then add `MapViewModel.dayProgress` (design D11). Verify: `./gradlew :app:testDebugUnitTest --tests "*MapViewModel*"` passes.
+- [ ] 13.3 Show `dayProgress` as a determinate bar below the chip in `OverlayControl`, wired in `MapScreen` (design D10). Verify: `./gradlew :app:assembleDebug :app:lintDebug` succeeds; the look is checked in 12.2.
+- [ ] 13.4 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: everything passes.
