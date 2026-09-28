@@ -232,7 +232,8 @@ class MapViewModel(
             var lookup: Job? = null
             var day: DayOverlay? = null
             var dayJob: Job? = null
-            var shown: OverlayUiState.Ready? = null
+            // Written by the lookups, read by the collector, as for the horizon's `done`.
+            val shown = AtomicReference<OverlayUiState.Ready?>(null)
             var requestedTime: ZonedDateTime? = null
             combine(camera, selectedTime, mutableOverlayOn, mapSize, isOnline) { camera, time, on, size, online ->
                 OverlayInput(camera, time, on, size, online)
@@ -245,15 +246,15 @@ class MapViewModel(
                         lookup?.cancelAndJoin()
                         dayJob?.cancelAndJoin()
                         day = null
-                        shown = null
+                        shown.set(null)
                         requestedTime = null
                         send(if (input.on && input.camera.zoom < MIN_OVERLAY_ZOOM) OverlayUiState.ZoomedOut else OverlayUiState.Off)
                         return@collect
                     }
-                    val current = shown
+                    val current = shown.get()
                     val unchanged =
                         current != null && current.grid.area == area && current.time == input.time && requestedTime == input.time
-                    if (unchanged && (!input.online || !current!!.grid.hasUnknown)) return@collect
+                    if (unchanged && (!input.online || !current.grid.hasUnknown)) return@collect
                     val timeChanged = requestedTime != null && requestedTime != input.time
                     requestedTime = input.time
                     lookup?.cancelAndJoin()
@@ -302,7 +303,7 @@ class MapViewModel(
                     val known = selectedDay.gridAt(input.time)
                     if (known != null) {
                         val ready = OverlayUiState.Ready(known, input.time, renderOverlay(known))
-                        shown = ready
+                        shown.set(ready)
                         send(ready)
                         return@collect
                     }
@@ -317,7 +318,7 @@ class MapViewModel(
                                     "grid ${computing.inWholeMilliseconds} ms, image ${rendering.inWholeMilliseconds} ms",
                             )
                             val ready = OverlayUiState.Ready(grid, input.time, image)
-                            shown = ready
+                            shown.set(ready)
                             send(ready)
                         }
                 }
