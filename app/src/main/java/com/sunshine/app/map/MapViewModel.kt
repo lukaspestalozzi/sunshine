@@ -265,7 +265,7 @@ class MapViewModel(
                                 launch {
                                     val took = measureTime { newDay.computeRest { mutableSelectedTime.value } }
                                     log(
-                                        "Overlay day ${newDay.date}: ${newDay.computedSteps} of ${newDay.steps.size} steps, " +
+                                        "Overlay day ${newDay.date}: ${newDay.computed.value} of ${newDay.steps.size} steps, " +
                                             "${newDay.nightSteps} at night, in ${took.inWholeMilliseconds} ms",
                                     )
                                 }

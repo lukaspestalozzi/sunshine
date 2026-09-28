@@ -16,6 +16,10 @@ import kotlin.math.max
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -39,9 +43,14 @@ class DayOverlay(
     /** Steps whose grid needs no terrain work, as the sun is below every horizon (design D12). */
     val nightSteps: Int = steps.count { SunShadeSweep.isNight(sunAt(it)) }
 
-    val computedSteps: Int get() = steps.count { gridAt(it) != null }
+    private val stepInstants: Set<Instant> = steps.mapTo(HashSet()) { it.toInstant() }
 
     private val grids = ConcurrentHashMap<Instant, ShadeGrid>()
+
+    private val mutableComputed = MutableStateFlow(0)
+
+    /** Steps computed so far; an off-grid selected time does not count (design D11). */
+    val computed: StateFlow<Int> = mutableComputed.asStateFlow()
 
     // Fair, so a selected time waiting for it comes before the next background step.
     private val lock = Mutex()
@@ -54,9 +63,9 @@ class DayOverlay(
 
     /** The grid at [time], computed on the caller's dispatcher unless it is known. */
     suspend fun compute(time: ZonedDateTime): ShadeGrid {
-        val computed = lock.withLock { gridAt(time) ?: grid(area, sunAt(time)).also { grids[time.toInstant()] = it } }
+        val known = lock.withLock { gridAt(time) ?: grid(area, sunAt(time)).also { store(time, it) } }
         started.complete(Unit)
-        return computed
+        return known
     }
 
     /** Computes the remaining steps on [background], nearest to [selected] first; returns when all are known. */
@@ -65,9 +74,17 @@ class DayOverlay(
         while (true) {
             val next = nearestUncomputed(selected()) ?: return
             lock.withLock {
-                if (gridAt(next) == null) grids[next.toInstant()] = withContext(background) { grid(area, sunAt(next)) }
+                if (gridAt(next) == null) store(next, withContext(background) { grid(area, sunAt(next)) })
             }
         }
+    }
+
+    private fun store(
+        time: ZonedDateTime,
+        computed: ShadeGrid,
+    ) {
+        grids[time.toInstant()] = computed
+        if (time.toInstant() in stepInstants) mutableComputed.update { it + 1 }
     }
 
     // Ties go to the later step, so the order alternates later and earlier.
