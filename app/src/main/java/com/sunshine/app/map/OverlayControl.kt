@@ -4,12 +4,9 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -22,7 +19,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.sunshine.app.R
 import java.time.ZonedDateTime
@@ -40,15 +39,16 @@ fun OverlayControl(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier, horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        // As wide as the chip, so that the bar spans it.
-        Column(Modifier.width(IntrinsicSize.Max)) {
-            FilterChip(
-                selected = isOn,
-                onClick = onToggle,
-                label = { Text(stringResource(R.string.overlay_toggle)) },
-            )
-            if (dayProgress != null) LinearProgressIndicator(progress = { dayProgress }, modifier = Modifier.fillMaxWidth())
-        }
+        ChipWithBar(
+            chip = {
+                FilterChip(
+                    selected = isOn,
+                    onClick = onToggle,
+                    label = { Text(stringResource(R.string.overlay_toggle)) },
+                )
+            },
+            bar = dayProgress?.let { progress -> { LinearProgressIndicator(progress = { progress }) } },
+        )
         if (isOn) {
             Surface(color = MaterialTheme.colorScheme.surface.copy(alpha = LEGEND_ALPHA), shape = MaterialTheme.shapes.small) {
                 Column(Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -74,6 +74,26 @@ fun overlayNotice(
         is OverlayUiState.Computing -> if (state.kept?.time != selectedTime) R.string.overlay_computing else null
         OverlayUiState.Off, is OverlayUiState.Ready -> null
     }
+
+// The chip, and below it the bar at exactly the chip's width: the bar's own default width (240 dp)
+// would otherwise set the width.
+@Composable
+private fun ChipWithBar(
+    chip: @Composable () -> Unit,
+    bar: (@Composable () -> Unit)?,
+) {
+    Layout(content = {
+        chip()
+        bar?.invoke()
+    }) { measurables, constraints ->
+        val chipPlaceable = measurables[0].measure(constraints)
+        val barPlaceable = measurables.getOrNull(1)?.measure(Constraints.fixedWidth(chipPlaceable.width))
+        layout(chipPlaceable.width, chipPlaceable.height + (barPlaceable?.height ?: 0)) {
+            chipPlaceable.place(0, 0)
+            barPlaceable?.place(0, chipPlaceable.height)
+        }
+    }
+}
 
 @Composable
 private fun LegendRow(
