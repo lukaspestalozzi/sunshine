@@ -288,7 +288,9 @@ class MapViewModel(
                         }
                 }
         }.flowOn(computeDispatcher)
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), initialValue = OverlayUiState.Off)
+            // Eagerly, unlike the other states: the day lives in this flow and must survive the app
+            // leaving the screen, where it keeps computing (user decision, design D11).
+            .stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = OverlayUiState.Off)
 
     init {
         // Debug builds: once an overlay has stayed for a while, log how many cells agree with the
