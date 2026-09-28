@@ -743,6 +743,42 @@ class MapViewModelTest {
         }
 
     @Test
+    fun `leaving the screen for more than 5 s keeps the computed day`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val viewModel =
+                MapViewModel(
+                    SavedStateHandle(),
+                    isOnline,
+                    clock,
+                    repository { heightBytes(568) },
+                    { null },
+                    { area, sun ->
+                        suns += sun
+                        val sweep = SunShadeSweep(area, SunPosition(0.0, -30.0, false))
+                        sweep.night(sweep.groundTiles().associateWith { FLAT })
+                    },
+                    UnconfinedTestDispatcher(testScheduler),
+                    dayDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            viewModel.onMapSizeChanged(MAP_WIDTH, MAP_HEIGHT)
+            viewModel.onSliderMoved(12 * 60f)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            val screen = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.overlay.collect {} }
+            advanceTimeBy(SETTLE_MILLIS)
+            assertEquals(288, suns.size)
+
+            // The app goes to the background for 10 s, then comes back.
+            screen.cancel()
+            advanceTimeBy(10_000)
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.overlay.collect {} }
+            advanceTimeBy(SETTLE_MILLIS)
+
+            assertEquals(288, suns.size, "the day was computed again")
+        }
+
+    @Test
     fun `switching the overlay off stops the day`() =
         runTest {
             val suns = mutableListOf<SunPosition>()

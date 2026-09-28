@@ -140,6 +140,7 @@
 
   Then wire `DayOverlay` into `MapViewModel` (design D8, D11). Verify: `./gradlew :app:testDebugUnitTest --tests "*MapViewModel*"` passes, including the existing tests.
 - [x] 10.3 Add a debug log of the day: steps done out of total, night steps, and total time when finished. Verify: a `MapViewModel` test sees the log line, and `./gradlew :app:assembleDebug` succeeds.
+- [x] 10.4 Keep the day when the app leaves the screen (device check, 2026-09-28: days were computed again on return, because the overlay flow stopped 5 s after the screen stopped collecting). Write the `MapViewModel` test first: a computed day, the collector gone for 10 s, then back → no grid computed again. Then share the overlay flow eagerly (design D11, user decision: keep computing). Verify: `./gradlew :app:testDebugUnitTest --tests "*MapViewModel*"` passes.
 
 ## 11. Docs (revision 2026-09-27)
 

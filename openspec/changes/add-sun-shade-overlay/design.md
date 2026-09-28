@@ -227,7 +227,13 @@ hatching would rotate with the sun, and MapLibre interpolates quads in Mercator 
   - a map from time to `ShadeGrid`, filled as steps finish;
   - its job is cancelled and the day discarded after a camera rest, a date change, a reconnect
     while some cell is unknown, or when the overlay is switched off;
-  - a time change within the day keeps it.
+  - a time change within the day keeps it;
+  - leaving the screen keeps it, and the day keeps computing in the background (user decision,
+    2026-09-28, after the device check found days recomputed on return). The overlay flow is
+    shared eagerly for the view model's lifetime instead of stopping 5 s after the screen stops
+    collecting. *Alternative:* pause while the app is not visible and resume on return, which
+    needs the day kept outside the flow: more code for a cost bounded by one day per area and
+    date.
 - **Rendering:** only the selected time's grid is rendered (`renderOverlay`, D9). The day keeps
   grids, never bitmaps: ~1.4 MB per bitmap × 190 steps would be too much.
 - **Tiles:** the ground tiles stay in the repository's kept map for the whole day. Upwind tiles

@@ -187,7 +187,8 @@ of the day, over its actual length; time-selection "Choose the time of day"):
 - **Stop and restart:** the background computation SHALL stop when the overlay is switched off.
   It SHALL start over, with the selected time first, after a camera rest, a change of the selected
   date, or a reconnect while some cell is unknown. A change of the selected time within the day
-  SHALL NOT restart it; if that time has not been computed yet, it is computed next.
+  SHALL NOT restart it; if that time has not been computed yet, it is computed next. Leaving the
+  app SHALL NOT discard the computed steps; the computation continues in the background.
 
 #### Scenario: Scrubbing a computed day
 - **WHEN** the overlay is on at Lauterbrunnen, 46.5935° N, 7.9091° E, map zoom 12, on 2025-12-21 at 12:00, and the day's computation has finished
@@ -200,6 +201,10 @@ of the day, over its actual length; time-selection "Choose the time of day"):
 #### Scenario: A pan starts the day over
 - **WHEN** the day is being computed and the user pans the map
 - **THEN** after the camera has rested for 300 ms, the day is computed again for the new area, starting with the selected time
+
+#### Scenario: Back to the app
+- **WHEN** the day has been computed and the user leaves the app for a minute and returns
+- **THEN** moving the slider to a time of that day shows its overlay within 100 ms, without `Computing sun and shade …`
 
 #### Scenario: Responsive while computing the day
 - **WHEN** the day is being computed in the background
