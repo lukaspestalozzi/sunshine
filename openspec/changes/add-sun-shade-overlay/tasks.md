@@ -195,4 +195,4 @@
   - with a small budget, the least recently used day is dropped.
 
   Then use `DayCache` in `MapViewModel`, with a budget of a quarter of `ActivityManager.memoryClass` in `MapScreen` (design D14). Verify: `./gradlew :app:testDebugUnitTest --tests "*MapViewModel*"` passes.
-- [ ] 14.4 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: everything passes.
+- [x] 14.4 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: everything passes.
