@@ -14,6 +14,16 @@ Ordered list of planned OpenSpec changes. Each row becomes one change under `ope
 | 6 | `add-offline-regions` | offline-regions | Download map + DEM tiles per region, per-region delete, storage usage, fully offline use | fixed region list vs. custom area; OpenTopoMap bulk-download policy | planned |
 | 7 | `add-sun-exposure-heatmap` | sun-exposure-heatmap | Hours of direct sun per cell for a day, reusing horizon data | — | planned |
 
+Polishing after the v1 features (#1–#7):
+- **Overlay on pans (from #5, deferred by user decision 2026-09-28).** Today a pan computes the
+  day again for the new area, because the overlay covers exactly the visible area. Options,
+  measured on the desktop JVM against one screen-sized sweep (zoom 12, 400 × 850 dp):
+  - geographic tiles: ~3.4–7× CPU for a fresh view at any tile size (64–512 dp), ~1.5–2.2× for
+    a typical pan, free for small pans and panning back;
+  - a margin of half a screen per side: ~4× CPU per fresh view, free pans within the margin;
+  - showing the previous day's grids while the new day computes: no extra CPU, scrubbing stays
+    instant after a pan, the computation still restarts.
+
 Post-1.0 candidates: GPS location, bookmarks, time playback animation, home-screen widget,
 photo planning mode.
 

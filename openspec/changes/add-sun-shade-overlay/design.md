@@ -402,5 +402,9 @@ user opts in. Rollback: revert the change's commits.
 
 - Mapterhorn's acceptable use for about 50–70 tiles per screen, carried over from #4. Ask before a
   public release; this can change caching or pacing, not the specs.
+- Panning (device check, 2026-09-28): a pan computes the day again for the new area. Reusing work
+  across pans (geographic tiles, a margin, or showing the previous day meanwhile) is deferred to a
+  polishing step after the v1 features (user decision); options and measured costs are in
+  `docs/roadmap.md`.
 - Final tint and hatch colours after the device check. They are constants in `renderOverlay`, and
   the spec only requires "readable through the tint" and "grey hatching".
