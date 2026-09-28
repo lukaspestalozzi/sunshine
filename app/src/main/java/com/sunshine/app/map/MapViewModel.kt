@@ -30,6 +30,7 @@ import kotlin.time.measureTime
 import kotlin.time.measureTimedValue
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -46,6 +47,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class CameraState(
     val center: GeoPoint,
@@ -212,6 +214,11 @@ class MapViewModel(
     // Size of the map in dp; `null` until the screen reports it.
     private val mapSize = MutableStateFlow<Pair<Double, Double>?>(null)
 
+    private val mutableDayProgress = MutableStateFlow<Float?>(null)
+
+    /** Share of the day's slider steps computed while the day's computation runs, else `null` (design D11). */
+    val dayProgress: StateFlow<Float?> = mutableDayProgress.asStateFlow()
+
     // The overlay of the visible area at the selected time (design D8 of add-sun-shade-overlay).
     // Latest wins, as for the horizon. A camera move waits [SETTLE_MILLIS]; a time change starts at
     // once. Both keep the previous grid meanwhile. A reconnect recomputes only a grid with unknown
@@ -263,11 +270,24 @@ class MapViewModel(
                         dayJob =
                             dayDispatcher?.let {
                                 launch {
-                                    val took = measureTime { newDay.computeRest { mutableSelectedTime.value } }
-                                    log(
-                                        "Overlay day ${newDay.date}: ${newDay.computed.value} of ${newDay.steps.size} steps, " +
-                                            "${newDay.nightSteps} at night, in ${took.inWholeMilliseconds} ms",
-                                    )
+                                    val progress =
+                                        launch {
+                                            newDay.computed.collect {
+                                                mutableDayProgress.value =
+                                                    it.toFloat() / newDay.steps.size
+                                            }
+                                        }
+                                    try {
+                                        val took = measureTime { newDay.computeRest { mutableSelectedTime.value } }
+                                        log(
+                                            "Overlay day ${newDay.date}: ${newDay.computed.value} of ${newDay.steps.size} steps, " +
+                                                "${newDay.nightSteps} at night, in ${took.inWholeMilliseconds} ms",
+                                        )
+                                    } finally {
+                                        // Joined, so that no late progress value follows the null.
+                                        withContext(NonCancellable) { progress.cancelAndJoin() }
+                                        mutableDayProgress.value = null
+                                    }
                                 }
                             }
                     }

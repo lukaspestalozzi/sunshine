@@ -37,6 +37,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withContext
@@ -776,6 +777,46 @@ class MapViewModelTest {
             advanceTimeBy(SETTLE_MILLIS)
 
             assertEquals(288, suns.size, "the day was computed again")
+        }
+
+    @Test
+    fun `the day's progress is the share of computed steps while it runs, and null when finished`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val gate = MutableStateFlow(false)
+            // 12:00, 12:05 and 11:55 are computed; 12:10 waits.
+            val viewModel = dayViewModel(suns, before = { if (suns.size == 3) gate.first { it } })
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            assertEquals(null, viewModel.dayProgress.value)
+
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            assertEquals(3f / 288, viewModel.dayProgress.value)
+
+            gate.value = true
+            advanceUntilIdle()
+            assertEquals(288, suns.size)
+            assertEquals(null, viewModel.dayProgress.value)
+        }
+
+    @Test
+    fun `the day's progress starts over after a pan and is null when switched off`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val gate = MutableStateFlow(false)
+            val viewModel = dayViewModel(suns, before = { if (suns.size == 3) gate.first { it } })
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            assertEquals(3f / 288, viewModel.dayProgress.value)
+
+            viewModel.onCameraMoved(CameraState(center = GeoPoint(46.69, 7.87), zoom = 12.0))
+            // Lets the old day's waiting step, on the test scheduler, see its cancellation.
+            runCurrent()
+            assertEquals(0f, viewModel.dayProgress.value)
+
+            viewModel.onOverlayToggled()
+            assertEquals(null, viewModel.dayProgress.value)
         }
 
     @Test
