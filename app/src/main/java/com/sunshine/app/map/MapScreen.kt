@@ -1,5 +1,6 @@
 package com.sunshine.app.map
 
+import android.app.ActivityManager
 import android.net.ConnectivityManager
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
@@ -95,6 +96,8 @@ private val SUN_PANEL_MAX_WIDTH = 360.dp
 // Label padding (8 dp) + half the 32 dp crosshair (16 dp) + a gap (8 dp).
 private val CROSSHAIR_CLEARANCE = 32.dp
 
+private const val MEBIBYTE = 1024L * 1024
+
 private val mapViewModelFactory =
     viewModelFactory {
         initializer {
@@ -103,6 +106,8 @@ private val mapViewModelFactory =
                 checkNotNull(application.getSystemService(ConnectivityManager::class.java)) {
                     "ConnectivityManager is not available"
                 }
+            val activityManager =
+                checkNotNull(application.getSystemService(ActivityManager::class.java)) { "ActivityManager is not available" }
             MapViewModel(
                 savedState = createSavedStateHandle(),
                 isOnline = NetworkMonitor(connectivityManager).isOnline,
@@ -112,6 +117,8 @@ private val mapViewModelFactory =
                 overlayGrid = application.overlayRepository::grid,
                 computeDispatcher = Dispatchers.Default,
                 dayDispatcher = dayDispatcher(),
+                // A quarter of the app's heap limit (user decision, design D14).
+                dayCache = DayCache(maxBytes = activityManager.memoryClass * MEBIBYTE / 4),
                 log = ::debugLog,
                 checkOverlayAgreement = BuildConfig.DEBUG,
             )
