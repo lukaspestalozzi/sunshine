@@ -137,7 +137,8 @@ it SHALL take place.
 The overlay SHALL be computed off the main thread; the map SHALL stay responsive while it is
 computed. It SHALL be recomputed:
 - when the camera has rested for 300 ms after a move;
-- when the selected date changes;
+- when the selected date changes to a day that is not in the cache of days ("Overlay of the
+  whole day");
 - when the network connection returns while some cell is unknown.
 
 A change of the selected time within the selected day SHALL show that time's overlay if it has
@@ -162,7 +163,7 @@ newer trigger SHALL replace a computation still running. While a new overlay is 
 - **THEN** that overlay is drawn within 100 ms, without the notice
 
 #### Scenario: Date change
-- **WHEN** the overlay is on and the user picks another date
+- **WHEN** the overlay is on and the user picks another date whose day has not been computed
 - **THEN** the previous overlay stays and `Computing sun and shade …` is shown until the overlay for the new date and time replaces it
 
 #### Scenario: Slider dragged continuously
