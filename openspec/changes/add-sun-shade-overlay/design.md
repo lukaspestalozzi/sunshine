@@ -229,8 +229,9 @@ hatching would rotate with the sun, and MapLibre interpolates quads in Mercator 
   `Dispatchers.Default.limitedParallelism(max(1, cores / 2))` (user decision: half the cores).
 - **Lifetime:** one `DayOverlay` per (area, date):
   - a map from time to `ShadeGrid`, filled as steps finish;
-  - its job is cancelled and the day discarded after a camera rest, a date change, a reconnect
-    while some cell is unknown, or when the overlay is switched off;
+  - its job is cancelled after a camera rest on another area, a date change, or when the overlay
+    is switched off; the day itself stays in the cache of days (D14, revised 2026-09-28; it was
+    discarded before). A reconnect while some cell is unknown discards it;
   - a time change within the day keeps it;
   - leaving the screen keeps it, and the day keeps computing in the background (user decision,
     2026-09-28, after the device check found days recomputed on return). The overlay flow is
@@ -273,6 +274,27 @@ between −3.5° and 0°, so those steps are swept.
 day of up to ~190 steps × ~90k cells then takes ≤ ~4.3 MB instead of ~17 MB. The API is unchanged
 (`stateAt`, `cellState`, `sampleCells`, `hasUnknown`).
 
+### D14. Cache of days (user decisions, 2026-09-28)
+- **`DayCache(maxBytes)`:** `DayOverlay`s by (area, date) in an access-ordered `LinkedHashMap`.
+  After each finished step, the least recently used days are dropped while the cached bytes exceed
+  `maxBytes`, never the day being shown. A day's bytes are the sum of its grids'
+  `ShadeGrid.stateBytes` (now public).
+- **Budget:** a quarter of `ActivityManager.memoryClass` (user decision): 32 MB on a 128 MB phone,
+  64 MB on 256 MB, 128 MB on 512 MB; about 5, 10 and 20 days at map zoom 12 on a phone.
+  *Alternatives:* a fixed 64 MB (risks running out of memory on 128 MB phones, where tiles already
+  take up to ~67 MB) or a fixed number of days (memory would vary with the screen size).
+- **Only the selected day computes** (user decision). Switching days or turning the overlay off
+  cancels the day's job and keeps its grids. On return, `computeRest` continues with the missing
+  steps. It waits until the selected time is known instead of for the day's first grid, so the
+  selected time still comes first. *Alternative:* finish partly computed days in the background
+  too, which costs more CPU and code.
+- **Unknown cells:** `DayOverlay.hasUnknown` is true if some grid has unknown cells. Such a day is
+  taken from the cache only while offline; online it is dropped and computed anew (user decision),
+  like the reconnect rule of D8.
+- **Keys:** `MapArea` is compared exactly. A pan back to exactly the same view hits the cache, but
+  the reliable hits are date switches and turning the overlay off and on.
+- **Progress (D10, D11):** a day that is already complete shows no bar.
+
 ### Performance budget
 - **Triggers:** the camera at rest for 300 ms, a time or date change (slider positions conflated),
   and a reconnect with unknown cells. Only while the toggle is on and zoom ≥ 11.
@@ -295,7 +317,8 @@ day of up to ~190 steps × ~90k cells then takes ≤ ~4.3 MB instead of ~17 MB. 
   - the referenced tile map ≤ ~70 tiles × 512 KiB ≈ 35 MiB during a computation, plus the
     64-tile cache (32 MiB);
   - grid and bitmap ≤ 3 MiB;
-  - the day's packed grids ≤ ~5 MiB (D13).
+  - the day's packed grids ≤ ~6.6 MiB at map zoom 12 on a phone (D13); all cached days ≤ a
+    quarter of the heap limit (D14).
 - **Threading:** loading on OkHttp threads; sweep and rendering on `Dispatchers.Default`.
   Everything is cancellable between line chunks.
 - Debug builds log the timings (loading, sweep, rendering) with `debugLog`, as #4 does.
