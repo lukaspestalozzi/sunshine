@@ -183,12 +183,12 @@ class SunFormatTest {
     @CsvSource(
         delimiter = '|',
         value = [
-            // 64 steps of 5 min = 5 h 20 min; 2 steps = 10 min; 24 steps = 2 h; 15 steps = 1 h 15 min.
-            " 64 |   0 | 288 | ≈ 5 h 20 min",
-            " 64 |   2 | 288 | at least 5 h 20 min (10 min unknown)",
-            " 24 |  15 | 288 | at least 2 h 0 min (1 h 15 min unknown)",
-            "  0 |   0 | 288 | ≈ 0 h 0 min",
-            "  0 | 288 | 288 | unknown",
+            // 32 steps of 10 min = 5 h 20 min; 1 step = 10 min; 12 steps = 2 h; 8 steps = 1 h 20 min.
+            " 32 |   0 | 144 | ≈ 5 h 20 min",
+            " 32 |   1 | 144 | at least 5 h 20 min (10 min unknown)",
+            " 12 |   8 | 144 | at least 2 h 0 min (1 h 20 min unknown)",
+            "  0 |   0 | 144 | ≈ 0 h 0 min",
+            "  0 | 144 | 144 | unknown",
         ],
     )
     fun `formats the sun hours of the cell under the crosshair`(
@@ -202,8 +202,8 @@ class SunFormatTest {
 
     @Test
     fun `sun hours show loading while computing or for another area`() {
-        assertEquals("…", formatSunHours(HeatmapUiState.Computing(kept = heatmap(64, 0, 288)), CENTER))
-        assertEquals("…", formatSunHours(heatmap(64, 0, 288), GeoPoint(46.7, 7.9)))
+        assertEquals("…", formatSunHours(HeatmapUiState.Computing(kept = heatmap(32, 0, 144)), CENTER))
+        assertEquals("…", formatSunHours(heatmap(32, 0, 144), GeoPoint(46.7, 7.9)))
     }
 
     @Test
@@ -211,7 +211,7 @@ class SunFormatTest {
         val originalLocale = Locale.getDefault()
         Locale.setDefault(Locale.forLanguageTag("de-CH"))
         try {
-            assertEquals("at least 5 h 20 min (10 min unknown)", formatSunHours(heatmap(64, 2, 288), CENTER))
+            assertEquals("at least 5 h 20 min (10 min unknown)", formatSunHours(heatmap(32, 1, 144), CENTER))
         } finally {
             Locale.setDefault(originalLocale)
         }
@@ -233,6 +233,8 @@ class SunFormatTest {
                 steps,
                 ShortArray(16) { if (it == centre) sun else 0 },
                 ShortArray(16) { if (it == centre) unknown else 0 },
+                stepMinutes = 10,
+                cellDp = 1.0,
             )
         val bands = HeatmapBands(Duration.ofHours(8))
         return HeatmapUiState.Ready(hours, CENTER_DATE, bands, renderSunHours(hours, bands))

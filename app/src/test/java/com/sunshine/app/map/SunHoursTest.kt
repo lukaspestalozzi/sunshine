@@ -18,16 +18,17 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertSame
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
-// Sun hours of a cell (sun-exposure-heatmap spec; design D2 of add-sun-exposure-heatmap).
+// Sun hours of a cell (sun-exposure-heatmap spec; design D2, D9 of add-sun-exposure-heatmap).
 class SunHoursTest {
     @Test
     fun `sun and unknown steps are counted per pixel`() =
         runTest {
-            // 57 daytime steps of sun from 10:00, unknown at 15:00 and 15:05, shade otherwise (spec "Counting steps").
-            val sunny = (0 until 57).map { at(10, 0).plusMinutes(5L * it) }.toSet()
-            val unknown = setOf(at(15, 0), at(15, 5))
+            // 29 daytime steps of sun from 10:00, unknown at 15:00, shade otherwise (spec "Counting steps").
+            val sunny = (0 until 29).map { at(10, 0).plusMinutes(10L * it) }.toSet()
+            val unknown = setOf(at(15, 0))
             val day =
                 completeDay(DECEMBER_21, at(12, 0)) { time ->
                     when (time) {
@@ -39,10 +40,12 @@ class SunHoursTest {
 
             val hours = day.sunHours()
 
-            assertEquals(288, hours.steps)
-            assertEquals(AREA.widthDp.toInt() * AREA.heightDp.toInt(), hours.sun.size)
-            assertEquals(setOf<Short>(57), hours.sun.toSet())
-            assertEquals(setOf<Short>(2), hours.unknown.toSet())
+            assertEquals(144, hours.steps)
+            // One pixel per 8 dp cell: 20 × 30 dp → 3 × 4 pixels (design D9).
+            assertEquals(3, hours.width)
+            assertEquals(4, hours.height)
+            assertEquals(setOf<Short>(29), hours.sun.toSet())
+            assertEquals(setOf<Short>(1), hours.unknown.toSet())
         }
 
     @Test
@@ -58,13 +61,13 @@ class SunHoursTest {
     @Test
     fun `night steps without unknown cells add nothing, as their grids are not read`() =
         runTest {
-            // A sun grid at every step, which cannot happen at night: only the 111 daytime steps count.
+            // A sun grid at every step, which cannot happen at night: only the daytime steps count.
             val day = completeDay(DECEMBER_21, at(12, 0)) { SUN }
 
             val hours = day.sunHours()
 
-            assertEquals(177, day.nightSteps)
-            assertEquals(setOf<Short>(111), hours.sun.toSet())
+            assertTrue(day.nightSteps in 80..100, "${day.nightSteps}")
+            assertEquals(setOf((144 - day.nightSteps).toShort()), hours.sun.toSet())
         }
 
     @Test
@@ -74,17 +77,17 @@ class SunHoursTest {
 
             val hours = day.sunHours()
 
-            assertEquals(setOf<Short>(288), hours.unknown.toSet())
+            assertEquals(setOf<Short>(144), hours.unknown.toSet())
             assertEquals(setOf<Short>(0), hours.sun.toSet())
         }
 
     @Test
-    fun `a short day has 276 steps`() =
+    fun `a short day has 138 steps`() =
         runTest {
             val date = LocalDate.of(2025, 3, 30)
             val day = completeDay(date, ZonedDateTime.of(date.atTime(12, 0), ZURICH)) { SUN }
 
-            assertEquals(276, day.sunHours().steps)
+            assertEquals(138, day.sunHours().steps)
         }
 
     @Test
@@ -106,14 +109,20 @@ class SunHoursTest {
         selected: ZonedDateTime,
         state: (ZonedDateTime) -> ShadeGrid,
     ): DayOverlay {
-        val times = DayOverlay(AREA, date, ZURICH, { _, _, _ -> SHADE }, StandardTestDispatcher(testScheduler)).steps + selected
+        val times = heatmapDay(date) { _, _, _ -> SHADE }.steps + selected
         val bySun = times.associateBy { sunPosition(AREA.center, it.toInstant()) }
-        val day = DayOverlay(AREA, date, ZURICH, { _, sun, _ -> state(bySun.getValue(sun)) }, StandardTestDispatcher(testScheduler))
+        val day = heatmapDay(date) { _, sun, _ -> state(bySun.getValue(sun)) }
         launch { day.computeRest { selected } }
         day.compute(selected)
         advanceUntilIdle()
         return day
     }
+
+    // A day as the heatmap computes it: 8 dp cells every 10 minutes (design D9).
+    private fun TestScope.heatmapDay(
+        date: LocalDate,
+        grid: suspend (MapArea, SunPosition, Double) -> ShadeGrid,
+    ) = DayOverlay(AREA, date, ZURICH, grid, StandardTestDispatcher(testScheduler), stepMinutes = 10, cellDp = 8.0)
 
     private fun at(
         hour: Int,

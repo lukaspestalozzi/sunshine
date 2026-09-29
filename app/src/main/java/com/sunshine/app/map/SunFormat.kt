@@ -81,10 +81,10 @@ fun formatSunHours(
     center: GeoPoint,
 ): String {
     val hours = (heatmap as? HeatmapUiState.Ready)?.hours?.takeIf { it.area.center == center } ?: return "…"
-    // The crosshair is the centre of the area, so the raster's centre pixel.
-    val pixel = hours.height / 2 * hours.width + hours.width / 2
-    val sun = hours.sun[pixel] * SLIDER_STEP_MINUTES
-    val unknown = hours.unknown[pixel] * SLIDER_STEP_MINUTES
+    // The crosshair is the centre of the area.
+    val pixel = countIndex(hours, hours.area.widthDp / 2, hours.area.heightDp / 2)
+    val sun = hours.sun[pixel] * hours.stepMinutes
+    val unknown = hours.unknown[pixel] * hours.stepMinutes
     return when {
         hours.unknown[pixel].toInt() == hours.steps -> "unknown"
         unknown == 0 -> "≈ ${formatMinutes(sun)}"

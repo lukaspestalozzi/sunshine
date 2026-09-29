@@ -26,12 +26,12 @@ class HeatmapBands(
             ALPHA or oklabToRgb(interpolate(t))
         }
 
-    /** The band of [sunSteps] slider steps of sun: 6 steps per band, the last band at or beyond the day length. */
-    fun bandOf(sunSteps: Int): Int = min(sunSteps / STEPS_PER_BAND, count - 1)
+    /** The band of [sunMinutes] minutes of sun: 30 minutes per band, the last band at or beyond the day length. */
+    fun bandOf(sunMinutes: Int): Int = min(sunMinutes / BAND_MINUTES, count - 1)
 
     private companion object {
         const val BAND_SECONDS = 30.0 * 60.0
-        const val STEPS_PER_BAND = 30 / SLIDER_STEP_MINUTES
+        const val BAND_MINUTES = 30
         const val ALPHA = SHADE_ARGB and 0xFF000000.toInt()
 
         // Slate (the shade tint), blue, yellow, light amber; OKLab L 0.454, 0.584, 0.824, 0.918.

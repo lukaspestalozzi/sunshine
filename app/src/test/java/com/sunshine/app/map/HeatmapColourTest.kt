@@ -15,11 +15,11 @@ class HeatmapColourTest {
         val bands = HeatmapBands(hm(8, 33))
 
         assertEquals(18, bands.count)
-        assertEquals(10, bands.bandOf(steps(hm(5, 25))))
-        assertEquals(9, bands.bandOf(steps(hm(4, 45))))
+        assertEquals(10, bands.bandOf(minutes(hm(5, 20))))
+        assertEquals(9, bands.bandOf(minutes(hm(4, 50))))
         assertEquals(0, bands.bandOf(0))
         // At or beyond the day length: the last band.
-        assertEquals(17, bands.bandOf(steps(hm(8, 35))))
+        assertEquals(17, bands.bandOf(minutes(hm(8, 40))))
     }
 
     @Test
@@ -69,6 +69,5 @@ class HeatmapColourTest {
         minutes: Long,
     ): Duration = Duration.ofHours(hours).plusMinutes(minutes)
 
-    // Slider steps of 5 minutes in [duration].
-    private fun steps(duration: Duration): Int = (duration.toMinutes() / 5).toInt()
+    private fun minutes(duration: Duration): Int = duration.toMinutes().toInt()
 }

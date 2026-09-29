@@ -63,7 +63,7 @@ class OverlayNoticesTest {
 
     private fun heatmap(): HeatmapUiState.Ready {
         val area = MapArea(GeoPoint(46.6863, 7.8632), 12.0, 20.0, 20.0)
-        val hours = SunHours(area, 20, 20, 288, ShortArray(400), ShortArray(400))
+        val hours = SunHours(area, 3, 3, 144, ShortArray(9), ShortArray(9), stepMinutes = 10, cellDp = 8.0)
         val bands = HeatmapBands(Duration.ofHours(8))
         return HeatmapUiState.Ready(hours, NOON.toLocalDate(), bands, renderSunHours(hours, bands))
     }

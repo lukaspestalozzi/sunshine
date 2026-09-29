@@ -22,6 +22,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import kotlin.math.ceil
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -704,7 +705,9 @@ class MapViewModelTest {
             assertEquals(setOf<Short>(144), ready.hours.unknown.toSet())
             // Day length at Interlaken on 21 December: 8 h 33 min, 18 bands.
             assertEquals(18, ready.bands.count)
-            assertEquals(ready.hours.width * ready.hours.height, ready.image.pixels.size)
+            // Counts per 8 dp cell, the image at one pixel per dp (design D9).
+            assertEquals(ceil(MAP_WIDTH / 8).toInt() * ceil(MAP_HEIGHT / 8).toInt(), ready.hours.sun.size)
+            assertEquals(MAP_WIDTH.toInt() * MAP_HEIGHT.toInt(), ready.image.pixels.size)
         }
 
     @Test
@@ -838,7 +841,13 @@ class MapViewModelTest {
             val cells = mutableListOf<Double>()
             val gate = MutableStateFlow(false)
             val viewModel =
-                dayViewModel(suns, cells = cells, beforeCell = { cell -> if (cell == 2.0 && cells.count { it == 2.0 } == 3) gate.first { it } })
+                dayViewModel(suns, cells = cells, beforeCell = { cell ->
+                    if (cell == 2.0 &&
+                        cells.count { it == 2.0 } == 3
+                    ) {
+                        gate.first { it }
+                    }
+                })
             viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
             viewModel.onOverlaySelected(OverlayOption.SUN_AND_SHADE)
             advanceTimeBy(SETTLE_MILLIS)
