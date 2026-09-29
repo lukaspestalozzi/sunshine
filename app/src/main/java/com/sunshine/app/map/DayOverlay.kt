@@ -101,7 +101,11 @@ class DayOverlay(
     fun gridAt(time: ZonedDateTime): ShadeGrid? = grids[time.toInstant()]
 
     /** The grid at [time], computed on the caller's dispatcher unless it is known. */
-    suspend fun compute(time: ZonedDateTime): ShadeGrid = lock.withLock { gridAt(time) ?: grid(area, sunAt(time), cellDp).also { store(time, it) } }
+    suspend fun compute(time: ZonedDateTime): ShadeGrid =
+        lock.withLock {
+            gridAt(time)
+                ?: grid(area, sunAt(time), cellDp).also { store(time, it) }
+        }
 
     /**
      * Computes the remaining steps on [background], nearest to [selected] first; returns when all
