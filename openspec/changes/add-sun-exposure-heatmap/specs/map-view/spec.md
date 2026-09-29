@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: About and attributions
-The map screen SHALL show an ⓘ button in the map's top-left corner, directly left of the
+The map screen SHALL show an ⓘ button in the map's top-left corner, directly above the
 selected-location coordinates, with the content description `About and attributions`. It SHALL be
 at least 48 × 48 dp to touch and SHALL NOT be covered by other elements. The attributions SHALL NOT
 be shown on the map itself (user decision, 2026-09-29).

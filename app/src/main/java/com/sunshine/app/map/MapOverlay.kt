@@ -2,7 +2,6 @@ package com.sunshine.app.map
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -21,12 +22,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import com.sunshine.app.R
-import com.sunshine.app.elevation.MapterhornTiles
 
 /** Crosshair marking the selected location; must share the map's bounds so it sits on the map centre. */
 @Composable
@@ -42,14 +41,15 @@ fun Crosshair(modifier: Modifier = Modifier) {
 }
 
 /**
- * Selected-location coordinates, offline notice, an optional [notice], the [topEnd] controls,
- * [bottomPanel] and the map and elevation attributions, kept clear of the system bars. [bottomPanel] sits directly above the attributions,
- * so it never covers them. The elevation attribution opens the list of Mapterhorn's sources.
+ * The ⓘ button opening the About page with the attributions ([onAboutClicked]; map-view spec, "About
+ * and attributions"), below it the selected-location coordinates, the offline notice and an
+ * optional [notice], the [topEnd] controls and the [bottomPanel], kept clear of the system bars.
  */
 @Composable
 fun MapLabels(
     camera: CameraState,
     isOffline: Boolean,
+    onAboutClicked: () -> Unit,
     modifier: Modifier = Modifier,
     @StringRes notice: Int? = null,
     topEnd: @Composable () -> Unit = {},
@@ -62,10 +62,16 @@ fun MapLabels(
             .padding(8.dp),
     ) {
         Column(
-            modifier = Modifier.align(Alignment.TopCenter),
-            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.align(Alignment.TopStart),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            // Alone in the corner: in one row with the coordinates it did not fit beside the overlay
+            // toggle on narrow phones (design D8 of add-sun-exposure-heatmap).
+            Surface(color = MaterialTheme.colorScheme.surface.copy(alpha = LABEL_ALPHA), shape = MaterialTheme.shapes.small) {
+                IconButton(onClick = onAboutClicked) {
+                    Icon(painterResource(R.drawable.ic_info), contentDescription = stringResource(R.string.about_button))
+                }
+            }
             Label(text = formatCoordinates(camera.center))
             if (isOffline) {
                 Label(
@@ -76,40 +82,22 @@ fun MapLabels(
             notice?.let { Label(text = stringResource(it)) }
         }
         Box(Modifier.align(Alignment.TopEnd)) { topEnd() }
-        Column(
-            modifier = Modifier.align(Alignment.BottomStart),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            bottomPanel()
-            Label(
-                text = stringResource(R.string.map_attribution),
-                style = MaterialTheme.typography.labelSmall,
-            )
-            val uriHandler = LocalUriHandler.current
-            Label(
-                text = stringResource(R.string.elevation_attribution),
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.clickable { uriHandler.openUri(MapterhornTiles.ATTRIBUTION_URL) },
-            )
-        }
+        Box(Modifier.align(Alignment.BottomStart)) { bottomPanel() }
     }
 }
 
 @Composable
 private fun Label(
     text: String,
-    modifier: Modifier = Modifier,
-    style: TextStyle = MaterialTheme.typography.labelLarge,
     containerColor: Color = MaterialTheme.colorScheme.surface,
 ) {
     Surface(
-        modifier = modifier,
         color = containerColor.copy(alpha = LABEL_ALPHA),
         shape = MaterialTheme.shapes.small,
     ) {
         Text(
             text = text,
-            style = style,
+            style = MaterialTheme.typography.labelLarge,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
         )
     }
