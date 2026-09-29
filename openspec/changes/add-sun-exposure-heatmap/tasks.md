@@ -15,14 +15,14 @@
 
 ## 2. app: colour scale and rendering
 
-- [ ] 2.1 Write `HeatmapColourTest` first:
+- [x] 2.1 Write `HeatmapColourTest` first:
   - day length 8 h 33 min → 18 bands; 5 h 25 min → band 10; 8 h 35 min → band 17;
   - 15 h 51 min → 32 bands; 0 h 0 min → 1 band;
   - band 0 has the colour `#455A64`, the last band `#FFE0A3`, and every colour's alpha is `0x73`;
   - for 32 bands, the OKLab lightness rises strictly from each band to the next.
 
   Then implement the bands and the OKLab interpolation of the four stops (design D3). Verify: `./gradlew :app:testDebugUnitTest --tests "*HeatmapColourTest*"` passes.
-- [ ] 2.2 Write `RenderSunHoursTest` first:
+- [x] 2.2 Write `RenderSunHoursTest` first:
   - `unknown == steps` → only the hatching (`UNKNOWN_ARGB` on stripes, transparent between them);
   - `0 < unknown < steps` → `UNKNOWN_ARGB` on stripes and the band colour between them;
   - `unknown == 0` → the band colour everywhere;
