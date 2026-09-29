@@ -245,13 +245,14 @@ steps at 2 dp cells), then counted ~340k pixels per step. `Sun hours` now comput
 - *Alternatives (asked):* measure first; 8 dp cells alone (~4×); all cores in `Sun hours`; a
   coarser counting raster only.
 
-### D10. A greyscale map under the overlay (user decisions, 2026-09-29)
-- The OpenTopoMap `RasterLayer` gets `raster-saturation` −1 while the overlay shows `Sun & shade`
-  or `Sun hours`, and 0 while `Off` (`MapLibreMap` takes a `greyscale` flag; a pure function maps
-  the toggle's option to it, tested on the JVM).
+### D10. A greyscale map under the heatmap (user decisions, 2026-09-29)
+- The OpenTopoMap `RasterLayer` gets `raster-saturation` −1 while the overlay shows `Sun hours`,
+  and 0 while `Sun & shade` or `Off` (`MapLibreMap` takes the saturation; `mapSaturation` maps the
+  toggle's option to it, tested on the JVM). First built for both modes; then the user decided
+  that only the heatmap gets the greyscale map, and `Sun & shade` keeps the colours.
 - The overlay's alpha rises from 0.45 to 0.6: `SHADE_ARGB` becomes `0x99455A64`, and the heatmap's
   bands take the same alpha (D3). Tuned in the device check, keeping band 0 equal to the shade tint.
-- *Alternatives (asked):* greyscale only in `Sun hours`; always greyscale.
+- *Alternatives (asked):* greyscale in both modes (built first, then changed); always greyscale.
 
 ### Performance budget
 | Interaction | Budget | How it is checked |
@@ -291,7 +292,7 @@ later (proposal, Non-goals).
 - `MapViewModelTest` (D9): `Sun hours` computes 144 steps at 8 dp and no 2 dp grid; switching back
   resumes the paused `Sun & shade` day; the progress 36 of 144 is 25 %; the cache keeps both days.
 - `SunHoursTest`, `RenderSunHoursTest` (D9): counts on the 8 dp raster, the image at 1 px/dp.
-- `MapColoursTest` (D10): greyscale for `Sun & shade` and `Sun hours`, colour for `Off`.
+- `MapColoursTest` (D10): greyscale for `Sun hours`, colour for `Sun & shade` and `Off`.
 - Device check: Interlaken on 2025-12-21 at zoom 12 gives `Sun hours ≈` 5 h 23 min ± 20 min at
   the centre, and the timings of the budget.
 
@@ -302,7 +303,7 @@ later (proposal, Non-goals).
   2 dp and 5 minutes.
 - [Two days per area and date in the cache] → The heatmap's day is ~1/32 of the other's size (1/16
   the cells, half the steps), so it barely touches the budget.
-- [Greyscale hides the map's colour cues (water, forest) while the overlay is on] → Only while it
+- [Greyscale hides the map's colour cues (water, forest) under the heatmap] → Only while it
   is on; `Off` restores the colours.
 
 - [The counting pass is slow on the phone: ~100–190 daytime grids × ~340k `stateAt` calls] →

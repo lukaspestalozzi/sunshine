@@ -40,20 +40,24 @@ the selected time and the overlay as they were.
 - **WHEN** the user has moved the map to Interlaken at zoom 12, selected `Sun hours`, opened the About page and goes back
 - **THEN** the map shows Interlaken at zoom 12 with `Sun hours` selected
 
-### Requirement: Map colours while the overlay is on
-While the sun-shade overlay shows `Sun & shade` or `Sun hours` (sun-shade-overlay "Overlay
-toggle"), the map tiles SHALL be shown in greyscale, so that the overlay's colours stand out
-against the map's own greens and blues (user decision, 2026-09-29). While `Off` is selected, the
-map tiles SHALL be shown in their own colours. Lines, labels and contour lines SHALL stay readable
-in greyscale.
+### Requirement: Map colours under the heatmap
+While the sun-shade overlay shows `Sun hours` (sun-shade-overlay "Overlay toggle"), the map tiles
+SHALL be shown in greyscale, so that the heatmap's colours stand out against the map's own greens
+and blues (user decisions, 2026-09-29). While `Off` or `Sun & shade` is selected, the map tiles
+SHALL be shown in their own colours. Lines, labels and contour lines SHALL stay readable in
+greyscale.
 
-#### Scenario: Overlay on
+#### Scenario: Heatmap
 - **WHEN** the user selects `Sun hours`
 - **THEN** the map tiles are shown in greyscale, with the heatmap on top
 
+#### Scenario: Sun and shade
+- **WHEN** the user selects `Sun & shade`
+- **THEN** the map tiles are shown in their own colours, with the shade tint on top
+
 #### Scenario: Overlay off
 - **WHEN** the user selects `Off`
-- **THEN** the map tiles are shown in colour again
+- **THEN** the map tiles are shown in their own colours
 
 ## MODIFIED Requirements
 
