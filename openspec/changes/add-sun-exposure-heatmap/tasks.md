@@ -104,8 +104,8 @@
 
 ## 8. Docs and integration after the redesign
 
-- [ ] 8.1 Update `CLAUDE.md` (the `app` row: `about/AboutScreen.kt`, the toggle and status card in `map/OverlayControl.kt`, no attributions in `MapLabels`). Verify: `openspec validate --all --strict` passes and `CLAUDE.md` names `AboutScreen.kt`.
-- [ ] 8.2 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, all unit tests and the debug APK pass, and validation reports no failures.
+- [x] 8.1 Update `CLAUDE.md` (the `app` row: `about/AboutScreen.kt`, the toggle and status card in `map/OverlayControl.kt`, no attributions in `MapLabels`). Verify: `openspec validate --all --strict` passes and `CLAUDE.md` names `AboutScreen.kt`.
+- [x] 8.2 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, all unit tests and the debug APK pass, and validation reports no failures.
 - [ ] 8.3 On-device check with the CI APK. Expected:
   - at launch the toggle shows `Off` selected and no status card; the ⓘ button sits in the top-left corner with the coordinates below it, and no attribution covers the map;
   - at 360 dp width, in portrait and landscape, the toggle's three icons stay in one row on screen, the status card has the toggle's width and right edge, and nothing overlaps;
