@@ -173,10 +173,12 @@ top right:
   `Sun hours of the day`. The icons are Material Symbols, copied as vector drawables (see D8):
   `layers_clear` (off), `contrast` (a half-filled circle: sun and shade), `timelapse` (hours of
   the day). The selected button's check icon is turned off, so the width stays fixed.
-- **State:** no view-model change. The toggle shows `Off` when `isOverlayOn` is false, else the
-  `overlayMode`. Selecting `Off` switches the overlay off; selecting a mode sets the mode and
-  switches the overlay on if it is off. A small pure function maps the two states to the selected
-  option and back, so it can be tested on the JVM.
+- **State:** the view model keeps `isOverlayOn` and `overlayMode`. The toggle shows `Off` when
+  `isOverlayOn` is false, else the `overlayMode` (`overlayOption`, a pure function tested on the
+  JVM). `MapViewModel.onOverlaySelected` takes the selection: `Off` switches the overlay off; a mode
+  is set first and the overlay then switched on if it is off, so the other mode never shows for a
+  moment. (Planned as a UI-only mapping; moved into the view model during apply, 2026-09-29, so that
+  it is tested with the view model.)
 - **Status card:** a `Surface` of exactly the toggle's width, directly below it, shown while the
   overlay is on. Top to bottom: the mode's name (`labelLarge`); the notice from `notice(mode, …)`
   (`labelMedium`), if any; the `LinearProgressIndicator` of `dayProgress` directly below the

@@ -1,6 +1,5 @@
 package com.sunshine.app.map
 
-import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,8 +41,8 @@ fun Crosshair(modifier: Modifier = Modifier) {
 
 /**
  * The ⓘ button opening the About page with the attributions ([onAboutClicked]; map-view spec, "About
- * and attributions"), below it the selected-location coordinates, the offline notice and an
- * optional [notice], the [topEnd] controls and the [bottomPanel], kept clear of the system bars.
+ * and attributions"), below it the selected-location coordinates and the offline notice, the
+ * [topEnd] controls and the [bottomPanel], kept clear of the system bars.
  */
 @Composable
 fun MapLabels(
@@ -51,7 +50,6 @@ fun MapLabels(
     isOffline: Boolean,
     onAboutClicked: () -> Unit,
     modifier: Modifier = Modifier,
-    @StringRes notice: Int? = null,
     topEnd: @Composable () -> Unit = {},
     bottomPanel: @Composable () -> Unit = {},
 ) {
@@ -67,7 +65,7 @@ fun MapLabels(
         ) {
             // Alone in the corner: in one row with the coordinates it did not fit beside the overlay
             // toggle on narrow phones (design D8 of add-sun-exposure-heatmap).
-            Surface(color = MaterialTheme.colorScheme.surface.copy(alpha = LABEL_ALPHA), shape = MaterialTheme.shapes.small) {
+            Surface(color = floatingSurfaceColor(), shape = MaterialTheme.shapes.medium) {
                 IconButton(onClick = onAboutClicked) {
                     Icon(painterResource(R.drawable.ic_info), contentDescription = stringResource(R.string.about_button))
                 }
@@ -79,7 +77,6 @@ fun MapLabels(
                     containerColor = MaterialTheme.colorScheme.errorContainer,
                 )
             }
-            notice?.let { Label(text = stringResource(it)) }
         }
         Box(Modifier.align(Alignment.TopEnd)) { topEnd() }
         Box(Modifier.align(Alignment.BottomStart)) { bottomPanel() }
@@ -93,7 +90,7 @@ private fun Label(
 ) {
     Surface(
         color = containerColor.copy(alpha = LABEL_ALPHA),
-        shape = MaterialTheme.shapes.small,
+        shape = MaterialTheme.shapes.medium,
     ) {
         Text(
             text = text,

@@ -149,6 +149,24 @@ enum class OverlayMode {
     SUN_HOURS,
 }
 
+/** An option of the three-way overlay toggle (sun-shade-overlay spec, "Overlay toggle"; design D7 of add-sun-exposure-heatmap). */
+enum class OverlayOption {
+    OFF,
+    SUN_AND_SHADE,
+    SUN_HOURS,
+}
+
+/** The toggle's option for the overlay switched on or off and its [mode]. */
+fun overlayOption(
+    isOn: Boolean,
+    mode: OverlayMode,
+): OverlayOption =
+    when {
+        !isOn -> OverlayOption.OFF
+        mode == OverlayMode.SUN_AND_SHADE -> OverlayOption.SUN_AND_SHADE
+        else -> OverlayOption.SUN_HOURS
+    }
+
 /** Lowest map zoom with an overlay (user decision, design D8 of add-sun-shade-overlay). */
 const val MIN_OVERLAY_ZOOM = 11.0
 
@@ -508,6 +526,17 @@ class MapViewModel(
     fun onOverlayModeSelected(mode: OverlayMode) {
         mutableOverlayMode.value = mode
         savedState[KEY_OVERLAY_MODE] = mode.name
+    }
+
+    /** Selects an [option] of the toggle: off, or a mode with the overlay on (design D7 of add-sun-exposure-heatmap). */
+    fun onOverlaySelected(option: OverlayOption) {
+        // The mode first, so that switching on never shows the other mode for a moment.
+        when (option) {
+            OverlayOption.OFF -> if (isOverlayOn.value) onOverlayToggled()
+            OverlayOption.SUN_AND_SHADE -> onOverlayModeSelected(OverlayMode.SUN_AND_SHADE)
+            OverlayOption.SUN_HOURS -> onOverlayModeSelected(OverlayMode.SUN_HOURS)
+        }
+        if (option != OverlayOption.OFF && !isOverlayOn.value) onOverlayToggled()
     }
 
     /** Keeps the wall-clock time of day (design D3). */
