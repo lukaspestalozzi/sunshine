@@ -35,6 +35,7 @@ fun SunPanel(
     sun: SunInfo?,
     elevation: ElevationState,
     sunshine: SunshineUiState,
+    sunHours: String?,
     onDateSelected: (LocalDate) -> Unit,
     onSliderMoved: (Float) -> Unit,
     onNowClicked: () -> Unit,
@@ -67,6 +68,8 @@ fun SunPanel(
             // Altitude and sunshine belong to the location and day, so they do not wait for the sun values.
             Value(R.string.sun_panel_altitude, formatAltitude(elevation))
             Value(R.string.sun_panel_sunshine, formatSunshine(sunshine, selectedTime))
+            // Only in the mode `Sun hours` (sun-exposure-heatmap spec, "Sun hours in the information panel").
+            sunHours?.let { Value(R.string.sun_panel_sun_hours, it) }
             if (sun != null) SunValues(sun, selectedTime)
         }
     }

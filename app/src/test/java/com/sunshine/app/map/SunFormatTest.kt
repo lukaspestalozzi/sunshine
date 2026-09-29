@@ -1,11 +1,13 @@
 package com.sunshine.app.map
 
 import com.sunshine.core.GeoPoint
+import com.sunshine.core.MapArea
 import com.sunshine.core.SunPeriod
 import com.sunshine.core.SunPeriods
 import com.sunshine.core.Sunshine
 import com.sunshine.core.WholeDay
 import java.time.Duration
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -114,6 +116,8 @@ class SunFormatTest {
 
     private companion object {
         val WINTER_NOON: ZonedDateTime = ZonedDateTime.parse("2025-12-21T12:00+01:00[Europe/Zurich]")
+        val CENTER = GeoPoint(46.6863, 7.8632)
+        val CENTER_DATE: LocalDate = LocalDate.of(2025, 12, 21)
     }
 
     // The panel prefixes the label "Altitude" (strings.xml).
@@ -173,6 +177,65 @@ class SunFormatTest {
         val period = SunPeriod(zurich("2025-03-30T01:00"), zurich("2025-03-30T03:30"))
 
         assertEquals("01:00 UTC+1–03:30", formatSunshine(ready(SunPeriods.Known(listOf(period))), zurich("2025-03-30T12:00")))
+    }
+
+    @ParameterizedTest(name = "{3}")
+    @CsvSource(
+        delimiter = '|',
+        value = [
+            // 64 steps of 5 min = 5 h 20 min; 2 steps = 10 min; 24 steps = 2 h; 15 steps = 1 h 15 min.
+            " 64 |   0 | 288 | ≈ 5 h 20 min",
+            " 64 |   2 | 288 | at least 5 h 20 min (10 min unknown)",
+            " 24 |  15 | 288 | at least 2 h 0 min (1 h 15 min unknown)",
+            "  0 |   0 | 288 | ≈ 0 h 0 min",
+            "  0 | 288 | 288 | unknown",
+        ],
+    )
+    fun `formats the sun hours of the cell under the crosshair`(
+        sun: Short,
+        unknown: Short,
+        steps: Int,
+        expected: String,
+    ) {
+        assertEquals(expected, formatSunHours(heatmap(sun, unknown, steps), CENTER))
+    }
+
+    @Test
+    fun `sun hours show loading while computing or for another area`() {
+        assertEquals("…", formatSunHours(HeatmapUiState.Computing(kept = heatmap(64, 0, 288)), CENTER))
+        assertEquals("…", formatSunHours(heatmap(64, 0, 288), GeoPoint(46.7, 7.9)))
+    }
+
+    @Test
+    fun `sun hours do not depend on the device locale`() {
+        val originalLocale = Locale.getDefault()
+        Locale.setDefault(Locale.forLanguageTag("de-CH"))
+        try {
+            assertEquals("at least 5 h 20 min (10 min unknown)", formatSunHours(heatmap(64, 2, 288), CENTER))
+        } finally {
+            Locale.setDefault(originalLocale)
+        }
+    }
+
+    // A heatmap centred on [CENTER] whose centre pixel, and only that one, has the given counts.
+    private fun heatmap(
+        sun: Short,
+        unknown: Short,
+        steps: Int,
+    ): HeatmapUiState.Ready {
+        val area = MapArea(CENTER, 12.0, 4.0, 4.0)
+        val centre = 2 * 4 + 2
+        val hours =
+            SunHours(
+                area,
+                4,
+                4,
+                steps,
+                ShortArray(16) { if (it == centre) sun else 0 },
+                ShortArray(16) { if (it == centre) unknown else 0 },
+            )
+        val bands = HeatmapBands(Duration.ofHours(8))
+        return HeatmapUiState.Ready(hours, CENTER_DATE, bands, renderSunHours(hours, bands))
     }
 
     private fun ready(periods: SunPeriods) = SunshineUiState.Ready(GeoPoint(46.6863, 7.8632), periods, Sunshine.SUN)

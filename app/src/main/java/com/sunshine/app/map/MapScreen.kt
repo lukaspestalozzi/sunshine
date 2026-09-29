@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -41,6 +42,8 @@ fun MapScreen(viewModel: MapViewModel = viewModel(factory = mapViewModelFactory)
     val overlay by viewModel.overlay.collectAsStateWithLifecycle()
     val isOverlayOn by viewModel.isOverlayOn.collectAsStateWithLifecycle()
     val dayProgress by viewModel.dayProgress.collectAsStateWithLifecycle()
+    val overlayMode by viewModel.overlayMode.collectAsStateWithLifecycle()
+    val heatmap by viewModel.heatmap.collectAsStateWithLifecycle()
     val sunshine = computedSunshine.at(camera.center)
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -52,21 +55,39 @@ fun MapScreen(viewModel: MapViewModel = viewModel(factory = mapViewModelFactory)
             initialCamera = camera,
             onCameraMoved = viewModel::onCameraMoved,
             modifier = Modifier.fillMaxSize(),
-            overlay = overlay.image(),
+            overlay =
+                when (overlayMode) {
+                    OverlayMode.SUN_AND_SHADE -> overlay.image()
+                    OverlayMode.SUN_HOURS -> heatmap.image()
+                },
         )
         sun?.let { SunLine(it.position, (sunshine as? SunshineUiState.Ready)?.atSelectedTime) }
         Crosshair(Modifier.align(Alignment.Center))
         MapLabels(
             camera = camera,
             isOffline = isOffline,
-            notice = overlayNotice(overlay, selectedTime),
-            topEnd = { OverlayControl(isOn = isOverlayOn, dayProgress = dayProgress, onToggle = viewModel::onOverlayToggled) },
+            notice = notice(overlayMode, overlay, heatmap, selectedTime),
+            topEnd = {
+                OverlayControl(
+                    isOn = isOverlayOn,
+                    dayProgress = dayProgress,
+                    mode = overlayMode,
+                    // The scale runs up to the day length at the map centre (design D3 of add-sun-exposure-heatmap).
+                    bands = sun?.day?.dayLength?.let { remember(it) { HeatmapBands(it) } },
+                    onToggle = viewModel::onOverlayToggled,
+                    onModeSelected = viewModel::onOverlayModeSelected,
+                )
+            },
         ) {
             SunPanel(
                 selectedTime = selectedTime,
                 sun = sun,
                 elevation = elevation,
                 sunshine = sunshine,
+                sunHours =
+                    formatSunHours(heatmap, camera.center).takeIf {
+                        isOverlayOn && overlayMode == OverlayMode.SUN_HOURS && camera.zoom >= MIN_OVERLAY_ZOOM
+                    },
                 onDateSelected = viewModel::onDateSelected,
                 onSliderMoved = viewModel::onSliderMoved,
                 onNowClicked = viewModel::onNowClicked,
@@ -123,6 +144,14 @@ private val mapViewModelFactory =
                 checkOverlayAgreement = BuildConfig.DEBUG,
             )
         }
+    }
+
+/** The heatmap to draw: the finished one, or the one kept while a new one is computed. */
+private fun HeatmapUiState.image(): OverlayImage? =
+    when (this) {
+        is HeatmapUiState.Ready -> image
+        is HeatmapUiState.Computing -> kept?.image
+        HeatmapUiState.Off, HeatmapUiState.ZoomedOut -> null
     }
 
 /** The image to draw: the finished overlay, or the one kept while a new one is computed. */

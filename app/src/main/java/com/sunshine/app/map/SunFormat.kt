@@ -1,5 +1,6 @@
 package com.sunshine.app.map
 
+import com.sunshine.core.GeoPoint
 import com.sunshine.core.SunPeriods
 import com.sunshine.core.WholeDay
 import java.math.BigDecimal
@@ -70,6 +71,28 @@ fun formatDayLength(dayLength: Duration): String {
     return "${minutes / MINUTES_PER_HOUR} h ${minutes % MINUTES_PER_HOUR} min"
 }
 
+/**
+ * The sun hours of the cell under the crosshair at [center] (sun-exposure-heatmap spec, "Sun hours in
+ * the information panel"): `≈ 5 h 20 min`, `at least 5 h 20 min (10 min unknown)`, `unknown`, or
+ * `…` unless [heatmap] is ready for the area around [center].
+ */
+fun formatSunHours(
+    heatmap: HeatmapUiState,
+    center: GeoPoint,
+): String {
+    val hours = (heatmap as? HeatmapUiState.Ready)?.hours?.takeIf { it.area.center == center } ?: return "…"
+    // The crosshair is the centre of the area, so the raster's centre pixel.
+    val pixel = hours.height / 2 * hours.width + hours.width / 2
+    val sun = hours.sun[pixel] * SLIDER_STEP_MINUTES
+    val unknown = hours.unknown[pixel] * SLIDER_STEP_MINUTES
+    return when {
+        hours.unknown[pixel].toInt() == hours.steps -> "unknown"
+        unknown == 0 -> "≈ ${formatMinutes(sun)}"
+        unknown < MINUTES_PER_HOUR -> "at least ${formatMinutes(sun)} ($unknown min unknown)"
+        else -> "at least ${formatMinutes(sun)} (${formatMinutes(unknown)} unknown)"
+    }
+}
+
 /** The whole-day text, or `null` when the day has a sunrise or a sunset. */
 fun formatWholeDay(wholeDay: WholeDay?): String? =
     when (wholeDay) {
@@ -77,6 +100,9 @@ fun formatWholeDay(wholeDay: WholeDay?): String? =
         WholeDay.BELOW_HORIZON -> "Sun below the horizon all day"
         null -> null
     }
+
+// E.g. `5 h 20 min`.
+private fun formatMinutes(minutes: Int): String = "${minutes / MINUTES_PER_HOUR} h ${minutes % MINUTES_PER_HOUR} min"
 
 /** `UTC`, `UTC+1`, `UTC+5:30`, `UTC-2:30`. */
 private fun formatUtcOffset(offset: ZoneOffset): String {

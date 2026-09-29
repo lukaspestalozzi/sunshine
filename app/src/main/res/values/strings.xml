@@ -21,4 +21,8 @@
     <string name="overlay_legend_unknown">Unknown</string>
     <string name="overlay_zoom_in">Zoom in to see sun and shade</string>
     <string name="overlay_computing">Computing sun and shade …</string>
+    <string name="heatmap_mode_sun_and_shade">Sun &amp; shade</string>
+    <string name="heatmap_mode_sun_hours">Sun hours</string>
+    <string name="heatmap_computing">Computing sun hours …</string>
+    <string name="sun_panel_sun_hours">Sun hours</string>
 </resources>
