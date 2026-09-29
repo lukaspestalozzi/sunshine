@@ -44,7 +44,7 @@ class DayOverlayTest {
 
     // Records each request and returns the same grid; [gate] holds a request, which cannot be cancelled
     // meanwhile, like a sweep between two chunks.
-    private val fakeGrid: suspend (MapArea, SunPosition) -> ShadeGrid = { _, sun ->
+    private val fakeGrid: suspend (MapArea, SunPosition, Double) -> ShadeGrid = { _, sun, _ ->
         suns += sun
         dispatchers += currentCoroutineContext()[ContinuationInterceptor]
         withContext(NonCancellable) { gate.first { it } }
@@ -160,7 +160,7 @@ class DayOverlayTest {
             assertEquals(2L * GRID.stateBytes, known.bytes)
             assertEquals(false, known.hasUnknown)
 
-            val unknown = DayOverlay(AREA, DECEMBER_21, ZURICH, { _, _ -> UNKNOWN_GRID }, StandardTestDispatcher(testScheduler))
+            val unknown = DayOverlay(AREA, DECEMBER_21, ZURICH, { _, _, _ -> UNKNOWN_GRID }, StandardTestDispatcher(testScheduler))
             unknown.compute(at(12, 0))
             assertEquals(true, unknown.hasUnknown)
         }
@@ -171,7 +171,7 @@ class DayOverlayTest {
             val requested = mutableListOf<SunPosition>()
             val hold = MutableStateFlow(true)
             val day =
-                DayOverlay(AREA, DECEMBER_21, ZURICH, { _, sun ->
+                DayOverlay(AREA, DECEMBER_21, ZURICH, { _, sun, _ ->
                     requested += sun
                     // The fourth grid waits and cannot be cancelled, like a sweep between chunks.
                     if (requested.size == 4) withContext(NonCancellable) { hold.first { it } }

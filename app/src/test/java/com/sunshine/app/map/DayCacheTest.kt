@@ -116,7 +116,7 @@ class DayCacheTest {
         date: LocalDate,
         grids: Int,
     ): DayOverlay {
-        val day = DayOverlay(area, date, ZURICH, { _, _ -> GRID }, StandardTestDispatcher(testScheduler))
+        val day = DayOverlay(area, date, ZURICH, { _, _, _ -> GRID }, StandardTestDispatcher(testScheduler))
         for (step in day.steps.take(grids)) day.compute(step)
         assertEquals(grids.toLong() * GRID.stateBytes, day.bytes)
         return day

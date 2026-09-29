@@ -1,37 +1,40 @@
 package com.sunshine.app.map
 
 import com.sunshine.core.MapArea
+import com.sunshine.core.SunShadeSweep
 import java.time.LocalDate
 
 /**
- * Computed overlay days by visible area and date (design D14 of add-sun-shade-overlay). [trim]
- * drops the least recently used days while their states take more than [maxBytes].
+ * Computed overlay days by visible area, date and cell size (design D14 of add-sun-shade-overlay,
+ * D9 of add-sun-exposure-heatmap). [trim] drops the least recently used days while their states
+ * take more than [maxBytes].
  */
 class DayCache(
     private val maxBytes: Long,
 ) {
     // Access order: the eldest entry is the least recently used.
-    private val days = LinkedHashMap<Pair<MapArea, LocalDate>, DayOverlay>(16, 0.75f, true)
+    private val days = LinkedHashMap<Triple<MapArea, LocalDate, Double>, DayOverlay>(16, 0.75f, true)
 
     /** Bytes of all cached days' states. */
     val bytes: Long
         @Synchronized get() = days.values.sumOf { it.bytes }
 
-    /** The day of [area] and [date], which becomes the most recently used, or `null`. */
+    /** The day of [area], [date] and [cellDp], which becomes the most recently used, or `null`. */
     @Synchronized
     fun get(
         area: MapArea,
         date: LocalDate,
-    ): DayOverlay? = days[area to date]
+        cellDp: Double = SunShadeSweep.CELL_DP,
+    ): DayOverlay? = days[Triple(area, date, cellDp)]
 
     @Synchronized
     fun put(day: DayOverlay) {
-        days[day.area to day.date] = day
+        days[Triple(day.area, day.date, day.cellDp)] = day
     }
 
     @Synchronized
     fun remove(day: DayOverlay) {
-        days.remove(day.area to day.date, day)
+        days.remove(Triple(day.area, day.date, day.cellDp), day)
     }
 
     /** Drops the least recently used days while the cache is over budget, never [keep]. */
