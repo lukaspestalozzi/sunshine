@@ -43,6 +43,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -112,6 +113,40 @@ sealed interface OverlayUiState {
         val time: ZonedDateTime,
         val image: OverlayImage,
     ) : OverlayUiState
+}
+
+/** The heatmap of the selected day as shown on screen (sun-exposure-heatmap spec). */
+sealed interface HeatmapUiState {
+    /** Not in the mode `Sun hours`, or the overlay is off. */
+    data object Off : HeatmapUiState
+
+    /** In the mode `Sun hours` below zoom [MIN_OVERLAY_ZOOM]: not shown. */
+    data object ZoomedOut : HeatmapUiState
+
+    /**
+     * The day of the visible area and selected date is not complete or not counted yet. [kept] is the
+     * previous heatmap, shown on its own area until the new one is ready.
+     */
+    data class Computing(
+        val kept: Ready?,
+    ) : HeatmapUiState
+
+    /** The sun hours of [date] over their area, their [bands] and [image] (rendered off the main thread). */
+    class Ready(
+        val hours: SunHours,
+        val date: LocalDate,
+        val bands: HeatmapBands,
+        val image: OverlayImage,
+    ) : HeatmapUiState
+}
+
+/** What the overlay shows (sun-exposure-heatmap spec, "Overlay mode"; design D1 of add-sun-exposure-heatmap). */
+enum class OverlayMode {
+    /** Sun and shade at the selected time. */
+    SUN_AND_SHADE,
+
+    /** Hours of sun on the selected day. */
+    SUN_HOURS,
 }
 
 /** Lowest map zoom with an overlay (user decision, design D8 of add-sun-shade-overlay). */
@@ -212,10 +247,17 @@ class MapViewModel(
     private val mutableOverlayOn = MutableStateFlow(savedState.get<Boolean>(KEY_OVERLAY_ON) ?: false)
     val isOverlayOn: StateFlow<Boolean> = mutableOverlayOn.asStateFlow()
 
+    private val mutableOverlayMode =
+        MutableStateFlow(savedState.get<String>(KEY_OVERLAY_MODE)?.let(OverlayMode::valueOf) ?: OverlayMode.SUN_AND_SHADE)
+    val overlayMode: StateFlow<OverlayMode> = mutableOverlayMode.asStateFlow()
+
     // Size of the map in dp; `null` until the screen reports it.
     private val mapSize = MutableStateFlow<Pair<Double, Double>?>(null)
 
     private val mutableDayProgress = MutableStateFlow<Float?>(null)
+
+    // The day of the overlay flow, for the heatmap; `null` while the overlay has no area.
+    private val currentDay = MutableStateFlow<DayOverlay?>(null)
 
     /** Share of the day's slider steps computed while the day's computation runs, else `null` (design D11). */
     val dayProgress: StateFlow<Float?> = mutableDayProgress.asStateFlow()
@@ -246,6 +288,7 @@ class MapViewModel(
                         lookup?.cancelAndJoin()
                         dayJob?.cancelAndJoin()
                         day = null
+                        currentDay.value = null
                         shown.set(null)
                         requestedTime = null
                         send(if (input.on && input.camera.zoom < MIN_OVERLAY_ZOOM) OverlayUiState.ZoomedOut else OverlayUiState.Off)
@@ -270,6 +313,7 @@ class MapViewModel(
                         }
                         val newDay = cached ?: DayOverlay(area, date, zone, overlayGrid, dayDispatcher ?: computeDispatcher)
                         day = newDay
+                        currentDay.value = newDay
                         dayJob =
                             dayDispatcher?.takeIf { newDay.computed.value < newDay.steps.size }?.let {
                                 launch {
@@ -326,6 +370,67 @@ class MapViewModel(
             // Eagerly, unlike the other states: the day lives in this flow and must survive the app
             // leaving the screen, where it keeps computing (user decision, design D11).
             .stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = OverlayUiState.Off)
+
+    // The heatmap of the current day in the mode `Sun hours` (design D5 of add-sun-exposure-heatmap):
+    // counted once the day is complete, and kept on its area until the next one is ready. A time
+    // change does not change the day, so the heatmap stays. Latest wins, as for the overlay.
+    val heatmap: StateFlow<HeatmapUiState> =
+        channelFlow {
+            var build: Job? = null
+            // Written by the builds, read by the collector, as for the overlay's `shown`.
+            val kept = AtomicReference<HeatmapUiState.Ready?>(null)
+            combine(currentDay, mutableOverlayMode, mutableOverlayOn, camera) { day, mode, on, camera ->
+                HeatmapInput(day, mode, on && camera.zoom < MIN_OVERLAY_ZOOM)
+            }.distinctUntilChanged()
+                .collect { input ->
+                    build?.cancelAndJoin()
+                    val day = input.day
+                    if (day == null) kept.set(null)
+                    when {
+                        input.mode != OverlayMode.SUN_HOURS -> send(HeatmapUiState.Off)
+                        day == null -> send(if (input.zoomedOut) HeatmapUiState.ZoomedOut else HeatmapUiState.Off)
+                        else -> {
+                            val counted = day.counted
+                            val previous = kept.get()
+                            if (counted != null && previous?.hours === counted) {
+                                send(previous)
+                                return@collect
+                            }
+                            if (counted == null) send(HeatmapUiState.Computing(kept = previous))
+                            build =
+                                launch {
+                                    day.computed.first { it == day.steps.size }
+                                    val (hours, counting) = measureTimedValue { day.sunHours() }
+                                    val (ready, rendering) = measureTimedValue { heatmapOf(day, hours) }
+                                    if (counted == null) {
+                                        log(
+                                            "Sun hours ${hours.width}×${hours.height} dp, ${hours.steps} steps: " +
+                                                "counts ${counting.inWholeMilliseconds} ms, image ${rendering.inWholeMilliseconds} ms",
+                                        )
+                                    }
+                                    kept.set(ready)
+                                    send(ready)
+                                }
+                        }
+                    }
+                }
+        }.flowOn(computeDispatcher)
+            // Eagerly, like the overlay whose day it counts.
+            .stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = HeatmapUiState.Off)
+
+    private fun heatmapOf(
+        day: DayOverlay,
+        hours: SunHours,
+    ): HeatmapUiState.Ready {
+        val bands = HeatmapBands(sunDay(day.area.center, day.date, zone).dayLength)
+        return HeatmapUiState.Ready(hours, day.date, bands, renderSunHours(hours, bands))
+    }
+
+    private data class HeatmapInput(
+        val day: DayOverlay?,
+        val mode: OverlayMode,
+        val zoomedOut: Boolean,
+    )
 
     init {
         // Debug builds: once an overlay has stayed for a while, log how many cells agree with the
@@ -395,6 +500,12 @@ class MapViewModel(
     fun onOverlayToggled() {
         mutableOverlayOn.value = !mutableOverlayOn.value
         savedState[KEY_OVERLAY_ON] = mutableOverlayOn.value
+    }
+
+    /** Selects what the overlay shows; saved like the switch, so it survives rotation. */
+    fun onOverlayModeSelected(mode: OverlayMode) {
+        mutableOverlayMode.value = mode
+        savedState[KEY_OVERLAY_MODE] = mode.name
     }
 
     /** Keeps the wall-clock time of day (design D3). */
@@ -475,6 +586,7 @@ class MapViewModel(
         const val KEY_ZOOM = "camera_zoom"
         const val KEY_SELECTED_TIME = "selected_time_epoch_millis"
         const val KEY_OVERLAY_ON = "overlay_on"
+        const val KEY_OVERLAY_MODE = "overlay_mode"
         const val AGREEMENT_DELAY_MILLIS = 3_000L
         const val AGREEMENT_CELLS = 200
     }

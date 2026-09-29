@@ -32,13 +32,13 @@
 
 ## 3. app: mode and heatmap state in the view model
 
-- [ ] 3.1 Write `MapViewModelTest` cases first for the mode:
+- [x] 3.1 Write `MapViewModelTest` cases first for the mode:
   - `SUN_AND_SHADE` by default;
   - saved in `SavedStateHandle` and restored;
   - switching the mode neither cancels nor restarts the day (the grid function's call count is unchanged).
 
   Then add `OverlayMode` and `onOverlayModeSelected` (design D1). Verify: `./gradlew :app:testDebugUnitTest --tests "*MapViewModel*"` passes.
-- [ ] 3.2 Write `MapViewModelTest` cases first for `heatmap`:
+- [x] 3.2 Write `MapViewModelTest` cases first for `heatmap`:
   - `Off` while the overlay is off or in `Sun & shade`, and `ZoomedOut` at zoom 10.5;
   - `Computing(kept = null)` while the day is incomplete, and `Ready` once it is complete, with counts equal to `sunHours(day)`;
   - a time change within the day leaves `Ready` unchanged and counts nothing again;

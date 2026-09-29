@@ -609,6 +609,185 @@ class MapViewModelTest {
     }
 
     @Test
+    fun `the overlay mode is sun and shade at launch and restored from saved state, as after a rotation`() {
+        val savedState = SavedStateHandle()
+        assertEquals(OverlayMode.SUN_AND_SHADE, newViewModel(savedState).overlayMode.value)
+
+        newViewModel(savedState).onOverlayModeSelected(OverlayMode.SUN_HOURS)
+
+        assertEquals(OverlayMode.SUN_HOURS, newViewModel(savedState).overlayMode.value)
+        assertEquals(OverlayMode.SUN_AND_SHADE, newViewModel().overlayMode.value)
+    }
+
+    @Test
+    fun `switching the mode neither cancels nor restarts the day`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val gate = MutableStateFlow(false)
+            // 12:00, 12:05 and 11:55 are computed; 12:10 waits.
+            val viewModel = dayViewModel(suns, before = { if (suns.size == 3) gate.first { it } })
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            assertEquals(3, suns.size)
+
+            viewModel.onOverlayModeSelected(OverlayMode.SUN_HOURS)
+            runCurrent()
+            viewModel.onOverlayModeSelected(OverlayMode.SUN_AND_SHADE)
+            runCurrent()
+            gate.value = true
+            advanceUntilIdle()
+
+            assertEquals(288, suns.size)
+            assertEquals(288, suns.toSet().size)
+        }
+
+    @Test
+    fun `the heatmap is off in sun and shade or while the overlay is off, and zoomed out below 11`() =
+        runTest {
+            val viewModel = dayViewModel(mutableListOf())
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 10.5))
+            assertEquals(HeatmapUiState.Off, viewModel.heatmap.value)
+
+            viewModel.onOverlayModeSelected(OverlayMode.SUN_HOURS)
+            assertEquals(HeatmapUiState.Off, viewModel.heatmap.value)
+
+            viewModel.onOverlayToggled()
+            assertEquals(HeatmapUiState.ZoomedOut, viewModel.heatmap.value)
+
+            viewModel.onOverlayModeSelected(OverlayMode.SUN_AND_SHADE)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            advanceUntilIdle()
+            assertEquals(HeatmapUiState.Off, viewModel.heatmap.value)
+        }
+
+    @Test
+    fun `in sun hours the heatmap is computing until the day is complete, then ready with the day's counts`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val gate = MutableStateFlow(false)
+            val viewModel = dayViewModel(suns, before = { if (suns.size == 3) gate.first { it } })
+            viewModel.onOverlayModeSelected(OverlayMode.SUN_HOURS)
+            isOnline.value = false
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            assertEquals(HeatmapUiState.Computing(kept = null), viewModel.heatmap.value)
+
+            gate.value = true
+            advanceUntilIdle()
+
+            // Offline, every cell is unknown at every step.
+            val ready = viewModel.heatmap.value as HeatmapUiState.Ready
+            assertEquals(MapArea(INTERLAKEN, 12.0, MAP_WIDTH, MAP_HEIGHT), ready.hours.area)
+            assertEquals(LocalDate.of(2025, 12, 21), ready.date)
+            assertEquals(288, ready.hours.steps)
+            assertEquals(setOf<Short>(288), ready.hours.unknown.toSet())
+            // Day length at Interlaken on 21 December: 8 h 33 min, 18 bands.
+            assertEquals(18, ready.bands.count)
+            assertEquals(ready.hours.width * ready.hours.height, ready.image.pixels.size)
+        }
+
+    @Test
+    fun `a time change leaves the heatmap unchanged and counts nothing again`() =
+        runTest {
+            val logged = mutableListOf<String>()
+            val viewModel = sunHoursViewModel(mutableListOf(), log = { logged += it })
+            val ready = viewModel.heatmap.value as HeatmapUiState.Ready
+
+            viewModel.onSliderMoved(14 * 60f)
+            advanceUntilIdle()
+
+            assertEquals(ready, viewModel.heatmap.value)
+            assertEquals(1, logged.count { it.startsWith("Sun hours") }, "$logged")
+        }
+
+    @Test
+    fun `after a pan the previous heatmap is kept until the new day is complete`() =
+        runTest {
+            val gate = MutableStateFlow(true)
+            val viewModel = sunHoursViewModel(mutableListOf(), before = { gate.first { it } })
+            val previous = viewModel.heatmap.value as HeatmapUiState.Ready
+            gate.value = false
+
+            viewModel.onCameraMoved(CameraState(center = GeoPoint(46.69, 7.87), zoom = 12.0))
+            advanceTimeBy(SETTLE_MILLIS)
+            assertEquals(HeatmapUiState.Computing(kept = previous), viewModel.heatmap.value)
+
+            gate.value = true
+            advanceUntilIdle()
+            assertEquals(GeoPoint(46.69, 7.87), (viewModel.heatmap.value as HeatmapUiState.Ready).hours.area.center)
+        }
+
+    @Test
+    fun `after a date change the previous heatmap is kept until the new day is complete`() =
+        runTest {
+            val gate = MutableStateFlow(true)
+            val viewModel = sunHoursViewModel(mutableListOf(), before = { gate.first { it } })
+            val previous = viewModel.heatmap.value as HeatmapUiState.Ready
+            gate.value = false
+
+            viewModel.onDateSelected(LocalDate.of(2025, 12, 22))
+            advanceTimeBy(SETTLE_MILLIS)
+            assertEquals(HeatmapUiState.Computing(kept = previous), viewModel.heatmap.value)
+
+            gate.value = true
+            advanceUntilIdle()
+            assertEquals(LocalDate.of(2025, 12, 22), (viewModel.heatmap.value as HeatmapUiState.Ready).date)
+        }
+
+    @Test
+    fun `switching back to a complete cached day shows its heatmap at once, without computing a grid`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val viewModel = sunHoursViewModel(suns)
+            val first = viewModel.heatmap.value as HeatmapUiState.Ready
+            viewModel.onDateSelected(LocalDate.of(2025, 12, 22))
+            advanceUntilIdle()
+            suns.clear()
+
+            viewModel.onDateSelected(LocalDate.of(2025, 12, 21))
+
+            assertEquals(first.hours, (viewModel.heatmap.value as HeatmapUiState.Ready).hours)
+            advanceUntilIdle()
+            assertEquals(emptyList<SunPosition>(), suns)
+        }
+
+    @Test
+    fun `switching to sun hours with a complete day counts it once, and switching back and forth is at once`() =
+        runTest {
+            val logged = mutableListOf<String>()
+            val viewModel = dayViewModel(mutableListOf(), log = { logged += it })
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceUntilIdle()
+            assertTrue(logged.none { it.startsWith("Sun hours") }, "$logged")
+
+            viewModel.onOverlayModeSelected(OverlayMode.SUN_HOURS)
+            advanceUntilIdle()
+            val ready = viewModel.heatmap.value as HeatmapUiState.Ready
+            viewModel.onOverlayModeSelected(OverlayMode.SUN_AND_SHADE)
+            assertEquals(HeatmapUiState.Off, viewModel.heatmap.value)
+            viewModel.onOverlayModeSelected(OverlayMode.SUN_HOURS)
+
+            assertEquals(ready, viewModel.heatmap.value)
+            assertEquals(1, logged.count { it.startsWith("Sun hours") }, "$logged")
+        }
+
+    @Test
+    fun `a day computed anew after a reconnect is counted anew`() =
+        runTest {
+            isOnline.value = false
+            val viewModel = sunHoursViewModel(mutableListOf())
+            assertEquals(setOf<Short>(288), (viewModel.heatmap.value as HeatmapUiState.Ready).hours.unknown.toSet())
+
+            isOnline.value = true
+            advanceUntilIdle()
+
+            assertEquals(setOf<Short>(0), (viewModel.heatmap.value as HeatmapUiState.Ready).hours.unknown.toSet())
+        }
+
+    @Test
     fun `debug builds log the overlay's agreement with the point tracer once it has stayed`() =
         runTest {
             val logged = mutableListOf<String>()
@@ -1004,6 +1183,21 @@ class MapViewModelTest {
         viewModel.onMapSizeChanged(MAP_WIDTH, MAP_HEIGHT)
         viewModel.onSliderMoved(12 * 60f)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.overlay.collect {} }
+        return viewModel
+    }
+
+    /** A [dayViewModel] in the mode `Sun hours` at Interlaken, zoom 12, whose first day is complete and counted. */
+    private fun TestScope.sunHoursViewModel(
+        suns: MutableList<SunPosition>,
+        before: suspend () -> Unit = {},
+        log: (String) -> Unit = {},
+    ): MapViewModel {
+        val viewModel = dayViewModel(suns, before = before, log = log)
+        viewModel.onOverlayModeSelected(OverlayMode.SUN_HOURS)
+        viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+        viewModel.onOverlayToggled()
+        advanceUntilIdle()
+        assertTrue(viewModel.heatmap.value is HeatmapUiState.Ready, "${viewModel.heatmap.value}")
         return viewModel
     }
 
