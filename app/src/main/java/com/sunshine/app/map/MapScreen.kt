@@ -32,7 +32,10 @@ import java.time.Clock
 import kotlinx.coroutines.Dispatchers
 
 @Composable
-fun MapScreen(viewModel: MapViewModel = viewModel(factory = mapViewModelFactory)) {
+fun MapScreen(
+    onAboutClicked: () -> Unit,
+    viewModel: MapViewModel = viewModel(factory = mapViewModelFactory),
+) {
     val camera by viewModel.camera.collectAsStateWithLifecycle()
     val isOffline by viewModel.isOffline.collectAsStateWithLifecycle()
     val selectedTime by viewModel.selectedTime.collectAsStateWithLifecycle()
@@ -66,6 +69,7 @@ fun MapScreen(viewModel: MapViewModel = viewModel(factory = mapViewModelFactory)
         MapLabels(
             camera = camera,
             isOffline = isOffline,
+            onAboutClicked = onAboutClicked,
             notice = notice(overlayMode, overlay, heatmap, selectedTime),
             topEnd = {
                 OverlayControl(

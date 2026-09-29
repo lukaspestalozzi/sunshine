@@ -25,4 +25,8 @@
     <string name="heatmap_mode_sun_hours">Sun hours</string>
     <string name="heatmap_computing">Computing sun hours …</string>
     <string name="sun_panel_sun_hours">Sun hours</string>
+    <string name="about_title">About</string>
+    <string name="about_version">Sunshine %1$s</string>
+    <string name="about_icons">Icons: Material Symbols (Apache License 2.0)</string>
+    <string name="about_button">About and attributions</string>
 </resources>

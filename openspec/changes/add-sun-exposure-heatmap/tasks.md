@@ -89,11 +89,11 @@
 
 ## 7. app: one toggle, one status card, About page (design D7, D8)
 
-- [ ] 7.1 Write `AboutEntriesTest` first:
+- [x] 7.1 Write `AboutEntriesTest` first:
   - the entries are the app name with version name `0.1.0`, the map attribution `© OpenStreetMap contributors, SRTM | Map style: © OpenTopoMap (CC-BY-SA)` with `https://www.openstreetmap.org/copyright`, the elevation attribution `Elevation: © Mapterhorn and its sources` with `https://mapterhorn.com/attribution/`, and `Icons: Material Symbols (Apache License 2.0)` without a link.
 
   Then implement the entries, `AboutScreen` in `app/.../about/AboutScreen.kt`, and the switch in `MainActivity` (`rememberSaveable` flag, `BackHandler`), with the `info` vector drawable (design D8). Verify: `./gradlew :app:testDebugUnitTest --tests "*AboutEntriesTest*"` passes and `./gradlew assembleDebug` succeeds.
-- [ ] 7.2 Remove the attribution labels from `MapLabels` and add the ⓘ `IconButton` (content description `About and attributions`) directly left of the coordinates in the top-start corner; the sun panel moves down to the bottom (design D8). Verify: `./gradlew assembleDebug` succeeds and `grep -rn "map_attribution" app/src/main/java` finds it only in the About entries.
+- [x] 7.2 Remove the attribution labels from `MapLabels` and add the ⓘ `IconButton` (content description `About and attributions`) alone in the top-start corner, with the coordinates and the offline notice stacked below it (user decision, 2026-09-29); the sun panel moves down to the bottom (design D8). Verify: `./gradlew assembleDebug` succeeds and `grep -rn "map_attribution" app/src/main/java` finds it only in the About entries.
 - [ ] 7.3 Write `OverlayToggleTest` first:
   - `isOverlayOn` false → `Off`; true with `SUN_AND_SHADE` → `Sun & shade`; true with `SUN_HOURS` → `Sun hours`;
   - selecting `Off` switches the overlay off; selecting a mode sets it and switches the overlay on only if it was off;
@@ -107,7 +107,7 @@
 - [ ] 8.1 Update `CLAUDE.md` (the `app` row: `about/AboutScreen.kt`, the toggle and status card in `map/OverlayControl.kt`, no attributions in `MapLabels`). Verify: `openspec validate --all --strict` passes and `CLAUDE.md` names `AboutScreen.kt`.
 - [ ] 8.2 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, all unit tests and the debug APK pass, and validation reports no failures.
 - [ ] 8.3 On-device check with the CI APK. Expected:
-  - at launch the toggle shows `Off` selected and no status card; the ⓘ button sits left of the coordinates, and no attribution covers the map;
+  - at launch the toggle shows `Off` selected and no status card; the ⓘ button sits in the top-left corner with the coordinates below it, and no attribution covers the map;
   - at 360 dp width, in portrait and landscape, the toggle's three icons stay in one row on screen, the status card has the toggle's width and right edge, and nothing overlaps;
   - at Interlaken (46.6863° N, 7.8632° E), zoom 12, 2025-12-21, `Sun hours`: the card shows `Sun hours`, `Computing sun hours …` and directly below it the progress bar until the day is complete, then the heatmap over the whole screen, and the panel reads `Sun hours ≈` 5 h 23 min ± 20 min;
   - the legend reads `0` … `8 h` with `Unknown` in opaque colours; the heatmap's bands rise from slate to light amber, and paths, labels and contour lines stay readable (tune alpha and stops in design D3 if not, keeping the lightness rising);

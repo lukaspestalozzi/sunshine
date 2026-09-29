@@ -156,8 +156,8 @@ top right:
 
 ```
 +--------------------------------------------+
-| (i) [46.8010 N, 8.2176 E]  [ o | (*) | ## ] |   toggle: 3 x 56 dp = 168 dp
-|                            +--------------+ |
+| (i)                        [ o | (*) | ## ] |   toggle: 3 x 56 dp = 168 dp
+| [46.8010 N, 8.2176 E]      +--------------+ |
 |                            | Sun hours    | |   mode name
 |                            | Computing .. | |   notice
 |                            | [=====-----] | |   progress, directly below the notice
@@ -181,7 +181,8 @@ top right:
   overlay is on. Top to bottom: the mode's name (`labelLarge`); the notice from `notice(mode, …)`
   (`labelMedium`), if any; the `LinearProgressIndicator` of `dayProgress` directly below the
   notice, or below the name when there is none; the mode's legend. The notices leave
-  `MapLabels`' top-centre column, which keeps the coordinates and the offline notice.
+  `MapLabels`' top column, which keeps the coordinates and the offline notice and moves from the
+  top centre to the top-left corner, below the ⓘ button (D8).
 - **Legend:** band and shade swatches are drawn opaque (alpha 1). The overlay's translucency is
   right on the map but made the legend's colours barely visible on the card. The labels are numbers
   every 2 h with the unit once, after the last label (`0 2 4 6 8 h`): at 168 dp a band of 2 h is
@@ -195,8 +196,12 @@ top right:
   two controls with `Sun & shade` twice).
 
 ### D8. Attributions on an About page (user decision, 2026-09-29)
-- **ⓘ button:** an `IconButton` (48 dp) with the Material Symbol `info`, in `MapLabels`' top-start
-  corner, in one row directly left of the coordinates label. The map's attribution labels and
+- **ⓘ button:** an `IconButton` (48 dp) with the Material Symbol `info`, alone in `MapLabels`'
+  top-start corner, with the coordinates label and the offline notice stacked below it (user
+  decision, 2026-09-29, during apply). In one row with the coordinates it did not fit next to the
+  168 dp toggle on a ~352 dp phone: 8 + 48 + ~130 + 8 + 168 + 8 ≈ 370 dp. Stacked, only the
+  ~130 dp label shares its height with the toggle column (322 dp). *Alternatives (asked):* the
+  coordinates as the sun panel's first line; a 144 dp toggle, which fits ~352 dp only barely. The map's attribution labels and
   their `Column` at the bottom are removed; the sun panel then sits directly at the bottom.
 - **About page:** a Compose screen (`AboutScreen`, new `app/.../about/AboutScreen.kt`) with the app
   name and version (`BuildConfig.VERSION_NAME`), the map attribution (opens
