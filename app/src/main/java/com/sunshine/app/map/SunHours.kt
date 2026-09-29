@@ -46,3 +46,25 @@ fun countSunHours(day: DayOverlay): SunHours {
     }
     return SunHours(day.area, width, raster.height, day.steps.size, sun, unknown)
 }
+
+/**
+ * The heatmap of [hours] (design D4 of add-sun-exposure-heatmap): each pixel in the colour of its
+ * band, with the unknown hatching on top where some step is unknown, and the hatching alone where
+ * every step is.
+ */
+fun renderSunHours(
+    hours: SunHours,
+    bands: HeatmapBands,
+): OverlayImage {
+    val pixels =
+        IntArray(hours.width * hours.height) { i ->
+            val unknown = hours.unknown[i].toInt()
+            val hatched = unknown > 0 && isHatched(i % hours.width, i / hours.width)
+            when {
+                hatched -> UNKNOWN_ARGB
+                unknown == hours.steps -> 0
+                else -> bands.colours[bands.bandOf(hours.sun[i].toInt())]
+            }
+        }
+    return OverlayImage(hours.width, hours.height, pixels, hours.area.corners())
+}
