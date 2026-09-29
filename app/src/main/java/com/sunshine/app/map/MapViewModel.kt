@@ -407,11 +407,11 @@ class MapViewModel(
             // Written by the jobs, read by the collector, as for the overlay's `shown`.
             val kept = AtomicReference<HeatmapUiState.Ready?>(null)
             combine(camera, selectedTime.map { it.toLocalDate() }.distinctUntilChanged(), sunHoursShown, mapSize, isOnline) {
-                    camera,
-                    date,
-                    (on, shown),
-                    size,
-                    online,
+                camera,
+                date,
+                (on, shown),
+                size,
+                online,
                 ->
                 HeatmapInput(camera, date, on, shown, size, online)
             }.conflate()
