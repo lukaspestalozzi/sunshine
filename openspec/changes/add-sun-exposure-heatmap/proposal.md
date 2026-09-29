@@ -15,9 +15,17 @@ tile servers' bulk-download policies, and #7 does not depend on it.
 
 ## What Changes
 
-- `app`: a second mode of the sun-shade overlay (user decision). While the overlay is on, a
-  segmented control switches between `Sun & shade` (today's overlay at the selected time) and
-  `Sun hours` (the heatmap of the selected day).
+- `app`: a second mode of the sun-shade overlay (user decision). A three-way icon toggle selects
+  `Off`, `Sun & shade` (today's overlay at the selected time) or `Sun hours` (the heatmap of the
+  selected day). It replaces the on/off chip (user decision, 2026-09-29, after the first device
+  screenshot showed the chip, a segmented control, the progress bar, the legend and the notice
+  crowding and overlapping each other).
+- `app`: below the toggle, one status card of the same width holds the mode's name, its notice
+  (`Computing …`, `Zoom in …`), directly below it the day's progress bar, and the mode's legend in
+  opaque colours (user decisions, 2026-09-29).
+- `app`: the attributions leave the map. An ⓘ button in the map's top-left corner opens an About
+  page with the map and elevation attributions, their links and the app version (user decision,
+  2026-09-29).
 - `app`: the heatmap colours every cell of the visible area by its hours of sun on the selected
   day: the number of slider steps at which the cell is sun, times 5 minutes. It is built from the
   day's grids once the whole day is computed.
@@ -49,7 +57,12 @@ tile servers' bulk-download policies, and #7 does not depend on it.
 ### Modified Capabilities
 
 - `sun-shade-overlay`: "Overlay appearance" and "Overlay updates" now apply to the `Sun & shade`
-  mode only, because the heatmap mode has its own legend, notice and update rules.
+  mode only, because the heatmap mode has its own legend, notice and update rules. The on/off
+  control becomes the three-way toggle ("Overlay toggle"), the progress bar moves into the new
+  status card ("Overlay of the whole day"), and "Overlay status card" is added.
+- `map-view`: "Map attribution" is replaced by "About and attributions" (the ⓘ button and the
+  About page), and "Missing map tiles" checks for the ⓘ button instead of the attribution.
+- `sun-position`: "Sun information panel" must not cover the ⓘ button instead of the attribution.
 
 ## Non-goals
 
@@ -62,14 +75,19 @@ tile servers' bulk-download policies, and #7 does not depend on it.
 - Keeping computed heatmaps across app restarts.
 - Downloading regions for offline use (roadmap #6).
 - Accuracy finer than the 5-minute slider steps. The panel's tracer line stays the precise value.
+- Showing the attributions on the map at launch before collapsing them (user decision,
+  2026-09-29). The OpenStreetMap Foundation's attribution guidelines allow collapsed attribution
+  reachable from an "(i)" button or an About option; their collapse options (dismiss, map
+  interaction, after five seconds) suggest an initial display. That risk is accepted.
 
 ## Impact
 
 - **Code:**
   - `app`: heatmap raster and image (sun and unknown counts per pixel, the colour bands), built
     from a finished `DayOverlay` and kept with it; overlay mode and heatmap state in
-    `MapViewModel`; the segmented control and heatmap legend in `OverlayControl`; the `Sun hours`
-    line in `SunPanel`; strings.
+    `MapViewModel`; the three-way toggle, the status card and the legends in `OverlayControl`; the
+    `Sun hours` line in `SunPanel`; the ⓘ button in `MapLabels` and a new About screen, switched in
+    `MainActivity` without a navigation library; icons as vector drawables; strings.
   - `core`: none expected. The heatmap reuses `ShadeGrid.stateAt` and `SunDay.dayLength`.
 - **Memory:** about 1.4 MB per cached day for the counts at map zoom 12 on a phone (two 16-bit
   counters per pixel), counted in the existing day-cache budget.

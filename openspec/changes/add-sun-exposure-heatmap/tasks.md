@@ -85,13 +85,36 @@
 ## 6. Integration
 
 - [x] 6.1 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, all unit tests and the debug APK pass, and validation reports no failures.
-- [ ] 6.2 On-device check with the CI APK. Expected:
-  - the overlay is off at launch; switched on, it shows `Sun & shade` with the mode control;
-  - at Interlaken (46.6863° N, 7.8632° E), zoom 12, 2025-12-21, `Sun hours`: `Computing sun hours …` and the progress bar until the day is complete, then the heatmap over the whole screen, and the panel reads `Sun hours ≈` 5 h 23 min ± 20 min;
-  - the legend reads `0 h` … `8 h` with `Unknown`; the bands rise from slate to light amber, and paths, labels and contour lines stay readable (tune alpha and stops in design D3 if not, keeping the lightness rising);
-  - moving the slider leaves the heatmap unchanged; switching modes shows each at once;
+6.2 (the on-device check) moved to 8.3, after the redesign of the controls and the About page (user decisions, 2026-09-29).
+
+## 7. app: one toggle, one status card, About page (design D7, D8)
+
+- [ ] 7.1 Write `AboutEntriesTest` first:
+  - the entries are the app name with version name `0.1.0`, the map attribution `© OpenStreetMap contributors, SRTM | Map style: © OpenTopoMap (CC-BY-SA)` with `https://www.openstreetmap.org/copyright`, the elevation attribution `Elevation: © Mapterhorn and its sources` with `https://mapterhorn.com/attribution/`, and `Icons: Material Symbols (Apache License 2.0)` without a link.
+
+  Then implement the entries, `AboutScreen` in `app/.../about/AboutScreen.kt`, and the switch in `MainActivity` (`rememberSaveable` flag, `BackHandler`), with the `info` vector drawable (design D8). Verify: `./gradlew :app:testDebugUnitTest --tests "*AboutEntriesTest*"` passes and `./gradlew assembleDebug` succeeds.
+- [ ] 7.2 Remove the attribution labels from `MapLabels` and add the ⓘ `IconButton` (content description `About and attributions`) directly left of the coordinates in the top-start corner; the sun panel moves down to the bottom (design D8). Verify: `./gradlew assembleDebug` succeeds and `grep -rn "map_attribution" app/src/main/java` finds it only in the About entries.
+- [ ] 7.3 Write `OverlayToggleTest` first:
+  - `isOverlayOn` false → `Off`; true with `SUN_AND_SHADE` → `Sun & shade`; true with `SUN_HOURS` → `Sun hours`;
+  - selecting `Off` switches the overlay off; selecting a mode sets it and switches the overlay on only if it was off;
+  - selecting `Sun hours` from `Off` gives `isOverlayOn` true and `SUN_HOURS` on a `MapViewModel` (spec "Straight to sun hours").
+
+  Then replace the chip and the segmented control with the three-way icon toggle, 3 × 56 dp, without the check icon, and the `layers_clear`, `contrast` and `timelapse` vector drawables (design D7). Verify: `./gradlew :app:testDebugUnitTest --tests "*OverlayToggleTest*"` passes.
+- [ ] 7.4 Update `HeatmapLegendTest` first: labels `0`, `2`, `4`, `6`, `8 h` for 8 h 33 min; `0` … `14 h` for 15 h 51 min; `0 h` for a day length of 0; every legend colour opaque (alpha 0xFF). Then build the status card of the toggle's width: the mode's name, the notice, directly below it the progress bar (below the name when there is no notice), and the mode's legend in opaque colours; move the notices out of `MapLabels`, and give every floating element the one surface style (design D7). Verify: `./gradlew :app:testDebugUnitTest --tests "*Heatmap*" --tests "*OverlayNoticesTest*"` passes and `./gradlew :app:lintDebug` reports no new issues.
+
+## 8. Docs and integration after the redesign
+
+- [ ] 8.1 Update `CLAUDE.md` (the `app` row: `about/AboutScreen.kt`, the toggle and status card in `map/OverlayControl.kt`, no attributions in `MapLabels`). Verify: `openspec validate --all --strict` passes and `CLAUDE.md` names `AboutScreen.kt`.
+- [ ] 8.2 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, all unit tests and the debug APK pass, and validation reports no failures.
+- [ ] 8.3 On-device check with the CI APK. Expected:
+  - at launch the toggle shows `Off` selected and no status card; the ⓘ button sits left of the coordinates, and no attribution covers the map;
+  - at 360 dp width, in portrait and landscape, the toggle's three icons stay in one row on screen, the status card has the toggle's width and right edge, and nothing overlaps;
+  - at Interlaken (46.6863° N, 7.8632° E), zoom 12, 2025-12-21, `Sun hours`: the card shows `Sun hours`, `Computing sun hours …` and directly below it the progress bar until the day is complete, then the heatmap over the whole screen, and the panel reads `Sun hours ≈` 5 h 23 min ± 20 min;
+  - the legend reads `0` … `8 h` with `Unknown` in opaque colours; the heatmap's bands rise from slate to light amber, and paths, labels and contour lines stay readable (tune alpha and stops in design D3 if not, keeping the lightness rising);
+  - moving the slider leaves the heatmap unchanged; switching between `Sun & shade` and `Sun hours` shows each at once;
   - a pan keeps the previous heatmap on its terrain with `Computing sun hours …`;
   - picking 2025-12-22 and then 2025-12-21 shows the first heatmap at once;
   - in flight mode over a never-visited area, the heatmap is hatched only, and the panel reads `Sun hours unknown`;
-  - zoom 10.5 shows `Zoom in to see sun and shade`;
+  - zoom 10.5 shows `Zoom in to see sun and shade` in the card;
+  - ⓘ opens the About page with the version and both attributions; each attribution opens its page in the browser; back returns to the same map, time and mode;
   - record in design.md, "Performance budget": the logged `Overlay day` total at zoom 12 and the `Sun hours` pass and rendering times, against the 2 s and 100 ms budgets. If the pass exceeds 2 s, ask the user about incremental counting; if the day is too slow, ask about a partial heatmap (proposal, Non-goals).

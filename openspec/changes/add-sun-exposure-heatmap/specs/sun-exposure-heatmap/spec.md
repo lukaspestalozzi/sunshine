@@ -8,34 +8,22 @@ selected day, taking terrain into account. Sun that cannot be decided is marked,
 ## ADDED Requirements
 
 ### Requirement: Overlay mode
-While the sun-shade overlay (sun-shade-overlay "Overlay toggle") is on, a segmented control with
-the two options `Sun & shade` and `Sun hours` SHALL be shown next to the overlay toggle.
+While the overlay is on, it SHALL show one of two modes, selected with the overlay toggle
+(sun-shade-overlay "Overlay toggle"):
 - `Sun & shade` shows the overlay of the selected time (sun-shade-overlay).
 - `Sun hours` shows the heatmap of the selected day (this capability).
 
-While the overlay is off, the control SHALL NOT be shown. The mode SHALL be `Sun & shade` when the
-app is launched. While the app process is alive, including across screen rotation, the selected
-mode SHALL be preserved, also while the overlay is off. Switching the mode SHALL NOT restart or
-discard the computation of the day (sun-shade-overlay "Overlay of the whole day"). Once the
-heatmap of the visible area and selected day has been built, switching to either mode SHALL show
-that mode within 100 ms.
-
-#### Scenario: Launch
-- **WHEN** the app is launched and the user switches the overlay on
-- **THEN** the mode is `Sun & shade`, and the control shows both options
-
-#### Scenario: Overlay off
-- **WHEN** the overlay is off
-- **THEN** the mode control is not shown
+Switching between the two modes SHALL NOT restart or discard the computation of the day
+(sun-shade-overlay "Overlay of the whole day"). Once the heatmap of the visible area and selected
+day has been built, switching to either mode SHALL show that mode within 100 ms.
 
 #### Scenario: Switch back and forth
 - **WHEN** the heatmap of the visible area and selected day has been built, and the user switches to `Sun & shade` and back to `Sun hours`
 - **THEN** each mode is shown within 100 ms, and the day is not computed again
 
-#### Scenario: Screen rotation
-- **WHEN** the mode is `Sun hours` and the device is rotated
-- **THEN** the mode is still `Sun hours`
-
+#### Scenario: Switch while computing
+- **WHEN** the day is being computed and the user switches from `Sun & shade` to `Sun hours`
+- **THEN** the computation continues where it was, and the heatmap is shown once the day is complete
 ### Requirement: Sun hours of a cell
 The sun hours of a cell SHALL be counted over the slider positions of the selected day
 (time-selection "Choose the time of day": 5-minute steps over the day's actual length). The cells
@@ -136,19 +124,25 @@ estimate of its unknown steps.
 - **THEN** every cell is drawn with the hatching only
 
 ### Requirement: Heatmap legend
-In `Sun hours` mode, while the overlay is on, a legend SHALL show the colour scale from 0 h to the
-day's possible sun, labelled every whole 2 hours from `0 h` (e.g. `0 h`, `2 h`, `4 h`, `6 h`, `8 h`
-for a day length of 8 h 33 min), and the hatching labelled `Unknown`. It SHALL NOT cover the
-crosshair, the sun direction line, the sun information panel or the map attributions.
+In `Sun hours` mode, while the overlay is on, the legend in the status card (sun-shade-overlay
+"Overlay status card") SHALL show:
+- the colour scale from 0 h to the day's possible sun, its band colours drawn opaque;
+- below it, labels every whole 2 hours from 0 at the band where each begins, as numbers, with the
+  unit `h` after the last one only (e.g. `0`, `2`, `4`, `6`, `8 h` for a day length of 8 h 33 min),
+  so that no labels overlap;
+- the hatching labelled `Unknown`.
 
 #### Scenario: Winter legend
 - **WHEN** the mode is `Sun hours` and the day length at the map centre is 8 h 33 min
-- **THEN** the legend shows the scale with the labels `0 h`, `2 h`, `4 h`, `6 h` and `8 h`, and `Unknown` with the hatching
+- **THEN** the legend shows the scale with the labels `0`, `2`, `4`, `6` and `8 h`, and `Unknown` with the hatching
 
 #### Scenario: Summer legend
 - **WHEN** the mode is `Sun hours` and the day length at the map centre is 15 h 51 min
-- **THEN** the scale's labels are `0 h`, `2 h`, `4 h`, `6 h`, `8 h`, `10 h`, `12 h` and `14 h`
+- **THEN** the scale's labels are `0`, `2`, `4`, `6`, `8`, `10`, `12` and `14 h`, and none of them overlap
 
+#### Scenario: Opaque colours
+- **WHEN** the legend is shown
+- **THEN** every band colour in it is fully opaque
 ### Requirement: Heatmap updates
 The heatmap SHALL be built off the main thread once every slider position of the day has been
 computed (sun-shade-overlay "Overlay of the whole day"); the map SHALL stay responsive meanwhile.
@@ -156,8 +150,8 @@ No heatmap of an area and date SHALL be shown before it is built; the app SHALL 
 heatmap.
 
 While the heatmap of the visible area and selected date is not built, in `Sun hours` mode:
-- the notice `Computing sun hours …` SHALL be shown, together with the progress bar of
-  sun-shade-overlay "Overlay of the whole day";
+- the notice `Computing sun hours …` SHALL be shown in the status card (sun-shade-overlay "Overlay
+  status card"), with the day's progress bar directly below it;
 - after a camera move, the previous heatmap SHALL stay on its geographic area until the new one is
   built; newly visible areas stay untinted meanwhile;
 - after a change of the selected date, the previous heatmap SHALL stay until the new one is built.
@@ -168,7 +162,7 @@ again once the day is complete. A built heatmap SHALL be kept with its day in th
 
 #### Scenario: Switching on in heatmap mode
 - **WHEN** the mode is `Sun hours`, the user switches the overlay on, and 72 of the day's 288 slider positions are computed
-- **THEN** no heatmap is drawn, `Computing sun hours …` is shown, and the progress bar shows 25 %
+- **THEN** no heatmap is drawn, the status card shows `Computing sun hours …` and directly below it the progress bar at 25 %
 
 #### Scenario: Day complete
 - **WHEN** the last slider position of the day has been computed

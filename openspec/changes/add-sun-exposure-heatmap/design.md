@@ -128,24 +128,92 @@ pixels, cheap next to the pass).
 - `MapScreen` passes MapLibre the image of the mode: `overlay.image()` in `Sun & shade`, and the
   heatmap's `Ready` or kept image in `Sun hours`.
 
-### D6. UI (user decisions)
-- **Mode control:** a Material 3 `SingleChoiceSegmentedButtonRow` with `Sun & shade` and
-  `Sun hours`. It sits below the toggle chip and its progress bar and above the legend, and is
-  shown only while the overlay is on. The chip keeps its label and its on/off meaning.
+### D6. UI (user decisions; controls and legend layout replaced by D7 on 2026-09-29)
+- **Mode control (replaced by D7):** a Material 3 `SingleChoiceSegmentedButtonRow` with
+  `Sun & shade` and `Sun hours`, below the toggle chip and its progress bar and above the legend,
+  shown only while the overlay is on. The first device screenshot showed it wrapping, running off
+  the screen and overlapping the notice.
 - **Legend:** in `Sun hours` mode, a horizontal bar of the n band colours on the legend's surface,
   with the labels `0 h`, `2 h`, … under the band where each whole 2 h begins. Its bands come from
   the sun panel's day length (map centre, selected date), so the scale shows while the day is
   still computed (apply, 2026-09-29). Below it is the `Unknown` hatching row, which it
   shares with the overlay's legend.
-- **Notices:** `overlayNotice` takes the mode. In `Sun hours` it shows `Computing sun hours …`
-  while the heatmap is `Computing`, and in both modes it shows `Zoom in to see sun and shade` when
-  zoomed out.
+- **Notices:** `notice(mode, …)` picks `overlayNotice` or `heatmapNotice`. In `Sun hours` it shows
+  `Computing sun hours …` while the heatmap is `Computing`, and in both modes it shows
+  `Zoom in to see sun and shade` when zoomed out. Since D7 they show in the status card.
 - **Panel:** `formatSunHours(state, center)` gives the `Sun hours` value text. It gives `…` unless
   a `Ready` heatmap's area is the current visible area. Otherwise it reads the pixel under the map
   centre, which is the raster's centre pixel. Durations use the existing `formatDayLength` style
   (`5 h 20 min`); an unknown time under an hour is `10 min`.
 - Strings live in `strings.xml`: `heatmap_mode_sun_and_shade`, `heatmap_mode_sun_hours`,
   `heatmap_computing`, `sun_panel_sun_hours`, and the value templates.
+
+### D7. One toggle and one status card (user decisions, 2026-09-29)
+The first device screenshot showed five floating pieces at the top right (chip, progress bar,
+segmented control, legend, notice) with different widths and edges, a wrapped `Sun & shade`
+label, a control running off the screen, and a washed-out legend. They become one column at the
+top right:
+
+```
++--------------------------------------------+
+| (i) [46.8010 N, 8.2176 E]  [ o | (*) | ## ] |   toggle: 3 x 56 dp = 168 dp
+|                            +--------------+ |
+|                            | Sun hours    | |   mode name
+|                            | Computing .. | |   notice
+|                            | [=====-----] | |   progress, directly below the notice
+|                            | [slate-amber]| |   legend, opaque
+|                            | 0 2 4 6 8 h  | |
+|                            | // Unknown   | |
+|                            +--------------+ |
++--------------------------------------------+
+```
+
+- **Toggle:** a `SingleChoiceSegmentedButtonRow` of three icon-only `SegmentedButton`s, 56 dp
+  wide each (168 dp in all), with content descriptions `Overlay off`, `Sun and shade now`,
+  `Sun hours of the day`. The icons are Material Symbols, copied as vector drawables (see D8):
+  `layers_clear` (off), `contrast` (a half-filled circle: sun and shade), `timelapse` (hours of
+  the day). The selected button's check icon is turned off, so the width stays fixed.
+- **State:** no view-model change. The toggle shows `Off` when `isOverlayOn` is false, else the
+  `overlayMode`. Selecting `Off` switches the overlay off; selecting a mode sets the mode and
+  switches the overlay on if it is off. A small pure function maps the two states to the selected
+  option and back, so it can be tested on the JVM.
+- **Status card:** a `Surface` of exactly the toggle's width, directly below it, shown while the
+  overlay is on. Top to bottom: the mode's name (`labelLarge`); the notice from `notice(mode, …)`
+  (`labelMedium`), if any; the `LinearProgressIndicator` of `dayProgress` directly below the
+  notice, or below the name when there is none; the mode's legend. The notices leave
+  `MapLabels`' top-centre column, which keeps the coordinates and the offline notice.
+- **Legend:** band and shade swatches are drawn opaque (alpha 1). The overlay's translucency is
+  right on the map but made the legend's colours barely visible on the card. The labels are numbers
+  every 2 h with the unit once, after the last label (`0 2 4 6 8 h`): at 168 dp a band of 2 h is
+  about 21 dp, too narrow for `10 h` or `14 h`.
+- **One surface style** for all floating elements (coordinates, offline notice, toggle
+  background, status card, sun panel): `colorScheme.surface` at alpha 0.85, `shapes.medium` (12 dp)
+  corners, 8 dp inner padding, 8 dp gaps, and the same 8 dp margin from the safe-drawing insets.
+  The top-right column aligns to one right edge.
+- *Alternatives (asked):* a layers button with a menu and a progress ring (least crowded, but two
+  taps to switch and the mode hidden); keeping the chip plus a narrower segmented control (still
+  two controls with `Sun & shade` twice).
+
+### D8. Attributions on an About page (user decision, 2026-09-29)
+- **ⓘ button:** an `IconButton` (48 dp) with the Material Symbol `info`, in `MapLabels`' top-start
+  corner, in one row directly left of the coordinates label. The map's attribution labels and
+  their `Column` at the bottom are removed; the sun panel then sits directly at the bottom.
+- **About page:** a Compose screen (`AboutScreen`, new `app/.../about/AboutScreen.kt`) with the app
+  name and version (`BuildConfig.VERSION_NAME`), the map attribution (opens
+  `https://www.openstreetmap.org/copyright`), the elevation attribution (opens
+  `MapterhornTiles.ATTRIBUTION_URL`), and the icon credit. Its entries (text and URL) come from a
+  pure function, testable on the JVM.
+- **Navigation:** `MainActivity` switches between `MapScreen` and `AboutScreen` on a
+  `rememberSaveable` flag; `BackHandler` returns to the map. The map's view model is scoped to the
+  activity, so camera, time and overlay survive the round trip. No navigation library for two
+  screens.
+- **Icons:** the four Material Symbols (`info`, `layers_clear`, `contrast`, `timelapse`) are copied
+  as vector drawables into `res/drawable`, instead of adding the large
+  `material-icons-extended` dependency. They are Apache License 2.0, hence the credit on the About
+  page.
+- *Alternative (asked):* show the attributions on the map at launch and collapse them on the first
+  map interaction or after 5 s, which follows the collapse options of the OpenStreetMap
+  Foundation's guidelines literally. The user chose the About page alone (risk below).
 
 ### Performance budget
 | Interaction | Budget | How it is checked |
@@ -154,6 +222,7 @@ pixels, cheap next to the pass).
 | Counting pass after the day's last step | ≤ 2 s on the phone at map zoom 12 | log line `Sun hours ... in N ms`, device check |
 | Rendering the heatmap image | ≤ 100 ms on the phone | the same log line |
 | Time slider in `Sun hours` mode | no heatmap work | unit test |
+| Opening the About page and going back | ≤ 100 ms, map state kept | device check |
 
 If the pass exceeds 2 s, the fallback is incremental counting (D2), which would be a user decision
 in a follow-up. The whole day's duration at zoom 12 is also logged (the existing `Overlay day`
@@ -174,6 +243,10 @@ later (proposal, Non-goals).
   with `Computing`; switching back to a cached complete day gives `Ready` without computing the
   day again; switching modes does not restart the day.
 - `OverlayNoticesTest`: the notices per mode.
+- `OverlayToggleTest` (D7): `Off` / `Sun & shade` / `Sun hours` from `isOverlayOn` and
+  `overlayMode`, and the actions each selection takes.
+- `HeatmapLegendTest` (D7): the number labels with the unit once; opaque legend colours.
+- `AboutEntriesTest` (D8): the attribution texts, their URLs and the version entry.
 - Device check: Interlaken on 2025-12-21 at zoom 12 gives `Sun hours ≈` 5 h 23 min ± 20 min at
   the centre, and the timings of the budget.
 
@@ -193,6 +266,14 @@ later (proposal, Non-goals).
   (≤ 1 min at the screen edges at zoom 11), far below the 5-minute steps.
 - [A day of ~340k pixels adds ~1.4 MB to the cache per heatmap] → It is counted in the existing
   quarter-of-heap budget, so it costs cached days, not memory safety.
+
+- [Attributions only behind the ⓘ button, never shown on the map (user decision)] → The
+  OpenStreetMap Foundation's guidelines accept collapsed attribution reachable from an "(i)"
+  button or an About option. Their collapse options (dismiss, first map interaction, after five
+  seconds) suggest an initial display. If that is required, the D8 alternative adds it without
+  changing the About page.
+- [Icons copied into the app] → Four small vector drawables, credited on the About page; no new
+  dependency to update.
 
 ## Migration Plan
 
