@@ -70,16 +70,14 @@ fun MapScreen(
             camera = camera,
             isOffline = isOffline,
             onAboutClicked = onAboutClicked,
-            notice = notice(overlayMode, overlay, heatmap, selectedTime),
             topEnd = {
                 OverlayControl(
-                    isOn = isOverlayOn,
+                    option = overlayOption(isOverlayOn, overlayMode),
+                    notice = notice(overlayMode, overlay, heatmap, selectedTime),
                     dayProgress = dayProgress,
-                    mode = overlayMode,
                     // The scale runs up to the day length at the map centre (design D3 of add-sun-exposure-heatmap).
                     bands = sun?.day?.dayLength?.let { remember(it) { HeatmapBands(it) } },
-                    onToggle = viewModel::onOverlayToggled,
-                    onModeSelected = viewModel::onOverlayModeSelected,
+                    onOptionSelected = viewModel::onOverlaySelected,
                 )
             },
         ) {

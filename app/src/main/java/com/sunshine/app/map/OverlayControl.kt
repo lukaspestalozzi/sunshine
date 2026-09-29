@@ -3,14 +3,17 @@ package com.sunshine.app.map
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
@@ -26,55 +29,52 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.sunshine.app.R
 import java.time.ZonedDateTime
 
 /**
- * The overlay switch, below it the progress of the day's computation while it runs ([dayProgress]
- * from 0 to 1, or `null`), and while the overlay is on the [mode] control and the legend of the mode
- * (sun-shade-overlay spec, "Overlay toggle", "Overlay appearance", "Overlay of the whole day";
- * design D10 of add-sun-shade-overlay; sun-exposure-heatmap spec, "Overlay mode", "Heatmap legend";
- * design D6 of add-sun-exposure-heatmap). The heatmap's scale is shown once its [bands] are known.
+ * The three-way overlay toggle showing [option] and, while the overlay is on, the status card of
+ * its width below it: the mode's name, its [notice], directly below the notice (or the name) the
+ * progress of the day's computation while it runs ([dayProgress] from 0 to 1, or `null`), and the
+ * mode's legend (sun-shade-overlay spec, "Overlay toggle", "Overlay status card", "Overlay
+ * appearance"; sun-exposure-heatmap spec, "Heatmap legend"; design D7 of add-sun-exposure-heatmap).
+ * The heatmap's scale is shown once its [bands] are known.
  */
 @Composable
 fun OverlayControl(
-    isOn: Boolean,
+    option: OverlayOption,
+    @StringRes notice: Int?,
     dayProgress: Float?,
-    mode: OverlayMode,
     bands: HeatmapBands?,
-    onToggle: () -> Unit,
-    onModeSelected: (OverlayMode) -> Unit,
+    onOptionSelected: (OverlayOption) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier, horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        ChipWithBar(
-            chip = {
-                FilterChip(
-                    selected = isOn,
-                    onClick = onToggle,
-                    label = { Text(stringResource(R.string.overlay_toggle)) },
-                )
-            },
-            bar = dayProgress?.let { progress -> { LinearProgressIndicator(progress = { progress }) } },
-        )
-        if (isOn) {
-            ModeControl(mode, onModeSelected)
-            Surface(color = MaterialTheme.colorScheme.surface.copy(alpha = LEGEND_ALPHA), shape = MaterialTheme.shapes.small) {
-                Column(Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    when (mode) {
-                        OverlayMode.SUN_AND_SHADE -> LegendRow(R.string.overlay_legend_shade) { drawRect(Color(SHADE_ARGB)) }
-                        OverlayMode.SUN_HOURS -> bands?.let { BandLegend(it) }
-                    }
-                    LegendRow(R.string.overlay_legend_unknown) { drawHatching() }
-                }
+    Column(modifier.width(TOGGLE_WIDTH), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OverlayToggle(option, onOptionSelected)
+        val (name, legend) =
+            when (option) {
+                OverlayOption.OFF -> return@Column
+                OverlayOption.SUN_AND_SHADE -> R.string.heatmap_mode_sun_and_shade to @Composable { ShadeLegend() }
+                OverlayOption.SUN_HOURS -> R.string.heatmap_mode_sun_hours to @Composable { bands?.let { BandLegend(it) } }
+            }
+        Surface(Modifier.fillMaxWidth(), color = floatingSurfaceColor(), shape = MaterialTheme.shapes.medium) {
+            Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(name), style = MaterialTheme.typography.labelLarge)
+                notice?.let { Text(stringResource(it), style = MaterialTheme.typography.labelMedium) }
+                dayProgress?.let { progress -> LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth()) }
+                legend()
+                LegendRow(R.string.overlay_legend_unknown) { drawHatching() }
             }
         }
     }
 }
+
+/** The background of every floating element on the map (design D7 of add-sun-exposure-heatmap). */
+@Composable
+fun floatingSurfaceColor(): Color = MaterialTheme.colorScheme.surface.copy(alpha = FLOATING_ALPHA)
 
 /**
  * The notice for [state], if any: zoomed out, or computing while the overlay on screen, if any,
@@ -113,24 +113,37 @@ fun notice(
         OverlayMode.SUN_HOURS -> heatmapNotice(heatmap)
     }
 
-/** The legend's labels: `0 h`, `2 h`, … at the index of the band where each whole 2 hours begins. */
-fun legendLabels(bands: HeatmapBands): List<Pair<Int, String>> =
-    (0 until bands.count step BANDS_PER_LABEL).map { band -> band to "${band * BAND_MINUTES / MINUTES_PER_HOUR} h" }
+/**
+ * The legend's labels: `0`, `2`, … at the index of the band where each whole 2 hours begins, with
+ * the unit after the last one only, so that they fit side by side (design D7 of add-sun-exposure-heatmap).
+ */
+fun legendLabels(bands: HeatmapBands): List<Pair<Int, String>> {
+    val starts = (0 until bands.count step BANDS_PER_LABEL).toList()
+    return starts.map { band -> band to "${band * BAND_MINUTES / MINUTES_PER_HOUR}" + if (band == starts.last()) " h" else "" }
+}
 
+/** The bands' colours, opaque: the map's translucency would wash them out on the card. */
+fun legendColours(bands: HeatmapBands): IntArray = IntArray(bands.count) { bands.colours[it] or OPAQUE }
+
+// Icons only, at a fixed width, so that nothing wraps (design D7 of add-sun-exposure-heatmap).
 @Composable
-private fun ModeControl(
-    mode: OverlayMode,
-    onModeSelected: (OverlayMode) -> Unit,
+private fun OverlayToggle(
+    option: OverlayOption,
+    onOptionSelected: (OverlayOption) -> Unit,
 ) {
-    val labels = listOf(R.string.heatmap_mode_sun_and_shade, R.string.heatmap_mode_sun_hours)
-    SingleChoiceSegmentedButtonRow {
-        OverlayMode.entries.forEachIndexed { index, option ->
-            SegmentedButton(
-                selected = mode == option,
-                onClick = { onModeSelected(option) },
-                shape = SegmentedButtonDefaults.itemShape(index, OverlayMode.entries.size),
-                label = { Text(stringResource(labels[index])) },
-            )
+    Surface(color = floatingSurfaceColor(), shape = CircleShape) {
+        SingleChoiceSegmentedButtonRow(Modifier.width(TOGGLE_WIDTH)) {
+            OverlayOption.entries.forEachIndexed { index, entry ->
+                val (icon, description) = TOGGLE_ICONS.getValue(entry)
+                SegmentedButton(
+                    selected = option == entry,
+                    onClick = { onOptionSelected(entry) },
+                    shape = SegmentedButtonDefaults.itemShape(index, OverlayOption.entries.size),
+                    // No check mark: it would widen the selected button.
+                    icon = {},
+                    label = { Icon(painterResource(icon), contentDescription = stringResource(description)) },
+                )
+            }
         }
     }
 }
@@ -139,43 +152,26 @@ private fun ModeControl(
 @Composable
 private fun BandLegend(bands: HeatmapBands) {
     Column {
-        Canvas(Modifier.size(BAND_BAR_WIDTH, 12.dp)) {
+        Canvas(Modifier.fillMaxWidth().height(12.dp)) {
             val width = size.width / bands.count
-            bands.colours.forEachIndexed { band, colour ->
+            legendColours(bands).forEachIndexed { band, colour ->
                 drawRect(Color(colour), topLeft = Offset(band * width, 0f), size = Size(width, size.height))
             }
         }
-        Box(Modifier.width(BAND_BAR_WIDTH + LAST_LABEL_ROOM)) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
             for ((band, label) in legendLabels(bands)) {
                 Text(
                     label,
                     style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.offset(x = BAND_BAR_WIDTH * band / bands.count),
+                    modifier = Modifier.offset(x = maxWidth * band / bands.count),
                 )
             }
         }
     }
 }
 
-// The chip, and below it the bar at exactly the chip's width: the bar's own default width (240 dp)
-// would otherwise set the width.
 @Composable
-private fun ChipWithBar(
-    chip: @Composable () -> Unit,
-    bar: (@Composable () -> Unit)?,
-) {
-    Layout(content = {
-        chip()
-        bar?.invoke()
-    }) { measurables, constraints ->
-        val chipPlaceable = measurables[0].measure(constraints)
-        val barPlaceable = measurables.getOrNull(1)?.measure(Constraints.fixedWidth(chipPlaceable.width))
-        layout(chipPlaceable.width, chipPlaceable.height + (barPlaceable?.height ?: 0)) {
-            chipPlaceable.place(0, 0)
-            barPlaceable?.place(0, chipPlaceable.height)
-        }
-    }
-}
+private fun ShadeLegend() = LegendRow(R.string.overlay_legend_shade) { drawRect(Color(SHADE_ARGB or OPAQUE)) }
 
 @Composable
 private fun LegendRow(
@@ -207,11 +203,15 @@ private fun DrawScope.drawHatching() {
     }
 }
 
-private const val LEGEND_ALPHA = 0.85f
+private const val FLOATING_ALPHA = 0.85f
+private const val OPAQUE = 0xFF shl 24
 private const val BAND_MINUTES = 30
 private const val MINUTES_PER_HOUR = 60
 private const val BANDS_PER_LABEL = 2 * MINUTES_PER_HOUR / BAND_MINUTES
-private val BAND_BAR_WIDTH = 160.dp
-
-// Room for the last label, which may start near the bar's right end.
-private val LAST_LABEL_ROOM = 24.dp
+private val TOGGLE_WIDTH = 168.dp
+private val TOGGLE_ICONS =
+    mapOf(
+        OverlayOption.OFF to (R.drawable.ic_layers_clear to R.string.overlay_option_off),
+        OverlayOption.SUN_AND_SHADE to (R.drawable.ic_contrast to R.string.overlay_option_sun_and_shade),
+        OverlayOption.SUN_HOURS to (R.drawable.ic_timelapse to R.string.overlay_option_sun_hours),
+    )

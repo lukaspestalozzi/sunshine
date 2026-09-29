@@ -94,13 +94,13 @@
 
   Then implement the entries, `AboutScreen` in `app/.../about/AboutScreen.kt`, and the switch in `MainActivity` (`rememberSaveable` flag, `BackHandler`), with the `info` vector drawable (design D8). Verify: `./gradlew :app:testDebugUnitTest --tests "*AboutEntriesTest*"` passes and `./gradlew assembleDebug` succeeds.
 - [x] 7.2 Remove the attribution labels from `MapLabels` and add the ⓘ `IconButton` (content description `About and attributions`) alone in the top-start corner, with the coordinates and the offline notice stacked below it (user decision, 2026-09-29); the sun panel moves down to the bottom (design D8). Verify: `./gradlew assembleDebug` succeeds and `grep -rn "map_attribution" app/src/main/java` finds it only in the About entries.
-- [ ] 7.3 Write `OverlayToggleTest` first:
+- [x] 7.3 Write `OverlayToggleTest` first:
   - `isOverlayOn` false → `Off`; true with `SUN_AND_SHADE` → `Sun & shade`; true with `SUN_HOURS` → `Sun hours`;
   - selecting `Off` switches the overlay off; selecting a mode sets it and switches the overlay on only if it was off;
   - selecting `Sun hours` from `Off` gives `isOverlayOn` true and `SUN_HOURS` on a `MapViewModel` (spec "Straight to sun hours").
 
   Then replace the chip and the segmented control with the three-way icon toggle, 3 × 56 dp, without the check icon, and the `layers_clear`, `contrast` and `timelapse` vector drawables (design D7). Verify: `./gradlew :app:testDebugUnitTest --tests "*OverlayToggleTest*"` passes.
-- [ ] 7.4 Update `HeatmapLegendTest` first: labels `0`, `2`, `4`, `6`, `8 h` for 8 h 33 min; `0` … `14 h` for 15 h 51 min; `0 h` for a day length of 0; every legend colour opaque (alpha 0xFF). Then build the status card of the toggle's width: the mode's name, the notice, directly below it the progress bar (below the name when there is no notice), and the mode's legend in opaque colours; move the notices out of `MapLabels`, and give every floating element the one surface style (design D7). Verify: `./gradlew :app:testDebugUnitTest --tests "*Heatmap*" --tests "*OverlayNoticesTest*"` passes and `./gradlew :app:lintDebug` reports no new issues.
+- [x] 7.4 Update `HeatmapLegendTest` first: labels `0`, `2`, `4`, `6`, `8 h` for 8 h 33 min; `0` … `14 h` for 15 h 51 min; `0 h` for a day length of 0; every legend colour opaque (alpha 0xFF). Then build the status card of the toggle's width: the mode's name, the notice, directly below it the progress bar (below the name when there is no notice), and the mode's legend in opaque colours; move the notices out of `MapLabels`, and give every floating element the one surface style (design D7). Verify: `./gradlew :app:testDebugUnitTest --tests "*Heatmap*" --tests "*OverlayNoticesTest*"` passes and `./gradlew :app:lintDebug` reports no new issues.
 
 ## 8. Docs and integration after the redesign
 

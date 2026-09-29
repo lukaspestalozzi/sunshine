@@ -620,6 +620,25 @@ class MapViewModelTest {
     }
 
     @Test
+    fun `selecting an option of the toggle switches the overlay and sets the mode`() {
+        val viewModel = newViewModel()
+
+        viewModel.onOverlaySelected(OverlayOption.SUN_HOURS)
+        assertTrue(viewModel.isOverlayOn.value)
+        assertEquals(OverlayMode.SUN_HOURS, viewModel.overlayMode.value)
+
+        viewModel.onOverlaySelected(OverlayOption.SUN_AND_SHADE)
+        assertTrue(viewModel.isOverlayOn.value)
+        assertEquals(OverlayMode.SUN_AND_SHADE, viewModel.overlayMode.value)
+
+        viewModel.onOverlaySelected(OverlayOption.OFF)
+        assertFalse(viewModel.isOverlayOn.value)
+
+        viewModel.onOverlaySelected(OverlayOption.OFF)
+        assertFalse(viewModel.isOverlayOn.value, "selecting off again keeps it off")
+    }
+
+    @Test
     fun `switching the mode neither cancels nor restarts the day`() =
         runTest {
             val suns = mutableListOf<SunPosition>()
