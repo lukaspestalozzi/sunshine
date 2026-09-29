@@ -401,6 +401,8 @@ class MapViewModel(
                                 launch {
                                     day.computed.first { it == day.steps.size }
                                     val (hours, counting) = measureTimedValue { day.sunHours() }
+                                    // The counts add to the day's bytes after its last step trimmed the cache.
+                                    dayCache.trim(keep = day)
                                     val (ready, rendering) = measureTimedValue { heatmapOf(day, hours) }
                                     if (counted == null) {
                                         log(
