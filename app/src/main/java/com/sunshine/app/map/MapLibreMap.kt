@@ -31,7 +31,7 @@ import org.maplibre.android.style.sources.ImageSource
 /**
  * Full MapLibre map showing OpenTopoMap tiles. Starts at [initialCamera] and reports every camera
  * movement through [onCameraMoved]. [overlay] is drawn on the terrain, directly above the map tiles;
- * `null` removes it.
+ * `null` removes it. The tiles are drawn with [saturation] (−1 greyscale, 0 their own colours).
  */
 @Composable
 fun MapLibreMap(
@@ -39,6 +39,7 @@ fun MapLibreMap(
     onCameraMoved: (CameraState) -> Unit,
     modifier: Modifier = Modifier,
     overlay: OverlayImage? = null,
+    saturation: Float = 0f,
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -70,8 +71,21 @@ fun MapLibreMap(
         mapView.getMapAsync { map -> map.getStyle { style -> style.showOverlay(overlay) } }
     }
 
+    LaunchedEffect(mapView, saturation) {
+        mapView.getMapAsync { map ->
+            map.getStyle { style -> style.getLayer(TOPO_LAYER_ID)?.setProperties(PropertyFactory.rasterSaturation(saturation)) }
+        }
+    }
+
     AndroidView(factory = { mapView }, modifier = modifier)
 }
+
+/**
+ * The map tiles' saturation for the overlay toggle's [option]: greyscale while the overlay is on, so
+ * that its colours stand out (map-view spec, "Map colours while the overlay is on"; design D10 of
+ * add-sun-exposure-heatmap).
+ */
+fun mapSaturation(option: OverlayOption): Float = if (option == OverlayOption.OFF) 0f else GREYSCALE
 
 /**
  * Shows [image] as a georeferenced raster right above the map tiles (design D9 of
@@ -154,6 +168,7 @@ private class LowMemoryForwarder(
 private const val MIN_ZOOM = 5.0
 private const val OVERLAY_ID = "sun-shade-overlay"
 private const val TOPO_LAYER_ID = "opentopomap"
+private const val GREYSCALE = -1f
 private const val MAX_ZOOM = 17.0
 
 // Missing tiles leave the background visible: blank, never substitute imagery.

@@ -106,8 +106,8 @@ class RenderOverlayTest {
         val AREA = MapArea(CENTER, zoom = 13.0, widthDp = 80.0, heightDp = 400.0)
         val METRES_PER_DEGREE = Math.toRadians(1.0) * 6_371_000.0
 
-        // #455A64 at alpha 0.45 and #9E9E9E at alpha 0.6.
-        const val SHADE_ARGB = 0x73455A64
+        // #455A64 and #9E9E9E, both at alpha 0.6 (design D10 of add-sun-exposure-heatmap).
+        const val SHADE_ARGB = 0x99455A64.toInt()
         const val UNKNOWN_ARGB = 0x999E9E9E.toInt()
     }
 }

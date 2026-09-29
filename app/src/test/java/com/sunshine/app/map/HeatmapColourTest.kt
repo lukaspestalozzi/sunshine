@@ -36,11 +36,11 @@ class HeatmapColourTest {
         for (count in listOf(hm(8, 33), hm(15, 51))) {
             val colours = HeatmapBands(count).colours
 
-            assertEquals(0x73455A64, colours.first())
-            assertEquals(0x73FFE0A3, colours.last())
-            assertTrue(colours.all { it ushr 24 == 0x73 }, colours.joinToString { Integer.toHexString(it) })
+            assertEquals(0x99455A64.toInt(), colours.first())
+            assertEquals(0x99FFE0A3.toInt(), colours.last())
+            assertTrue(colours.all { it ushr 24 == 0x99 }, colours.joinToString { Integer.toHexString(it) })
         }
-        assertEquals(listOf(0x73455A64), HeatmapBands(Duration.ZERO).colours.toList())
+        assertEquals(listOf(0x99455A64.toInt()), HeatmapBands(Duration.ZERO).colours.toList())
     }
 
     @Test

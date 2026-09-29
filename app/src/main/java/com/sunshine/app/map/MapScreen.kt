@@ -63,6 +63,7 @@ fun MapScreen(
                     OverlayMode.SUN_AND_SHADE -> overlay.image()
                     OverlayMode.SUN_HOURS -> heatmap.image()
                 },
+            saturation = mapSaturation(overlayOption(isOverlayOn, overlayMode)),
         )
         sun?.let { SunLine(it.position, (sunshine as? SunshineUiState.Ready)?.atSelectedTime) }
         Crosshair(Modifier.align(Alignment.Center))
