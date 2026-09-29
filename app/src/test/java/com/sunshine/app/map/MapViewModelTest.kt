@@ -700,8 +700,8 @@ class MapViewModelTest {
             val ready = viewModel.heatmap.value as HeatmapUiState.Ready
             assertEquals(MapArea(INTERLAKEN, 12.0, MAP_WIDTH, MAP_HEIGHT), ready.hours.area)
             assertEquals(LocalDate.of(2025, 12, 21), ready.date)
-            assertEquals(288, ready.hours.steps)
-            assertEquals(setOf<Short>(288), ready.hours.unknown.toSet())
+            assertEquals(144, ready.hours.steps)
+            assertEquals(setOf<Short>(144), ready.hours.unknown.toSet())
             // Day length at Interlaken on 21 December: 8 h 33 min, 18 bands.
             assertEquals(18, ready.bands.count)
             assertEquals(ready.hours.width * ready.hours.height, ready.image.pixels.size)
@@ -797,24 +797,98 @@ class MapViewModelTest {
     fun `counting a day trims the cache of days, as the counts add to the day's bytes`() =
         runTest {
             val area = MapArea(INTERLAKEN, 12.0, MAP_WIDTH, MAP_HEIGHT)
-            val dayBytes = 288L * cheapGrid(area, online = true).stateBytes
-            val countBytes = 4L * MAP_WIDTH.toInt() * MAP_HEIGHT.toInt()
+            val dayBytes = 144L * cheapGrid(area, online = true, cellDp = 8.0).stateBytes
+            val probe = sunHoursViewModel(mutableListOf())
+            val countBytes = (probe.heatmap.value as HeatmapUiState.Ready).hours.bytes
             val suns = mutableListOf<SunPosition>()
-            // Two days fit, but not once one of them is counted.
-            val viewModel = dayViewModel(suns, dayCache = DayCache(maxBytes = 2 * dayBytes + countBytes - 1))
+            // Two heatmap days and one day's counts fit; the second day's counts do not.
+            val viewModel = dayViewModel(suns, dayCache = DayCache(maxBytes = 2 * dayBytes + 2 * countBytes - 1))
             viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
-            viewModel.onOverlayToggled()
-            advanceUntilIdle()
-            viewModel.onDateSelected(LocalDate.of(2025, 12, 22))
+            viewModel.onOverlaySelected(OverlayOption.SUN_HOURS)
             advanceUntilIdle()
 
-            viewModel.onOverlayModeSelected(OverlayMode.SUN_HOURS)
+            viewModel.onDateSelected(LocalDate.of(2025, 12, 22))
             advanceUntilIdle()
             suns.clear()
             viewModel.onDateSelected(LocalDate.of(2025, 12, 21))
             advanceUntilIdle()
 
-            assertEquals(288, suns.size, "21 December was not dropped")
+            assertEquals(144, suns.size, "21 December was not dropped")
+        }
+
+    @Test
+    fun `in sun hours the heatmap's own day computes 144 steps at 8 dp and no 2 dp grid`() =
+        runTest {
+            val cells = mutableListOf<Double>()
+            val viewModel = dayViewModel(mutableListOf(), cells = cells)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+
+            viewModel.onOverlaySelected(OverlayOption.SUN_HOURS)
+            advanceUntilIdle()
+
+            assertEquals(144, cells.size)
+            assertEquals(setOf(8.0), cells.toSet())
+            assertEquals(144, (viewModel.heatmap.value as HeatmapUiState.Ready).hours.steps)
+        }
+
+    @Test
+    fun `sun hours pauses the sun and shade day, and switching back resumes it`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val cells = mutableListOf<Double>()
+            val gate = MutableStateFlow(false)
+            val viewModel =
+                dayViewModel(suns, cells = cells, beforeCell = { cell -> if (cell == 2.0 && cells.count { it == 2.0 } == 3) gate.first { it } })
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlaySelected(OverlayOption.SUN_AND_SHADE)
+            advanceTimeBy(SETTLE_MILLIS)
+            assertEquals(3, cells.count { it == 2.0 })
+
+            viewModel.onOverlaySelected(OverlayOption.SUN_HOURS)
+            advanceUntilIdle()
+            assertEquals(144, cells.count { it == 8.0 })
+            assertEquals(3, cells.count { it == 2.0 }, "the sun and shade day did not pause")
+
+            gate.value = true
+            viewModel.onOverlaySelected(OverlayOption.SUN_AND_SHADE)
+            advanceUntilIdle()
+            val fine = suns.filterIndexed { i, _ -> cells[i] == 2.0 }
+            assertEquals(288, fine.size)
+            assertEquals(288, fine.toSet().size, "steps computed before the pause were computed again")
+        }
+
+    @Test
+    fun `the progress in sun hours is the share of the heatmap's day`() =
+        runTest {
+            val cells = mutableListOf<Double>()
+            val gate = MutableStateFlow(false)
+            val viewModel = dayViewModel(mutableListOf(), cells = cells, beforeCell = { if (cells.size == 36) gate.first { it } })
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+
+            viewModel.onOverlaySelected(OverlayOption.SUN_HOURS)
+            advanceUntilIdle()
+
+            assertEquals(0.25f, viewModel.dayProgress.value)
+            gate.value = true
+            advanceUntilIdle()
+            assertEquals(null, viewModel.dayProgress.value)
+        }
+
+    @Test
+    fun `the cache keeps both days of an area and date, one per cell size`() =
+        runTest {
+            val dayCache = DayCache(maxBytes = Long.MAX_VALUE)
+            val viewModel = dayViewModel(mutableListOf(), dayCache = dayCache)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlaySelected(OverlayOption.SUN_AND_SHADE)
+            advanceUntilIdle()
+            viewModel.onOverlaySelected(OverlayOption.SUN_HOURS)
+            advanceUntilIdle()
+
+            val area = MapArea(INTERLAKEN, 12.0, MAP_WIDTH, MAP_HEIGHT)
+            val december21 = LocalDate.of(2025, 12, 21)
+            assertEquals(2.0, dayCache.get(area, december21, 2.0)?.cellDp)
+            assertEquals(8.0, dayCache.get(area, december21, 8.0)?.cellDp)
         }
 
     @Test
@@ -822,7 +896,7 @@ class MapViewModelTest {
         runTest {
             isOnline.value = false
             val viewModel = sunHoursViewModel(mutableListOf())
-            assertEquals(setOf<Short>(288), (viewModel.heatmap.value as HeatmapUiState.Ready).hours.unknown.toSet())
+            assertEquals(setOf<Short>(144), (viewModel.heatmap.value as HeatmapUiState.Ready).hours.unknown.toSet())
 
             isOnline.value = true
             advanceUntilIdle()
@@ -841,7 +915,7 @@ class MapViewModelTest {
                     clock,
                     repository { heightBytes(568) },
                     { horizonOf(-1.0) },
-                    { area, sun -> flatGrid(area, sun, available = true) },
+                    { area, sun, _ -> flatGrid(area, sun, available = true) },
                     UnconfinedTestDispatcher(testScheduler),
                     log = { logged += it },
                     checkOverlayAgreement = true,
@@ -976,7 +1050,7 @@ class MapViewModelTest {
                     clock,
                     repository { heightBytes(568) },
                     { null },
-                    { area, sun ->
+                    { area, sun, _ ->
                         suns += sun
                         val sweep = SunShadeSweep(area, SunPosition(0.0, -30.0, false))
                         sweep.night(sweep.groundTiles().associateWith { FLAT })
@@ -1179,7 +1253,7 @@ class MapViewModelTest {
     ): MapViewModel {
         val viewModel =
             newViewModel(
-                overlayGrid = { area, sun ->
+                overlayGrid = { area, sun, _ ->
                     before()
                     areas += area
                     suns += sun
@@ -1195,8 +1269,8 @@ class MapViewModelTest {
 
     /**
      * A view model that computes the whole day, the background steps on the test scheduler. Its grids
-     * are cheap: shade over flat terrain, unknown while offline. [before] runs before each grid, [suns]
-     * and [areas] record the requests.
+     * are cheap: shade over flat terrain, unknown while offline. [before] and [beforeCell] (with the
+     * grid's cell size) run before each grid; [suns], [areas] and [cells] record the requests.
      */
     private fun TestScope.dayViewModel(
         suns: MutableList<SunPosition>,
@@ -1204,6 +1278,8 @@ class MapViewModelTest {
         before: suspend () -> Unit = {},
         log: (String) -> Unit = {},
         dayCache: DayCache = DayCache(maxBytes = Long.MAX_VALUE),
+        cells: MutableList<Double> = mutableListOf(),
+        beforeCell: suspend (Double) -> Unit = {},
     ): MapViewModel {
         val viewModel =
             MapViewModel(
@@ -1212,11 +1288,13 @@ class MapViewModelTest {
                 clock,
                 repository { heightBytes(568) },
                 { null },
-                { area, sun ->
+                { area, sun, cellDp ->
                     before()
+                    beforeCell(cellDp)
                     areas += area
                     suns += sun
-                    cheapGrid(area, isOnline.value)
+                    cells += cellDp
+                    cheapGrid(area, isOnline.value, cellDp)
                 },
                 UnconfinedTestDispatcher(testScheduler),
                 dayDispatcher = StandardTestDispatcher(testScheduler),
@@ -1248,8 +1326,9 @@ class MapViewModelTest {
     private fun cheapGrid(
         area: MapArea,
         online: Boolean,
+        cellDp: Double = 2.0,
     ): ShadeGrid {
-        val sweep = SunShadeSweep(area, SunPosition(0.0, -30.0, false))
+        val sweep = SunShadeSweep(area, SunPosition(0.0, -30.0, false), cellDp)
         return sweep.night(sweep.groundTiles().associateWith { if (online) FLAT else null })
     }
 
@@ -1280,7 +1359,7 @@ class MapViewModelTest {
         savedState: SavedStateHandle = SavedStateHandle(),
         repository: ElevationRepository = repository { heightBytes(568) },
         horizon: suspend (GeoPoint) -> HorizonProfile? = { null },
-        overlayGrid: suspend (MapArea, SunPosition) -> ShadeGrid = { _, _ -> awaitCancellation() },
+        overlayGrid: suspend (MapArea, SunPosition, Double) -> ShadeGrid = { _, _, _ -> awaitCancellation() },
         computeDispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(),
     ) = MapViewModel(savedState, isOnline, clock, repository, horizon, overlayGrid, computeDispatcher)
 

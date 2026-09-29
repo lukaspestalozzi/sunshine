@@ -106,9 +106,9 @@ class SunHoursTest {
         selected: ZonedDateTime,
         state: (ZonedDateTime) -> ShadeGrid,
     ): DayOverlay {
-        val times = DayOverlay(AREA, date, ZURICH, { _, _ -> SHADE }, StandardTestDispatcher(testScheduler)).steps + selected
+        val times = DayOverlay(AREA, date, ZURICH, { _, _, _ -> SHADE }, StandardTestDispatcher(testScheduler)).steps + selected
         val bySun = times.associateBy { sunPosition(AREA.center, it.toInstant()) }
-        val day = DayOverlay(AREA, date, ZURICH, { _, sun -> state(bySun.getValue(sun)) }, StandardTestDispatcher(testScheduler))
+        val day = DayOverlay(AREA, date, ZURICH, { _, sun, _ -> state(bySun.getValue(sun)) }, StandardTestDispatcher(testScheduler))
         launch { day.computeRest { selected } }
         day.compute(selected)
         advanceUntilIdle()

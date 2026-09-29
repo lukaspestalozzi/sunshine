@@ -32,6 +32,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -180,7 +181,7 @@ class MapViewModel(
     private val clock: Clock,
     private val elevationRepository: ElevationRepository,
     private val horizonProfile: suspend (GeoPoint) -> HorizonProfile?,
-    private val overlayGrid: suspend (MapArea, SunPosition) -> ShadeGrid,
+    private val overlayGrid: suspend (MapArea, SunPosition, Double) -> ShadeGrid,
     computeDispatcher: CoroutineDispatcher,
     private val dayDispatcher: CoroutineDispatcher? = null,
     private val dayCache: DayCache = DayCache(DEFAULT_DAY_CACHE_BYTES),
@@ -272,13 +273,22 @@ class MapViewModel(
     // Size of the map in dp; `null` until the screen reports it.
     private val mapSize = MutableStateFlow<Pair<Double, Double>?>(null)
 
-    private val mutableDayProgress = MutableStateFlow<Float?>(null)
-
-    // The day of the overlay flow, for the heatmap; `null` while the overlay has no area.
-    private val currentDay = MutableStateFlow<DayOverlay?>(null)
+    // The progress of each mode's day; only the shown mode's day runs (design D9 of add-sun-exposure-heatmap).
+    private val overlayDayProgress = MutableStateFlow<Float?>(null)
+    private val heatmapDayProgress = MutableStateFlow<Float?>(null)
 
     /** Share of the day's slider steps computed while the day's computation runs, else `null` (design D11). */
-    val dayProgress: StateFlow<Float?> = mutableDayProgress.asStateFlow()
+    val dayProgress: StateFlow<Float?> =
+        combine(mutableOverlayMode, overlayDayProgress, heatmapDayProgress) { mode, overlay, heatmap ->
+            if (mode == OverlayMode.SUN_HOURS) heatmap else overlay
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = null)
+
+    // The `Sun & shade` overlay is computed only while it is shown (design D9 of add-sun-exposure-heatmap).
+    private val sunAndShadeShown = combine(mutableOverlayOn, mutableOverlayMode) { on, mode -> on && mode == OverlayMode.SUN_AND_SHADE }
+
+    // The overlay switched on, and whether it shows the heatmap, whose day is computed only then.
+    private val sunHoursShown =
+        combine(mutableOverlayOn, mutableOverlayMode) { on, mode -> on to (on && mode == OverlayMode.SUN_HOURS) }
 
     // The overlay of the visible area at the selected time (design D8 of add-sun-shade-overlay).
     // Latest wins, as for the horizon. A camera move waits [SETTLE_MILLIS]; a time change starts at
@@ -295,7 +305,7 @@ class MapViewModel(
             // Written by the lookups, read by the collector, as for the horizon's `done`.
             val shown = AtomicReference<OverlayUiState.Ready?>(null)
             var requestedTime: ZonedDateTime? = null
-            combine(camera, selectedTime, mutableOverlayOn, mapSize, isOnline) { camera, time, on, size, online ->
+            combine(camera, selectedTime, sunAndShadeShown, mapSize, isOnline) { camera, time, on, size, online ->
                 OverlayInput(camera, time, on, size, online)
             }
                 // While a sweep that cannot stop mid-chunk is being cancelled, keep only the latest input.
@@ -306,7 +316,6 @@ class MapViewModel(
                         lookup?.cancelAndJoin()
                         dayJob?.cancelAndJoin()
                         day = null
-                        currentDay.value = null
                         shown.set(null)
                         requestedTime = null
                         send(if (input.on && input.camera.zoom < MIN_OVERLAY_ZOOM) OverlayUiState.ZoomedOut else OverlayUiState.Off)
@@ -331,7 +340,6 @@ class MapViewModel(
                         }
                         val newDay = cached ?: DayOverlay(area, date, zone, overlayGrid, dayDispatcher ?: computeDispatcher)
                         day = newDay
-                        currentDay.value = newDay
                         dayJob =
                             dayDispatcher?.takeIf { newDay.computed.value < newDay.steps.size }?.let {
                                 launch {
@@ -343,7 +351,7 @@ class MapViewModel(
                                                     dayCache.put(newDay)
                                                     dayCache.trim(keep = newDay)
                                                 }
-                                                mutableDayProgress.value =
+                                                overlayDayProgress.value =
                                                     it.toFloat() / newDay.steps.size
                                             }
                                         }
@@ -356,7 +364,7 @@ class MapViewModel(
                                     } finally {
                                         // Joined, so that no late progress value follows the null.
                                         withContext(NonCancellable) { progress.cancelAndJoin() }
-                                        mutableDayProgress.value = null
+                                        overlayDayProgress.value = null
                                     }
                                 }
                             }
@@ -394,49 +402,112 @@ class MapViewModel(
     // change does not change the day, so the heatmap stays. Latest wins, as for the overlay.
     val heatmap: StateFlow<HeatmapUiState> =
         channelFlow {
-            var build: Job? = null
-            // Written by the builds, read by the collector, as for the overlay's `shown`.
+            var job: Job? = null
+            var day: DayOverlay? = null
+            // Written by the jobs, read by the collector, as for the overlay's `shown`.
             val kept = AtomicReference<HeatmapUiState.Ready?>(null)
-            combine(currentDay, mutableOverlayMode, mutableOverlayOn, camera) { day, mode, on, camera ->
-                HeatmapInput(day, mode, on && camera.zoom < MIN_OVERLAY_ZOOM)
-            }.distinctUntilChanged()
+            combine(camera, selectedTime.map { it.toLocalDate() }.distinctUntilChanged(), sunHoursShown, mapSize, isOnline) {
+                    camera,
+                    date,
+                    (on, shown),
+                    size,
+                    online,
+                ->
+                HeatmapInput(camera, date, on, shown, size, online)
+            }.conflate()
                 .collect { input ->
-                    build?.cancelAndJoin()
-                    val day = input.day
-                    if (day == null) kept.set(null)
-                    when {
-                        input.mode != OverlayMode.SUN_HOURS -> send(HeatmapUiState.Off)
-                        day == null -> send(if (input.zoomedOut) HeatmapUiState.ZoomedOut else HeatmapUiState.Off)
-                        else -> {
-                            val counted = day.counted
-                            val previous = kept.get()
-                            if (counted != null && previous?.hours === counted) {
-                                send(previous)
-                                return@collect
-                            }
-                            if (counted == null) send(HeatmapUiState.Computing(kept = previous))
-                            build =
-                                launch {
-                                    day.computed.first { it == day.steps.size }
-                                    val (hours, counting) = measureTimedValue { day.sunHours() }
-                                    // The counts add to the day's bytes after its last step trimmed the cache.
-                                    dayCache.trim(keep = day)
-                                    val (ready, rendering) = measureTimedValue { heatmapOf(day, hours) }
-                                    if (counted == null) {
-                                        log(
-                                            "Sun hours ${hours.width}×${hours.height} dp, ${hours.steps} steps: " +
-                                                "counts ${counting.inWholeMilliseconds} ms, image ${rendering.inWholeMilliseconds} ms",
-                                        )
-                                    }
-                                    kept.set(ready)
-                                    send(ready)
-                                }
-                        }
+                    val area = input.area()
+                    if (area == null) {
+                        job?.cancelAndJoin()
+                        day = null
+                        // Kept across a switch to `Sun & shade`, so that switching back is at once.
+                        if (!input.on) kept.set(null)
+                        send(if (input.shown && input.camera.zoom < MIN_OVERLAY_ZOOM) HeatmapUiState.ZoomedOut else HeatmapUiState.Off)
+                        return@collect
                     }
+                    val current = day
+                    // Same area and date: only a reconnect matters, and only for a day with unknown cells.
+                    if (current != null && current.area == area && current.date == input.date) {
+                        if (!input.online || !current.hasUnknown) return@collect
+                    }
+                    job?.cancelAndJoin()
+                    var cached = dayCache.get(area, input.date, HEATMAP_CELL_DP)
+                    // A day with unknown cells is computed anew while online, as for the overlay (D14 of #5).
+                    if (cached != null && input.online && cached.hasUnknown) {
+                        dayCache.remove(cached)
+                        cached = null
+                    }
+                    val newDay =
+                        cached ?: DayOverlay(
+                            area,
+                            input.date,
+                            zone,
+                            overlayGrid,
+                            dayDispatcher ?: computeDispatcher,
+                            HEATMAP_STEP_MINUTES,
+                            HEATMAP_CELL_DP,
+                        )
+                    day = newDay
+                    val previous = kept.get()
+                    val counted = newDay.counted
+                    if (counted != null && previous?.hours === counted) {
+                        send(previous)
+                        return@collect
+                    }
+                    if (counted == null) send(HeatmapUiState.Computing(kept = previous))
+                    job = launch { kept.set(buildHeatmap(newDay, settle = cached == null)?.also { send(it) }) }
                 }
         }.flowOn(computeDispatcher)
-            // Eagerly, like the overlay whose day it counts.
+            // Eagerly, like the overlay: the day lives in this flow and keeps computing off screen.
             .stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = HeatmapUiState.Off)
+
+    // Computes [day]'s missing steps after the camera has rested, counts them and renders the heatmap
+    // (design D2, D9 of add-sun-exposure-heatmap); `null` without a background dispatcher.
+    private suspend fun buildHeatmap(
+        day: DayOverlay,
+        settle: Boolean,
+    ): HeatmapUiState.Ready? =
+        coroutineScope {
+            if (day.computed.value < day.steps.size) {
+                if (dayDispatcher == null) return@coroutineScope null
+                if (settle) delay(SETTLE_MILLIS)
+                val progress =
+                    launch {
+                        day.computed.collect {
+                            // Cached once it has a grid; each step may push older days out.
+                            if (it > 0) {
+                                dayCache.put(day)
+                                dayCache.trim(keep = day)
+                            }
+                            heatmapDayProgress.value = it.toFloat() / day.steps.size
+                        }
+                    }
+                try {
+                    // The grids run on the background dispatcher, as for the overlay's day.
+                    val took = measureTime { day.computeAll { mutableSelectedTime.value } }
+                    log(
+                        "Overlay day ${day.date} at ${day.cellDp.toInt()} dp every ${day.stepMinutes} min: " +
+                            "${day.computed.value} of ${day.steps.size} steps, ${day.nightSteps} at night, in ${took.inWholeMilliseconds} ms",
+                    )
+                } finally {
+                    // Joined, so that no late progress value follows the null.
+                    withContext(NonCancellable) { progress.cancelAndJoin() }
+                    heatmapDayProgress.value = null
+                }
+            }
+            val counted = day.counted
+            val (hours, counting) = measureTimedValue { day.sunHours() }
+            // The counts add to the day's bytes after its last step trimmed the cache.
+            dayCache.trim(keep = day)
+            val (ready, rendering) = measureTimedValue { heatmapOf(day, hours) }
+            if (counted == null) {
+                log(
+                    "Sun hours ${hours.width}×${hours.height} px, ${hours.steps} steps: " +
+                        "counts ${counting.inWholeMilliseconds} ms, image ${rendering.inWholeMilliseconds} ms",
+                )
+            }
+            ready
+        }
 
     private fun heatmapOf(
         day: DayOverlay,
@@ -446,11 +517,20 @@ class MapViewModel(
         return HeatmapUiState.Ready(hours, day.date, bands, renderSunHours(hours, bands))
     }
 
-    private data class HeatmapInput(
-        val day: DayOverlay?,
-        val mode: OverlayMode,
-        val zoomedOut: Boolean,
-    )
+    private class HeatmapInput(
+        val camera: CameraState,
+        val date: LocalDate,
+        val on: Boolean,
+        val shown: Boolean,
+        val size: Pair<Double, Double>?,
+        val online: Boolean,
+    ) {
+        // The area to compute, or null when the heatmap is not shown, zoomed out or the size unknown.
+        fun area(): MapArea? {
+            if (!shown || camera.zoom < MIN_OVERLAY_ZOOM || size == null) return null
+            return MapArea(camera.center, camera.zoom, size.first, size.second)
+        }
+    }
 
     init {
         // Debug builds: once an overlay has stayed for a while, log how many cells agree with the
@@ -618,6 +698,10 @@ class MapViewModel(
         const val KEY_SELECTED_TIME = "selected_time_epoch_millis"
         const val KEY_OVERLAY_ON = "overlay_on"
         const val KEY_OVERLAY_MODE = "overlay_mode"
+
+        // The heatmap's own day (user decisions, design D9 of add-sun-exposure-heatmap).
+        const val HEATMAP_CELL_DP = 8.0
+        const val HEATMAP_STEP_MINUTES = 10
         const val AGREEMENT_DELAY_MILLIS = 3_000L
         const val AGREEMENT_CELLS = 200
     }

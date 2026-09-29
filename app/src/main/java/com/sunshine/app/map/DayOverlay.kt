@@ -26,20 +26,27 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
- * The overlays of [area] at every slider position of [date] (design D11 of add-sun-shade-overlay).
- * [compute] gives the selected time on the caller's dispatcher; [computeRest] then fills in the
- * other steps on [background], nearest to the selected time first. One grid is computed at a time:
- * a selected time waiting in [compute] goes before the next background step.
+ * The overlays of [area] at every step of [date] (design D11 of add-sun-shade-overlay), in cells of
+ * [cellDp] dp every [stepMinutes] minutes: 2 dp and 5 minutes for `Sun & shade`, 8 dp and 10 minutes
+ * for the heatmap (design D9 of add-sun-exposure-heatmap). [compute] gives the selected time on the
+ * caller's dispatcher; [computeRest] then fills in the other steps on [background], nearest to the
+ * selected time first. One grid is computed at a time: a selected time waiting in [compute] goes
+ * before the next background step.
  */
 class DayOverlay(
     val area: MapArea,
     val date: LocalDate,
     zone: ZoneId,
-    private val grid: suspend (MapArea, SunPosition) -> ShadeGrid,
+    private val grid: suspend (MapArea, SunPosition, Double) -> ShadeGrid,
     private val background: CoroutineDispatcher,
+    val stepMinutes: Int = SLIDER_STEP_MINUTES,
+    val cellDp: Double = SunShadeSweep.CELL_DP,
 ) {
-    /** Every slider position of [date]: 5-minute steps over the day's real length. */
-    val steps: List<ZonedDateTime> = List(sliderPositions(date, zone)) { sliderTime(date, zone, it * SLIDER_STEP_MINUTES.toFloat()) }
+    /** Every [stepMinutes] minutes over the day's real length: the slider positions for 5 minutes. */
+    val steps: List<ZonedDateTime> =
+        List((sliderPositions(date, zone) * SLIDER_STEP_MINUTES + stepMinutes - 1) / stepMinutes) {
+            sliderTime(date, zone, it * stepMinutes.toFloat())
+        }
 
     private val nightInstants: Set<Instant> = steps.filter { SunShadeSweep.isNight(sunAt(it)) }.mapTo(HashSet()) { it.toInstant() }
 
@@ -94,7 +101,7 @@ class DayOverlay(
     fun gridAt(time: ZonedDateTime): ShadeGrid? = grids[time.toInstant()]
 
     /** The grid at [time], computed on the caller's dispatcher unless it is known. */
-    suspend fun compute(time: ZonedDateTime): ShadeGrid = lock.withLock { gridAt(time) ?: grid(area, sunAt(time)).also { store(time, it) } }
+    suspend fun compute(time: ZonedDateTime): ShadeGrid = lock.withLock { gridAt(time) ?: grid(area, sunAt(time), cellDp).also { store(time, it) } }
 
     /**
      * Computes the remaining steps on [background], nearest to [selected] first; returns when all
@@ -102,10 +109,18 @@ class DayOverlay(
      */
     suspend fun computeRest(selected: () -> ZonedDateTime) {
         stored.first { gridAt(selected()) != null }
+        computeAll(selected)
+    }
+
+    /**
+     * Computes every missing step on [background], nearest to [selected] first, without waiting for
+     * the selected time: the heatmap's day shows no single time (design D9 of add-sun-exposure-heatmap).
+     */
+    suspend fun computeAll(selected: () -> ZonedDateTime) {
         while (true) {
             val next = nearestUncomputed(selected()) ?: return
             lock.withLock {
-                if (gridAt(next) == null) store(next, withContext(background) { grid(area, sunAt(next)) })
+                if (gridAt(next) == null) store(next, withContext(background) { grid(area, sunAt(next), cellDp) })
             }
         }
     }
