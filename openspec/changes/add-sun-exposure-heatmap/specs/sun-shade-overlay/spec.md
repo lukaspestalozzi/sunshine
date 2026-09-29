@@ -138,9 +138,10 @@ of the day, over its actual length; time-selection "Choose the time of day"):
   ground at least 1000 m below sea level, lies above −2.9°, so this is exact.
 - **Stop and resume:** only the day of the selected date and the visible area SHALL be computed.
   The computation SHALL stop when the overlay is switched off, another date is selected or the
-  camera rests on another area. When a day is selected again, its computed positions SHALL be shown
-  without being computed again, and only its missing positions SHALL be computed, the selected
-  time first. A change of the selected time within the day SHALL NOT restart it; if that time has
+  camera rests on another area. It SHALL pause while the mode `Sun hours` is shown, which computes
+  its own day (sun-exposure-heatmap "Overlay mode"), and resume when `Sun & shade` is selected
+  again. When a day is selected again, its computed positions SHALL be shown without being computed
+  again, and only its missing positions SHALL be computed, the selected time first. A change of the selected time within the day SHALL NOT restart it; if that time has
   not been computed yet, it is computed next. Leaving the app SHALL NOT discard the computed steps;
   the computation continues in the background.
 - **Cache of days:** computed days SHALL be kept by visible area and date, up to a quarter of the
@@ -201,8 +202,9 @@ it SHALL hold:
 2. the mode's notice, if any: `Zoom in to see sun and shade` ("Overlay coverage and zoom range"),
    `Computing sun and shade …` ("Overlay updates") or `Computing sun hours …`
    (sun-exposure-heatmap "Heatmap updates");
-3. while the day is computed, its progress bar ("Overlay of the whole day"), directly below the
-   notice, or directly below the mode's name when there is no notice;
+3. while the day of the selected mode is computed ("Overlay of the whole day", sun-exposure-heatmap
+   "Heatmap updates"), its progress bar, directly below the notice, or directly below the mode's
+   name when there is no notice;
 4. the mode's legend ("Overlay appearance", sun-exposure-heatmap "Heatmap legend").
 
 These notices SHALL appear only in the status card. While `Off` is selected, no status card SHALL
