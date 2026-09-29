@@ -6,9 +6,9 @@ import com.sunshine.core.ShadeGrid
 import com.sunshine.core.Sunshine
 import kotlin.math.PI
 import kotlin.math.atan
+import kotlin.math.ceil
 import kotlin.math.ln
 import kotlin.math.pow
-import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sinh
 
@@ -44,25 +44,27 @@ fun renderOverlay(grid: ShadeGrid): OverlayImage {
 }
 
 /**
- * The pixel centres of the north-up raster of [area] at one pixel per dp: [latitudes] by row,
- * [longitudes] by column. The overlay and the heatmap use the same pixels (design D2 of
- * add-sun-exposure-heatmap).
+ * The pixel centres of the north-up raster of [area] at one pixel per [pixelDp] dp: [latitudes] by
+ * row, [longitudes] by column. The raster starts at the area's north-west corner and covers it
+ * whole, so a last row or column may reach past the area. The overlay uses 1 dp, the heatmap's
+ * counts one pixel per 8 dp cell (design D2, D9 of add-sun-exposure-heatmap).
  */
 class OverlayRaster(
     area: MapArea,
+    pixelDp: Double = 1.0,
 ) {
-    val width: Int = area.widthDp.roundToInt()
-    val height: Int = area.heightDp.roundToInt()
+    val width: Int = ceil(area.widthDp / pixelDp - EDGE_TOLERANCE).toInt()
+    val height: Int = ceil(area.heightDp / pixelDp - EDGE_TOLERANCE).toInt()
     val latitudes: DoubleArray
     val longitudes: DoubleArray
 
     init {
         val world = MAP_TILE_DP * 2.0.pow(area.zoom)
         val sinLat = sin(Math.toRadians(area.center.latitude))
-        val left = (area.center.longitude + 180.0) / 360.0 * world - width / 2.0
-        val top = (0.5 - ln((1 + sinLat) / (1 - sinLat)) / (4 * PI)) * world - height / 2.0
-        latitudes = DoubleArray(height) { y -> Math.toDegrees(atan(sinh(PI * (1 - 2 * (top + y + 0.5) / world)))) }
-        longitudes = DoubleArray(width) { x -> ((left + x + 0.5) / world * 360.0 % 360.0 + 360.0) % 360.0 - 180.0 }
+        val left = (area.center.longitude + 180.0) / 360.0 * world - area.widthDp / 2.0
+        val top = (0.5 - ln((1 + sinLat) / (1 - sinLat)) / (4 * PI)) * world - area.heightDp / 2.0
+        latitudes = DoubleArray(height) { y -> Math.toDegrees(atan(sinh(PI * (1 - 2 * (top + (y + 0.5) * pixelDp) / world)))) }
+        longitudes = DoubleArray(width) { x -> ((left + (x + 0.5) * pixelDp) / world * 360.0 % 360.0 + 360.0) % 360.0 - 180.0 }
     }
 }
 
@@ -74,6 +76,9 @@ internal fun isHatched(
 
 private const val MAP_TILE_DP = 512.0
 private const val TRANSPARENT = 0
+
+// An area 850.0000001 dp high still has 850 rows.
+private const val EDGE_TOLERANCE = 1e-6
 
 // #455A64 at alpha 0.45: dark blue-grey that keeps the topographic map readable.
 internal const val SHADE_ARGB = 0x73455A64

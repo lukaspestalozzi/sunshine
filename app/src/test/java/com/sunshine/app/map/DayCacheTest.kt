@@ -126,7 +126,9 @@ class DayCacheTest {
         val ZURICH: ZoneId = ZoneId.of("Europe/Zurich")
         val DECEMBER_21: LocalDate = LocalDate.of(2025, 12, 21)
         val AREA = MapArea(GeoPoint(46.6863, 7.8632), zoom = 12.0, widthDp = 20.0, heightDp = 30.0)
-        const val PIXELS = 20 * 30
+
+        // Count pixels: one per 2 dp cell of the 20 × 30 dp area (design D9 of add-sun-exposure-heatmap).
+        const val PIXELS = 10 * 15
         val GRID: ShadeGrid =
             SunShadeSweep(AREA, SunPosition(0.0, -30.0, false)).let { sweep ->
                 sweep.night(sweep.groundTiles().associateWith { HeightTile.fromMetres(512, FloatArray(512 * 512) { 568f }) })
