@@ -80,7 +80,7 @@
 
 ## 5. Docs
 
-- [ ] 5.1 Update `CLAUDE.md` (the `app` row: `map/SunHours.kt`, the heatmap mode) and `docs/roadmap.md` (#7 in progress; the note that #7 goes before #6 by user decision, 2026-09-28). Verify: `openspec validate --all --strict` passes, and both files name `SunHours.kt` and the order.
+- [x] 5.1 Update `CLAUDE.md` (the `app` row: `map/SunHours.kt`, the heatmap mode) and `docs/roadmap.md` (#7 in progress; the note that #7 goes before #6 by user decision, 2026-09-28). Verify: `openspec validate --all --strict` passes, and both files name `SunHours.kt` and the order.
 
 ## 6. Integration
 
