@@ -81,11 +81,11 @@ fun MapLibreMap(
 }
 
 /**
- * The map tiles' saturation for the overlay toggle's [option]: greyscale while the overlay is on, so
- * that its colours stand out (map-view spec, "Map colours while the overlay is on"; design D10 of
- * add-sun-exposure-heatmap).
+ * The map tiles' saturation for the overlay toggle's [option]: greyscale under the heatmap, so that
+ * its colours stand out, and the tiles' own colours otherwise (map-view spec, "Map colours under the
+ * heatmap"; design D10 of add-sun-exposure-heatmap).
  */
-fun mapSaturation(option: OverlayOption): Float = if (option == OverlayOption.OFF) 0f else GREYSCALE
+fun mapSaturation(option: OverlayOption): Float = if (option == OverlayOption.SUN_HOURS) GREYSCALE else 0f
 
 /**
  * Shows [image] as a georeferenced raster right above the map tiles (design D9 of

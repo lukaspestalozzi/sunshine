@@ -27,7 +27,7 @@ tile servers' bulk-download policies, and #7 does not depend on it.
   minutes, instead of waiting for the 2 dp / 5-minute `Sun & shade` day (user decision,
   2026-09-29, after the device check found the heatmap far too slow). Only the shown mode's day is
   computed; the other pauses and resumes.
-- `app`: while the overlay is on, the map is shown in greyscale, and the overlay is more opaque
+- `app`: under the heatmap (`Sun hours`), the map is shown in greyscale, and the overlay is more opaque
   (0.6 instead of 0.45), so that it no longer blends into the map's colours (user decision,
   2026-09-29).
 - `app`: the attributions leave the map. An ⓘ button in the map's top-left corner opens an About
@@ -69,7 +69,7 @@ tile servers' bulk-download policies, and #7 does not depend on it.
   status card ("Overlay of the whole day"), and "Overlay status card" is added.
 - `map-view`: "Map attribution" is replaced by "About and attributions" (the ⓘ button and the
   About page), and "Missing map tiles" checks for the ⓘ button instead of the attribution.
-  "Map colours while the overlay is on" is added (greyscale map).
+  "Map colours under the heatmap" is added (greyscale map in `Sun hours`).
 - `sun-position`: "Sun information panel" must not cover the ⓘ button instead of the attribution.
 
 ## Non-goals

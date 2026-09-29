@@ -122,6 +122,8 @@
 - [x] 9.3 Update `SunHoursTest` and `RenderSunHoursTest` first: 144 steps; 29 sun and 1 unknown give counts 29 and 1; counts on a raster of one pixel per 8 dp; the image at one pixel per dp, each pixel coloured from the raster pixel under it, hatched with the same 2 dp stripes every 8 dp. Then count on the coarse raster and draw at 1 px/dp (design D9); `formatSunHours` reads the centre of the coarse raster at 10 minutes per step, and `HeatmapBands.bandOf` takes minutes of sun instead of 5-minute steps (update `HeatmapColourTest` and `SunFormatTest` first). Verify: `./gradlew :app:testDebugUnitTest --tests "*SunHours*" --tests "*SunFormatTest*"` passes.
 - [x] 9.4 Write `MapColoursTest` first: greyscale for `Sun & shade` and `Sun hours`, colour for `Off`; and update `HeatmapColourTest` and `RenderOverlayTest` to alpha `0x99`. Then set `raster-saturation` on the map layer from the toggle's option, and raise `SHADE_ARGB` to `0x99455A64` (design D10). Verify: `./gradlew :app:testDebugUnitTest --tests "*MapColoursTest*" --tests "*HeatmapColourTest*" --tests "*RenderOverlayTest*"` passes and `./gradlew assembleDebug` succeeds.
 
+- [x] 9.5 Greyscale only under the heatmap (user decision, 2026-09-29, revising 9.4): update `MapColoursTest` first (greyscale for `Sun hours`; colour for `Sun & shade` and `Off`), then `mapSaturation` (design D10), `CLAUDE.md`, and run `./scripts/verify-local.sh`. Verify: `./gradlew :app:testDebugUnitTest --tests "*MapColoursTest*"` passes, then the full local check passes.
+
 ## 10. Docs and integration after the speed revision
 
 - [x] 10.1 Update `CLAUDE.md` (`SunShadeSweep`'s cell size; the heatmap's own day; the greyscale map), then run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, all unit tests and the debug APK pass, and validation reports no failures.
@@ -129,7 +131,7 @@
   - at launch the toggle shows `Off` selected and no status card; the ⓘ button sits in the top-left corner with the coordinates below it, and no attribution covers the map;
   - at 360 dp width, in portrait and landscape, the toggle's three icons stay in one row on screen, the status card has the toggle's width and right edge, and nothing overlaps;
   - at Interlaken (46.6863° N, 7.8632° E), zoom 12, 2025-12-21, `Sun hours`: the card shows `Sun hours`, `Computing sun hours …` and directly below it the progress bar until the heatmap's day is complete, then the heatmap over the whole screen, and the panel reads `Sun hours ≈` 5 h 23 min ± 40 min;
-  - while the overlay is on, the map is greyscale, and it is in colour again after selecting `Off`; the overlay stands out clearly (tune the alpha in design D10 if not);
+  - in `Sun hours` the map is greyscale; in `Sun & shade` and after selecting `Off` it is in colour; the overlay stands out clearly (tune the alpha in design D10 if not);
   - the legend reads `0` … `8 h` with `Unknown` in opaque colours; the heatmap's bands rise from slate to light amber, and paths, labels and contour lines stay readable (tune alpha and stops in design D3 if not, keeping the lightness rising);
   - moving the slider leaves the heatmap unchanged; switching between `Sun & shade` and `Sun hours` shows each at once;
   - a pan keeps the previous heatmap on its terrain with `Computing sun hours …`;
