@@ -124,7 +124,7 @@
 
 ## 10. Docs and integration after the speed revision
 
-- [ ] 10.1 Update `CLAUDE.md` (`SunShadeSweep`'s cell size; the heatmap's own day; the greyscale map), then run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, all unit tests and the debug APK pass, and validation reports no failures.
+- [x] 10.1 Update `CLAUDE.md` (`SunShadeSweep`'s cell size; the heatmap's own day; the greyscale map), then run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, all unit tests and the debug APK pass, and validation reports no failures.
 - [ ] 10.2 On-device check with the CI APK. Expected:
   - at launch the toggle shows `Off` selected and no status card; the ⓘ button sits in the top-left corner with the coordinates below it, and no attribution covers the map;
   - at 360 dp width, in portrait and landscape, the toggle's three icons stay in one row on screen, the status card has the toggle's width and right edge, and nothing overlaps;
