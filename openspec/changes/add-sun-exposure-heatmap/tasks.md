@@ -106,10 +106,30 @@
 
 - [x] 8.1 Update `CLAUDE.md` (the `app` row: `about/AboutScreen.kt`, the toggle and status card in `map/OverlayControl.kt`, no attributions in `MapLabels`). Verify: `openspec validate --all --strict` passes and `CLAUDE.md` names `AboutScreen.kt`.
 - [x] 8.2 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, all unit tests and the debug APK pass, and validation reports no failures.
-- [ ] 8.3 On-device check with the CI APK. Expected:
+8.3 (the on-device check) moved to 10.2, after the speed and visibility revision (user decisions, 2026-09-29).
+
+## 9. Speed and visibility (design D9, D10)
+
+- [ ] 9.1 Extend `SunShadeGeometryTest` first: with `cellDp` 8 the lines are 8 dp apart and fewer by a factor of about 4 than at 2 dp; the ridge's shadow edge of `SunShadeHullTest` lies within ±1 cell at 8 dp. Then add the `cellDp` parameter to `SunShadeSweep` (default 2 dp) and pass it through `OverlayRepository.grid` (design D9). Verify: `./gradlew :core:test` passes.
+- [ ] 9.2 Write `MapViewModelTest` cases first:
+  - in `Sun hours`, the heatmap's day computes 144 steps at 8 dp and no 2 dp grid is requested;
+  - switching from `Sun & shade` (paused after 3 steps) to `Sun hours` and back resumes the `Sun & shade` day without computing those 3 again;
+  - with 36 of 144 heatmap steps computed, `dayProgress` is 0.25;
+  - both days stay in the cache under one budget, keyed by cell size;
+  - update the existing heatmap cases to the heatmap's own day.
+
+  Then give `DayOverlay` its step length and cell size, run one day per mode, pause the other, and key `DayCache` by cell size (design D9). Verify: `./gradlew :app:testDebugUnitTest --tests "*MapViewModel*" --tests "*DayOverlay*" --tests "*DayCache*"` passes.
+- [ ] 9.3 Update `SunHoursTest` and `RenderSunHoursTest` first: 144 steps; 29 sun and 1 unknown give counts 29 and 1; counts on a raster of one pixel per 8 dp; the image at one pixel per dp, each pixel coloured from the raster pixel under it, hatched with the same 2 dp stripes every 8 dp. Then count on the coarse raster and draw at 1 px/dp (design D9); `formatSunHours` reads the centre of the coarse raster at 10 minutes per step, and `HeatmapBands.bandOf` takes minutes of sun instead of 5-minute steps (update `HeatmapColourTest` and `SunFormatTest` first). Verify: `./gradlew :app:testDebugUnitTest --tests "*SunHours*" --tests "*SunFormatTest*"` passes.
+- [ ] 9.4 Write `MapColoursTest` first: greyscale for `Sun & shade` and `Sun hours`, colour for `Off`; and update `HeatmapColourTest` and `RenderOverlayTest` to alpha `0x99`. Then set `raster-saturation` on the map layer from the toggle's option, and raise `SHADE_ARGB` to `0x99455A64` (design D10). Verify: `./gradlew :app:testDebugUnitTest --tests "*MapColoursTest*" --tests "*HeatmapColourTest*" --tests "*RenderOverlayTest*"` passes and `./gradlew assembleDebug` succeeds.
+
+## 10. Docs and integration after the speed revision
+
+- [ ] 10.1 Update `CLAUDE.md` (`SunShadeSweep`'s cell size; the heatmap's own day; the greyscale map), then run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, all unit tests and the debug APK pass, and validation reports no failures.
+- [ ] 10.2 On-device check with the CI APK. Expected:
   - at launch the toggle shows `Off` selected and no status card; the ⓘ button sits in the top-left corner with the coordinates below it, and no attribution covers the map;
   - at 360 dp width, in portrait and landscape, the toggle's three icons stay in one row on screen, the status card has the toggle's width and right edge, and nothing overlaps;
-  - at Interlaken (46.6863° N, 7.8632° E), zoom 12, 2025-12-21, `Sun hours`: the card shows `Sun hours`, `Computing sun hours …` and directly below it the progress bar until the day is complete, then the heatmap over the whole screen, and the panel reads `Sun hours ≈` 5 h 23 min ± 20 min;
+  - at Interlaken (46.6863° N, 7.8632° E), zoom 12, 2025-12-21, `Sun hours`: the card shows `Sun hours`, `Computing sun hours …` and directly below it the progress bar until the heatmap's day is complete, then the heatmap over the whole screen, and the panel reads `Sun hours ≈` 5 h 23 min ± 40 min;
+  - while the overlay is on, the map is greyscale, and it is in colour again after selecting `Off`; the overlay stands out clearly (tune the alpha in design D10 if not);
   - the legend reads `0` … `8 h` with `Unknown` in opaque colours; the heatmap's bands rise from slate to light amber, and paths, labels and contour lines stay readable (tune alpha and stops in design D3 if not, keeping the lightness rising);
   - moving the slider leaves the heatmap unchanged; switching between `Sun & shade` and `Sun hours` shows each at once;
   - a pan keeps the previous heatmap on its terrain with `Computing sun hours …`;
@@ -117,4 +137,4 @@
   - in flight mode over a never-visited area, the heatmap is hatched only, and the panel reads `Sun hours unknown`;
   - zoom 10.5 shows `Zoom in to see sun and shade` in the card;
   - ⓘ opens the About page with the version and both attributions; each attribution opens its page in the browser; back returns to the same map, time and mode;
-  - record in design.md, "Performance budget": the logged `Overlay day` total at zoom 12 and the `Sun hours` pass and rendering times, against the 2 s and 100 ms budgets. If the pass exceeds 2 s, ask the user about incremental counting; if the day is too slow, ask about a partial heatmap (proposal, Non-goals).
+  - record in design.md, "Performance budget": the logged `Overlay day` totals at zoom 12 of both days (2 dp / 5 min and 8 dp / 10 min) and the `Sun hours` pass and rendering times, against the ~20–30 s, 2 s and 100 ms budgets. If the pass exceeds 2 s, ask the user about incremental counting; if the day is too slow, ask about a partial heatmap (proposal, Non-goals).

@@ -23,11 +23,18 @@ tile servers' bulk-download policies, and #7 does not depend on it.
 - `app`: below the toggle, one status card of the same width holds the mode's name, its notice
   (`Computing …`, `Zoom in …`), directly below it the day's progress bar, and the mode's legend in
   opaque colours (user decisions, 2026-09-29).
+- `app`: `Sun hours` computes its own, coarser day: cells of at most 8 × 8 dp and steps every 10
+  minutes, instead of waiting for the 2 dp / 5-minute `Sun & shade` day (user decision,
+  2026-09-29, after the device check found the heatmap far too slow). Only the shown mode's day is
+  computed; the other pauses and resumes.
+- `app`: while the overlay is on, the map is shown in greyscale, and the overlay is more opaque
+  (0.6 instead of 0.45), so that it no longer blends into the map's colours (user decision,
+  2026-09-29).
 - `app`: the attributions leave the map. An ⓘ button in the map's top-left corner opens an About
   page with the map and elevation attributions, their links and the app version (user decision,
   2026-09-29).
 - `app`: the heatmap colours every cell of the visible area by its hours of sun on the selected
-  day: the number of slider steps at which the cell is sun, times 5 minutes. It is built from the
+  day: the number of 10-minute steps at which the cell is sun, times 10 minutes (since the revision of 2026-09-29; 5-minute slider steps before). It is built from the
   day's grids once the whole day is computed.
   - The colour scale runs from 0 h to the day's possible sun (the day length at the map centre)
     in 30-minute bands (user decisions).
@@ -62,6 +69,7 @@ tile servers' bulk-download policies, and #7 does not depend on it.
   status card ("Overlay of the whole day"), and "Overlay status card" is added.
 - `map-view`: "Map attribution" is replaced by "About and attributions" (the ⓘ button and the
   About page), and "Missing map tiles" checks for the ⓘ button instead of the attribution.
+  "Map colours while the overlay is on" is added (greyscale map).
 - `sun-position`: "Sun information panel" must not cover the ⓘ button instead of the attribution.
 
 ## Non-goals
@@ -74,7 +82,8 @@ tile servers' bulk-download policies, and #7 does not depend on it.
   the new area.
 - Keeping computed heatmaps across app restarts.
 - Downloading regions for offline use (roadmap #6).
-- Accuracy finer than the 5-minute slider steps. The panel's tracer line stays the precise value.
+- Accuracy finer than the heatmap's 10-minute steps and 8 dp cells. The panel's tracer line stays
+  the precise value; `Sun & shade` keeps 2 dp cells and 5-minute steps.
 - Showing the attributions on the map at launch before collapsing them (user decision,
   2026-09-29). The OpenStreetMap Foundation's attribution guidelines allow collapsed attribution
   reachable from an "(i)" button or an About option; their collapse options (dismiss, map

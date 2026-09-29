@@ -44,7 +44,7 @@ shown. The day's computation, its cache and its progress bar are shared and unaw
 *Alternatives (asked):* a separate heatmap layer with its own computation (duplicates
 `DayOverlay`), or a region heatmap at low zoom (needs the DEM halo of #6).
 
-### D2. Counting: one pass over the day's grids once the day is complete (user decision, 2026-09-28)
+### D2. Counting: one pass over the day's grids once the day is complete (user decision, 2026-09-28; the day and the raster are coarser since D9)
 `SunHours` (new, `app/map/SunHours.kt`) holds, for the north-up raster of the day's area at one
 pixel per dp (the raster of `renderOverlay`):
 - `sun: ShortArray`: steps at which the pixel's cell is sun;
@@ -89,7 +89,7 @@ is already complete.
 
 - Interpolation is in OKLab. Lightness is then linear between stops, and it rises strictly
   because the stops' L does. That is the spec's testable property.
-- Every band has alpha 0.45 (`0x73`, as `SHADE_ARGB`), so 0 h looks like the shade of
+- Every band has the alpha of `SHADE_ARGB`: 0.45 (`0x73`) at first, 0.6 (`0x99`) since D10, so 0 h looks like the shade of
   `Sun & shade`. The device check tunes the alpha and the stops. A change is acceptable as long as
   the lightness still rises.
 - Brightness rising with hours keeps the scale readable for colour-blind users and in sunlight.
@@ -113,7 +113,7 @@ The image is rendered when a `Ready` heatmap state is created (off the main thre
 overlay's). It is not stored in the cache, because the counts suffice to render it again (~340k
 pixels, cheap next to the pass).
 
-### D5. View-model state
+### D5. View-model state (the heatmap's own day since D9)
 - The overlay flow publishes its current day as `currentDay: StateFlow<DayOverlay?>`. This
   replaces nothing, because its local `day` stays the owner.
 - `heatmap: StateFlow<HeatmapUiState>` has the states `Off`, `ZoomedOut`, `Computing(kept: Ready?)`
@@ -222,10 +222,42 @@ top right:
   map interaction or after 5 s, which follows the collapse options of the OpenStreetMap
   Foundation's guidelines literally. The user chose the About page alone (risk below).
 
+### D9. The heatmap's own coarse day (user decisions, 2026-09-29)
+The first device check found the heatmap far too slow: it waited for the `Sun & shade` day (288
+steps at 2 dp cells), then counted ~340k pixels per step. `Sun hours` now computes its own day:
+- **Cells:** `SunShadeSweep` takes the cell size as a parameter (`cellDp`, default 2 dp for
+  `Sun & shade`, 8 dp for the heatmap). The lines are `cellDp` apart, so an 8 dp grid has ¼ of the
+  lines. Samples along a line keep the DEM's resolution, so each line costs about the same; the
+  sweep is therefore about 4× cheaper. `OverlayRepository.grid` passes the cell size through.
+- **Steps:** `DayOverlay` takes the step length (5 min for `Sun & shade`, 10 min for the heatmap):
+  144 steps on a normal day, 138 or 150 on DST days. Night steps stay free (D12 of #5).
+- **Which day runs:** the view model keeps one `DayOverlay` per mode for the visible area and
+  date. Only the shown mode's day runs; the other's job is cancelled and resumes from its computed
+  steps when its mode is shown again. In `Sun hours` the overlay flow computes no grid of the
+  selected time either, as nothing shows it.
+- **Cache:** `DayCache` keys days by area, date and cell size, under the same budget.
+- **Counting:** the raster is one pixel per 8 dp (≈ 50 × 107 at 400 × 850 dp), about 64× fewer
+  pixels than before. `renderSunHours` draws the image at one pixel per dp, reading the count of
+  the raster pixel under each image pixel, so the hatching keeps its 2 dp stripes every 8 dp.
+- **Estimate:** the day ~4× (cells) × 2× (steps) ≈ 8× faster than the 2 dp / 5-minute day, and
+  the counting pass ~100× faster (64× fewer pixels, half the steps). Not measured; the device
+  check records it.
+- *Alternatives (asked):* measure first; 8 dp cells alone (~4×); all cores in `Sun hours`; a
+  coarser counting raster only.
+
+### D10. A greyscale map under the overlay (user decisions, 2026-09-29)
+- The OpenTopoMap `RasterLayer` gets `raster-saturation` −1 while the overlay shows `Sun & shade`
+  or `Sun hours`, and 0 while `Off` (`MapLibreMap` takes a `greyscale` flag; a pure function maps
+  the toggle's option to it, tested on the JVM).
+- The overlay's alpha rises from 0.45 to 0.6: `SHADE_ARGB` becomes `0x99455A64`, and the heatmap's
+  bands take the same alpha (D3). Tuned in the device check, keeping band 0 equal to the shade tint.
+- *Alternatives (asked):* greyscale only in `Sun hours`; always greyscale.
+
 ### Performance budget
 | Interaction | Budget | How it is checked |
 |---|---|---|
 | Switching modes with a built heatmap | ≤ 100 ms to the new image | unit test (no computation) + device check |
+| The heatmap's day (8 dp, 10 min) at map zoom 12 | ~20–30 s on the phone (estimate, D9) | log line `Overlay day …` of the heatmap's day, device check |
 | Counting pass after the day's last step | ≤ 2 s on the phone at map zoom 12 | log line `Sun hours ... in N ms`, device check |
 | Rendering the heatmap image | ≤ 100 ms on the phone | the same log line |
 | Time slider in `Sun hours` mode | no heatmap work | unit test |
@@ -254,10 +286,24 @@ later (proposal, Non-goals).
   `overlayMode`, and the actions each selection takes.
 - `HeatmapLegendTest` (D7): the number labels with the unit once; opaque legend colours.
 - `AboutEntriesTest` (D8): the attribution texts, their URLs and the version entry.
+- `SunShadeGeometryTest` (core, D9): lines `cellDp` apart for 8 dp; the ridge's shadow edge within
+  ±1 cell at 8 dp.
+- `MapViewModelTest` (D9): `Sun hours` computes 144 steps at 8 dp and no 2 dp grid; switching back
+  resumes the paused `Sun & shade` day; the progress 36 of 144 is 25 %; the cache keeps both days.
+- `SunHoursTest`, `RenderSunHoursTest` (D9): counts on the 8 dp raster, the image at 1 px/dp.
+- `MapColoursTest` (D10): greyscale for `Sun & shade` and `Sun hours`, colour for `Off`.
 - Device check: Interlaken on 2025-12-21 at zoom 12 gives `Sun hours ≈` 5 h 23 min ± 20 min at
   the centre, and the timings of the budget.
 
 ## Risks / Trade-offs
+
+- [8 dp cells blur the heatmap at cliffs and narrow ridges; 10-minute steps widen the tolerance to
+  ±10 min per period boundary] → The panel keeps the tracer's exact periods; `Sun & shade` keeps
+  2 dp and 5 minutes.
+- [Two days per area and date in the cache] → The heatmap's day is ~1/32 of the other's size (1/16
+  the cells, half the steps), so it barely touches the budget.
+- [Greyscale hides the map's colour cues (water, forest) while the overlay is on] → Only while it
+  is on; `Off` restores the colours.
 
 - [The counting pass is slow on the phone: ~100–190 daytime grids × ~340k `stateAt` calls] →
   Night steps are skipped, the time is logged and the budget is checked on the device; incremental

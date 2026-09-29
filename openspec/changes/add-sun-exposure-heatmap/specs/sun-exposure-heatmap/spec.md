@@ -13,50 +13,63 @@ While the overlay is on, it SHALL show one of two modes, selected with the overl
 - `Sun & shade` shows the overlay of the selected time (sun-shade-overlay).
 - `Sun hours` shows the heatmap of the selected day (this capability).
 
-Switching between the two modes SHALL NOT restart or discard the computation of the day
-(sun-shade-overlay "Overlay of the whole day"). Once the heatmap of the visible area and selected
-day has been built, switching to either mode SHALL show that mode within 100 ms.
+Each mode computes its own day: `Sun & shade` the day of sun-shade-overlay "Overlay of the whole
+day", `Sun hours` the coarser day of "Sun hours of a cell" (user decision, 2026-09-29, after the
+device check found the heatmap far too slow on the shared day). Only the day of the mode shown
+SHALL be computed; the other SHALL pause. Switching modes SHALL NOT discard the computed steps of
+either day; switching back SHALL resume a day where it paused. Once the heatmap of the visible area
+and selected day has been built and the overlay of the selected time is known, switching to either
+mode SHALL show that mode within 100 ms.
 
 #### Scenario: Switch back and forth
-- **WHEN** the heatmap of the visible area and selected day has been built, and the user switches to `Sun & shade` and back to `Sun hours`
-- **THEN** each mode is shown within 100 ms, and the day is not computed again
+- **WHEN** the heatmap of the visible area and selected day has been built, the overlay of the selected time is known, and the user switches to `Sun & shade` and back to `Sun hours`
+- **THEN** each mode is shown within 100 ms, and neither day is computed again
 
 #### Scenario: Switch while computing
-- **WHEN** the day is being computed and the user switches from `Sun & shade` to `Sun hours`
-- **THEN** the computation continues where it was, and the heatmap is shown once the day is complete
+- **WHEN** the `Sun & shade` day is being computed and the user switches to `Sun hours`
+- **THEN** the `Sun & shade` day pauses, the heatmap's day is computed, and the heatmap is shown once that day is complete
+
+#### Scenario: Resume after switching back
+- **WHEN** the `Sun & shade` day paused at 100 of 288 slider positions, and the user switches back from `Sun hours` to `Sun & shade`
+- **THEN** the 100 computed positions are not computed again, and only the other 188 are
 ### Requirement: Sun hours of a cell
-The sun hours of a cell SHALL be counted over the slider positions of the selected day
-(time-selection "Choose the time of day": 5-minute steps over the day's actual length). The cells
-and each step's state (sun, shade or unknown) are those of sun-shade-overlay "Sunshine of a cell"
-and "Unknown cells" at that step. For each cell:
-- **sun hours** = the number of steps at which the cell is sun, × 5 min;
-- **unknown time** = the number of steps at which the cell is unknown, × 5 min.
+The heatmap SHALL divide the visible map area into cells no larger than 8 × 8 dp (about 105 m at
+map zoom 12 in the Alps). Each cell's state at an instant (sun, shade or unknown) follows the rules
+of sun-shade-overlay "Sunshine of a cell" and "Unknown cells", with these cells instead of the
+overlay's 2 × 2 dp cells. The sun hours SHALL be counted over the heatmap's steps: every 10 minutes
+from the start of the selected day, over its actual length (every second slider position of
+time-selection "Choose the time of day"). For each cell:
+- **sun hours** = the number of steps at which the cell is sun, × 10 min;
+- **unknown time** = the number of steps at which the cell is unknown, × 10 min.
 
 The sun hours are therefore a lower bound: the true value lies between the sun hours and the sun
-hours plus the unknown time. A time that is not a slider position (e.g. after `Now`) SHALL NOT be
+hours plus the unknown time. A time that is not one of these steps (e.g. after `Now`) SHALL NOT be
 counted.
 
 Accuracy: each start and end of a sun period is counted to the nearest step, so where the whole day
-is known, the sun hours SHALL be within 5 min × the number of period boundaries of the sum of the
+is known, the sun hours SHALL be within 10 min × the number of period boundaries of the sum of the
 cell's sun periods (point-sunshine "Sun periods of the selected day", evaluated at the cell's
 sample point with the map centre's sun position).
 
 #### Scenario: Counting steps
-- **WHEN** a cell is sun at 57 steps, unknown at 2 steps and shade at the other 229 steps of a 24-hour day
-- **THEN** its sun hours are 4 h 45 min and its unknown time is 10 min
+- **WHEN** a cell is sun at 29 steps, unknown at 1 step and shade at the other 114 steps of a 24-hour day (144 steps)
+- **THEN** its sun hours are 4 h 50 min and its unknown time is 10 min
 
 #### Scenario: Winter day in Interlaken
 - **WHEN** the map centre is 46.6863° N, 7.8632° E, the map zoom is 12, the selected date is 2025-12-21, and the whole day is known
-- **THEN** the sun hours of the cell containing the map centre are 5 h 23 min ± 20 min (the tracer's periods 10:09–14:51 and 15:11–15:52 have 4 boundaries)
+- **THEN** the sun hours of the cell containing the map centre are 5 h 23 min ± 40 min (the tracer's periods 10:09–14:51 and 15:11–15:52 have 4 boundaries)
 
 #### Scenario: Short day
-- **WHEN** the selected date is 2025-03-30 in Europe/Zurich (276 slider positions) and a cell is sun at every position
+- **WHEN** the selected date is 2025-03-30 in Europe/Zurich (276 slider positions, 138 steps) and a cell is sun at every step
 - **THEN** its sun hours are 23 h 0 min
+
+#### Scenario: Cell size
+- **WHEN** the map zoom is 12 and the visible area is 400 × 850 dp
+- **THEN** the heatmap's cells are at most 8 × 8 dp: about 50 × 107 cells, plus at most one cell of margin on each side
 
 #### Scenario: Ground height unknown
 - **WHEN** the ground height at a cell's sample point cannot be obtained
 - **THEN** the cell is unknown at every step: its sun hours are 0 h 0 min and its unknown time is the whole day
-
 ### Requirement: Heatmap coverage and zoom range
 In `Sun hours` mode, while the overlay is on and the map zoom is 11 or more, the app SHALL show
 the heatmap over every cell of the visible map area once it has been built. It SHALL NOT limit the
@@ -91,7 +104,7 @@ clear.
 
 #### Scenario: Bands on a winter day
 - **WHEN** the day length at the map centre is 8 h 33 min
-- **THEN** the scale has 18 bands, a cell with 5 h 25 min of sun is in band 10 (5 h 0 min to 5 h 30 min), and a cell with 8 h 35 min is in band 17, the last
+- **THEN** the scale has 18 bands, a cell with 5 h 20 min of sun is in band 10 (5 h 0 min to 5 h 30 min), and a cell with 8 h 40 min is in band 17, the last
 
 #### Scenario: Bands on a summer day
 - **WHEN** the day length at the map centre is 15 h 51 min
@@ -116,7 +129,7 @@ SHALL be drawn with the hatching only, without a colour. The app SHALL NOT colou
 estimate of its unknown steps.
 
 #### Scenario: Some steps unknown
-- **WHEN** a cell's sun hours are 4 h 45 min and its unknown time is 10 min
+- **WHEN** a cell's sun hours are 4 h 50 min and its unknown time is 10 min
 - **THEN** it is drawn in the colour of band 9 with the hatching on top
 
 #### Scenario: Every step unknown
@@ -144,14 +157,16 @@ In `Sun hours` mode, while the overlay is on, the legend in the status card (sun
 - **WHEN** the legend is shown
 - **THEN** every band colour in it is fully opaque
 ### Requirement: Heatmap updates
-The heatmap SHALL be built off the main thread once every slider position of the day has been
-computed (sun-shade-overlay "Overlay of the whole day"); the map SHALL stay responsive meanwhile.
+The heatmap's day SHALL be computed in the background, like the day of sun-shade-overlay "Overlay
+of the whole day" (the same CPU limit, stop and resume, and cache of days, kept apart from the
+`Sun & shade` day). The heatmap SHALL be built off the main thread once every step of its day has
+been computed; the map SHALL stay responsive meanwhile.
 No heatmap of an area and date SHALL be shown before it is built; the app SHALL NOT show a partial
 heatmap.
 
 While the heatmap of the visible area and selected date is not built, in `Sun hours` mode:
 - the notice `Computing sun hours …` SHALL be shown in the status card (sun-shade-overlay "Overlay
-  status card"), with the day's progress bar directly below it;
+  status card"), with the progress of the heatmap's day directly below it;
 - after a camera move, the previous heatmap SHALL stay on its geographic area until the new one is
   built; newly visible areas stay untinted meanwhile;
 - after a change of the selected date, the previous heatmap SHALL stay until the new one is built.
@@ -161,11 +176,11 @@ anew (sun-shade-overlay "Overlay of the whole day", "Cache of days"), its heatma
 again once the day is complete. A built heatmap SHALL be kept with its day in the cache of days.
 
 #### Scenario: Switching on in heatmap mode
-- **WHEN** the mode is `Sun hours`, the user switches the overlay on, and 72 of the day's 288 slider positions are computed
+- **WHEN** the mode is `Sun hours`, the user switches the overlay on, and 36 of the heatmap day's 144 steps are computed
 - **THEN** no heatmap is drawn, the status card shows `Computing sun hours …` and directly below it the progress bar at 25 %
 
 #### Scenario: Day complete
-- **WHEN** the last slider position of the day has been computed
+- **WHEN** the last step of the heatmap's day has been computed
 - **THEN** the heatmap is built and drawn, and the notice and the progress bar disappear
 
 #### Scenario: Time change
@@ -209,8 +224,8 @@ line SHALL NOT be shown.
 - **THEN** the panel shows `Sun hours at least 5 h 20 min (10 min unknown)`
 
 #### Scenario: Long unknown time
-- **WHEN** the cell under the crosshair has sun hours 2 h 0 min and an unknown time of 1 h 15 min
-- **THEN** the panel shows `Sun hours at least 2 h 0 min (1 h 15 min unknown)`
+- **WHEN** the cell under the crosshair has sun hours 2 h 0 min and an unknown time of 1 h 20 min
+- **THEN** the panel shows `Sun hours at least 2 h 0 min (1 h 20 min unknown)`
 
 #### Scenario: Wholly unknown
 - **WHEN** the cell under the crosshair is unknown at every step
