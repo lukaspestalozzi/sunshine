@@ -41,8 +41,10 @@ class DayOverlay(
     /** Every slider position of [date]: 5-minute steps over the day's real length. */
     val steps: List<ZonedDateTime> = List(sliderPositions(date, zone)) { sliderTime(date, zone, it * SLIDER_STEP_MINUTES.toFloat()) }
 
+    private val nightInstants: Set<Instant> = steps.filter { SunShadeSweep.isNight(sunAt(it)) }.mapTo(HashSet()) { it.toInstant() }
+
     /** Steps whose grid needs no terrain work, as the sun is below every horizon (design D12). */
-    val nightSteps: Int = steps.count { SunShadeSweep.isNight(sunAt(it)) }
+    val nightSteps: Int = nightInstants.size
 
     private val stepInstants: Set<Instant> = steps.mapTo(HashSet()) { it.toInstant() }
 
@@ -58,8 +60,15 @@ class DayOverlay(
 
     private val mutableBytes = AtomicLong()
 
-    /** Bytes of the stored grids' states (design D14). */
-    val bytes: Long get() = mutableBytes.get()
+    /** Bytes of the stored grids' states (design D14) and of the sun hours once counted. */
+    val bytes: Long get() = mutableBytes.get() + (counted?.bytes ?: 0L)
+
+    /** The day's sun hours once [sunHours] has counted them (design D2 of add-sun-exposure-heatmap). */
+    @Volatile
+    var counted: SunHours? = null
+        private set
+
+    private val counting = Mutex()
 
     /** Whether some stored grid has unknown cells (design D14). */
     @Volatile
@@ -68,6 +77,18 @@ class DayOverlay(
 
     // Fair, so a selected time waiting for it comes before the next background step.
     private val lock = Mutex()
+
+    /** Whether the sun is below every horizon at [step], so that its grid needs no terrain work (design D12). */
+    fun isNight(step: ZonedDateTime): Boolean = step.toInstant() in nightInstants
+
+    /**
+     * The day's sun hours, counted once on [background] and then kept (design D2 of
+     * add-sun-exposure-heatmap). Every step must be computed.
+     */
+    suspend fun sunHours(): SunHours =
+        counting.withLock {
+            counted ?: withContext(background) { countSunHours(this@DayOverlay) }.also { counted = it }
+        }
 
     /** The grid at [time] if it has been computed. */
     fun gridAt(time: ZonedDateTime): ShadeGrid? = grids[time.toInstant()]

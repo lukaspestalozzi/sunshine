@@ -79,6 +79,25 @@ class DayCacheTest {
         }
 
     @Test
+    fun `a day's sun hours count towards the budget, 4 bytes per pixel`() =
+        runTest {
+            val counted = day(AREA, DECEMBER_21, grids = 288)
+            val other = day(AREA, DECEMBER_21.plusDays(1), grids = 288)
+            val grids = 288L * GRID.stateBytes
+            counted.sunHours()
+            // One byte short of both days with the counts; without them, both would fit.
+            val cache = DayCache(maxBytes = 2 * grids + 4L * PIXELS - 1)
+            cache.put(counted)
+            cache.put(other)
+
+            assertEquals(grids + 4L * PIXELS, counted.bytes)
+            cache.trim(keep = other)
+
+            assertNull(cache.get(counted.area, counted.date))
+            assertSame(other, cache.get(other.area, other.date))
+        }
+
+    @Test
     fun `a removed day is gone`() =
         runTest {
             val cache = DayCache(maxBytes = Long.MAX_VALUE)
@@ -107,6 +126,7 @@ class DayCacheTest {
         val ZURICH: ZoneId = ZoneId.of("Europe/Zurich")
         val DECEMBER_21: LocalDate = LocalDate.of(2025, 12, 21)
         val AREA = MapArea(GeoPoint(46.6863, 7.8632), zoom = 12.0, widthDp = 20.0, heightDp = 30.0)
+        const val PIXELS = 20 * 30
         val GRID: ShadeGrid =
             SunShadeSweep(AREA, SunPosition(0.0, -30.0, false)).let { sweep ->
                 sweep.night(sweep.groundTiles().associateWith { HeightTile.fromMetres(512, FloatArray(512 * 512) { 568f }) })
