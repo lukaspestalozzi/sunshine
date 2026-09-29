@@ -107,19 +107,21 @@ internal class GnomonicFrame(
  *
  * Frame: the gnomonic plane of the map centre. Lines run towards the sun's azimuth at the centre;
  * `s` is the position along a line, growing downwind (away from the sun), and `w` the position
- * across the lines. Cells are [CELL_DP] dp squares; cell `j` of line `k` has its sample point at
+ * across the lines. Cells are [cellDp] dp squares (2 dp for the overlay, 8 dp for the heatmap; design
+ * D9 of add-sun-exposure-heatmap); cell `j` of line `k` has its sample point at
  * `s = lineStart[k] + (j + 0.5) · spacing`.
  */
 class SunShadeSweep(
     val area: MapArea,
     val sun: SunPosition,
+    cellDp: Double = CELL_DP,
     private val heightBound: Double = heightBoundAt(area.center),
     private val tileSize: Int = 512,
 ) {
     internal val frame = GnomonicFrame(area.center)
 
     /** Distance between neighbouring lines and between the cells of a line, in metres. */
-    val spacing: Double = CELL_DP * area.metresPerDp
+    val spacing: Double = cellDp * area.metresPerDp
 
     /** Unit vector towards the sun in the plane (east, north). */
     private val ux = sin(Math.toRadians(sun.azimuth))

@@ -35,14 +35,15 @@ class OverlayRepository(
         val tiles: Map<TileKey, HeightTile>,
     )
 
-    /** The grid of [area] with the sun at [sun]. */
+    /** The grid of [area] with the sun at [sun], in cells of [cellDp] dp (design D9 of add-sun-exposure-heatmap). */
     suspend fun grid(
         area: MapArea,
         sun: SunPosition,
+        cellDp: Double = SunShadeSweep.CELL_DP,
     ): ShadeGrid =
         coroutineScope {
             val start = TimeSource.Monotonic.markNow()
-            val sweep = SunShadeSweep(area, sun)
+            val sweep = SunShadeSweep(area, sun, cellDp)
             val reusable = kept?.takeIf { it.area.isNear(area) }?.tiles.orEmpty()
             val before = loads()
             val ground = load(sweep.groundTiles(), reusable)

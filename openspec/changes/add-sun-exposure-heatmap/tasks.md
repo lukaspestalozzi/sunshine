@@ -110,7 +110,7 @@
 
 ## 9. Speed and visibility (design D9, D10)
 
-- [ ] 9.1 Extend `SunShadeGeometryTest` first: with `cellDp` 8 the lines are 8 dp apart and fewer by a factor of about 4 than at 2 dp; the ridge's shadow edge of `SunShadeHullTest` lies within ±1 cell at 8 dp. Then add the `cellDp` parameter to `SunShadeSweep` (default 2 dp) and pass it through `OverlayRepository.grid` (design D9). Verify: `./gradlew :core:test` passes.
+- [x] 9.1 Extend `SunShadeGeometryTest` first: with `cellDp` 8 the lines are 8 dp apart and fewer by a factor of about 4 than at 2 dp; the ridge's shadow edge of `SunShadeHullTest` lies within ±1 cell at 8 dp. Then add the `cellDp` parameter to `SunShadeSweep` (default 2 dp) and pass it through `OverlayRepository.grid` (design D9). Verify: `./gradlew :core:test` passes.
 - [ ] 9.2 Write `MapViewModelTest` cases first:
   - in `Sun hours`, the heatmap's day computes 144 steps at 8 dp and no 2 dp grid is requested;
   - switching from `Sun & shade` (paused after 3 steps) to `Sun hours` and back resumes the `Sun & shade` day without computing those 3 again;

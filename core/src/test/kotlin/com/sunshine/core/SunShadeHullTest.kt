@@ -21,6 +21,21 @@ class SunShadeHullTest {
     }
 
     @Test
+    fun `with 8 dp cells the ridge's shadow still ends 2741 m to the north, within a cell`() {
+        val terrain = SyntheticTerrain { lat, _ -> if (lat in RIDGE_SOUTH..RIDGE_LATITUDE) 1500.0 else 500.0 }
+        val area = MapArea(northOf(RIDGE_LATITUDE, 2741.0), 12.0, 100.0, 400.0)
+        val grid = terrain.grid(area, sun(180.0, upperEdge = 20.0), cellDp = 8.0) { false }
+        val cell = 8 * area.metresPerDp
+
+        for (north in listOf(2400.0, 2741.0 - cell - 10)) {
+            assertEquals(Sunshine.SHADE, grid.stateAt(northOf(RIDGE_LATITUDE, north)), "$north m north")
+        }
+        for (north in listOf(2741.0 + cell + 10, 3200.0)) {
+            assertEquals(Sunshine.SUN, grid.stateAt(northOf(RIDGE_LATITUDE, north)), "$north m north")
+        }
+    }
+
+    @Test
     fun `earth curvature lowers a peak 4000 m above the eye 100 km towards the sun to 1_90 degrees`() {
         val ridge = northOf(CENTER.latitude, -100_000.0).latitude
         val terrain =
@@ -99,8 +114,16 @@ internal fun SyntheticTerrain.grid(
     area: MapArea,
     sun: SunPosition,
     missing: (TileKey) -> Boolean = { false },
+): ShadeGrid = grid(area, sun, SunShadeSweep.CELL_DP, missing)
+
+/** As [grid], with cells of [cellDp] dp (design D9 of add-sun-exposure-heatmap). */
+internal fun SyntheticTerrain.grid(
+    area: MapArea,
+    sun: SunPosition,
+    cellDp: Double,
+    missing: (TileKey) -> Boolean,
 ): ShadeGrid {
-    val sweep = SunShadeSweep(area, sun)
+    val sweep = SunShadeSweep(area, sun, cellDp = cellDp)
     sweep.tiles(sweep.groundTiles().associateWith { if (missing(it)) null else tile(it) })
     val tiles =
         object : AbstractMap<TileKey, HeightTile?>() {

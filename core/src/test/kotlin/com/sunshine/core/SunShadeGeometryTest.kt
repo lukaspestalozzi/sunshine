@@ -65,6 +65,17 @@ class SunShadeGeometryTest {
     }
 
     @Test
+    fun `with 8 dp cells the lines are 8 dp apart, about a quarter as many as with 2 dp`() {
+        val sun = SunPosition(azimuth = 200.0, elevation = 20.0, isAboveHorizon = true)
+        val fine = SunShadeSweep(AREA, sun)
+        val coarse = SunShadeSweep(AREA, sun, cellDp = 8.0)
+
+        assertEquals(8 * AREA.metresPerDp, coarse.spacing, 1e-9)
+        assertEquals(coarse.spacing, coarse.lineW(1) - coarse.lineW(0), 1e-6)
+        assertEquals(fine.lineCount / 4.0, coarse.lineCount.toDouble(), fine.lineCount / 4.0 * 0.05)
+    }
+
+    @Test
     fun `the grid covers every corner and the centre of the visible area`() {
         for (azimuth in listOf(0.0, 45.0, 135.0, 180.0, 271.0)) {
             val sweep = SunShadeSweep(AREA, SunPosition(azimuth, 20.0, true))
