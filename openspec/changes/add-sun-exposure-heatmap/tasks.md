@@ -84,7 +84,7 @@
 
 ## 6. Integration
 
-- [ ] 6.1 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, all unit tests and the debug APK pass, and validation reports no failures.
+- [x] 6.1 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, all unit tests and the debug APK pass, and validation reports no failures.
 - [ ] 6.2 On-device check with the CI APK. Expected:
   - the overlay is off at launch; switched on, it shows `Sun & shade` with the mode control;
   - at Interlaken (46.6863° N, 7.8632° E), zoom 12, 2025-12-21, `Sun hours`: `Computing sun hours …` and the progress bar until the day is complete, then the heatmap over the whole screen, and the panel reads `Sun hours ≈` 5 h 23 min ± 20 min;
