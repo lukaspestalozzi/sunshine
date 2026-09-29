@@ -775,6 +775,30 @@ class MapViewModelTest {
         }
 
     @Test
+    fun `counting a day trims the cache of days, as the counts add to the day's bytes`() =
+        runTest {
+            val area = MapArea(INTERLAKEN, 12.0, MAP_WIDTH, MAP_HEIGHT)
+            val dayBytes = 288L * cheapGrid(area, online = true).stateBytes
+            val countBytes = 4L * MAP_WIDTH.toInt() * MAP_HEIGHT.toInt()
+            val suns = mutableListOf<SunPosition>()
+            // Two days fit, but not once one of them is counted.
+            val viewModel = dayViewModel(suns, dayCache = DayCache(maxBytes = 2 * dayBytes + countBytes - 1))
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceUntilIdle()
+            viewModel.onDateSelected(LocalDate.of(2025, 12, 22))
+            advanceUntilIdle()
+
+            viewModel.onOverlayModeSelected(OverlayMode.SUN_HOURS)
+            advanceUntilIdle()
+            suns.clear()
+            viewModel.onDateSelected(LocalDate.of(2025, 12, 21))
+            advanceUntilIdle()
+
+            assertEquals(288, suns.size, "21 December was not dropped")
+        }
+
+    @Test
     fun `a day computed anew after a reconnect is counted anew`() =
         runTest {
             isOnline.value = false
