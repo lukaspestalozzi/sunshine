@@ -51,13 +51,13 @@
 
 ## 4. app: UI
 
-- [ ] 4.1 Extend `OverlayNoticesTest` first:
+- [x] 4.1 Extend `OverlayNoticesTest` first:
   - in `Sun hours`, `Computing` → `Computing sun hours …`, and `Ready` → none;
   - zoomed out → `Zoom in to see sun and shade` in both modes;
   - `Computing sun and shade …` never in `Sun hours`.
 
   Then make `overlayNotice` take the mode and add the strings (design D6). Verify: `./gradlew :app:testDebugUnitTest --tests "*OverlayNoticesTest*"` passes.
-- [ ] 4.2 Add cases to `SunFormatTest` first, one per spec scenario of "Sun hours in the information panel":
+- [x] 4.2 Add cases to `SunFormatTest` first, one per spec scenario of "Sun hours in the information panel":
   - `≈ 5 h 20 min`;
   - `at least 5 h 20 min (10 min unknown)`;
   - `at least 2 h 0 min (1 h 15 min unknown)`;
@@ -66,12 +66,12 @@
   - the same text under the de-CH locale.
 
   Then implement `formatSunHours` (design D6). Verify: `./gradlew :app:testDebugUnitTest --tests "*SunFormatTest*"` passes.
-- [ ] 4.3 Add a unit test for the legend's labels first: 8 h 33 min → `0 h`, `2 h`, `4 h`, `6 h`, `8 h`; 15 h 51 min → up to `14 h`; 0 h → `0 h`. Then add to `OverlayControl`:
+- [x] 4.3 Add a unit test for the legend's labels first: 8 h 33 min → `0 h`, `2 h`, `4 h`, `6 h`, `8 h`; 15 h 51 min → up to `14 h`; 0 h → `0 h`. Then add to `OverlayControl`:
   - the segmented control, shown while the overlay is on;
   - the heatmap legend in `Sun hours`, whose band bar and `Unknown` row replace the `Shade` / `Unknown` legend.
 
   Verify: `./gradlew :app:testDebugUnitTest --tests "*Heatmap*"` passes, and `./gradlew :app:lintDebug` reports no new issues.
-- [ ] 4.4 Wire `MapScreen`:
+- [x] 4.4 Wire `MapScreen`:
   - the image of the mode goes to `MapLibreMap`;
   - the mode control's callbacks;
   - the `Sun hours` line in `SunPanel` below `Sunshine`, only in `Sun hours` at zoom ≥ 11.

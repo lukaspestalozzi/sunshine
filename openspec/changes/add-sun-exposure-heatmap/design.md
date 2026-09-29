@@ -133,7 +133,9 @@ pixels, cheap next to the pass).
   `Sun hours`. It sits below the toggle chip and its progress bar and above the legend, and is
   shown only while the overlay is on. The chip keeps its label and its on/off meaning.
 - **Legend:** in `Sun hours` mode, a horizontal bar of the n band colours on the legend's surface,
-  with the labels `0 h`, `2 h`, … under the band where each whole 2 h begins. Below it is the `Unknown` hatching row, which it
+  with the labels `0 h`, `2 h`, … under the band where each whole 2 h begins. Its bands come from
+  the sun panel's day length (map centre, selected date), so the scale shows while the day is
+  still computed (apply, 2026-09-29). Below it is the `Unknown` hatching row, which it
   shares with the overlay's legend.
 - **Notices:** `overlayNotice` takes the mode. In `Sun hours` it shows `Computing sun hours …`
   while the heatmap is `Computing`, and in both modes it shows `Zoom in to see sun and shade` when
