@@ -2,8 +2,8 @@
 
 ## 1. app: counting the day's sun hours
 
-- [ ] 1.1 Move the pixel geometry of `renderOverlay` (pixel centre → latitude, longitude over the grid's area, one pixel per dp) into a shared helper in `map/OverlayImage.kt`, without changing its output (design D2). Verify: `./gradlew :app:testDebugUnitTest --tests "*RenderOverlayTest*"` passes unchanged.
-- [ ] 1.2 Write `SunHoursTest` first, with a `DayOverlay` whose grid function returns whole-area grids built through `SunShadeSweep` on flat or missing tiles, as `DayOverlayTest` does:
+- [x] 1.1 Move the pixel geometry of `renderOverlay` (pixel centre → latitude, longitude over the grid's area, one pixel per dp) into a shared helper in `map/OverlayImage.kt`, without changing its output (design D2). Verify: `./gradlew :app:testDebugUnitTest --tests "*RenderOverlayTest*"` passes unchanged.
+- [x] 1.2 Write `SunHoursTest` first, with a `DayOverlay` whose grid function returns whole-area grids built through `SunShadeSweep` on flat or missing tiles, as `DayOverlayTest` does:
   - a 24-hour day with a daytime cell sun at 57 steps, unknown at 2 and shade at the rest → `sun` 57 and `unknown` 2 at its pixels (spec "Counting steps");
   - an off-grid selected time (e.g. 12:03) is not counted;
   - night steps without unknown cells are skipped, and night steps with unknown cells are counted;
@@ -11,7 +11,7 @@
   - 2025-03-30 in Europe/Zurich → `steps` 276.
 
   Then implement `SunHours` and `sunHours(day)` in `map/SunHours.kt`, with the counts stored on the `DayOverlay` and counted in its `bytes` (design D2). Verify: `./gradlew :app:testDebugUnitTest --tests "*SunHoursTest*"` passes.
-- [ ] 1.3 Add a test to `DayCacheTest` first: a day with counts reports 4 bytes per pixel more, and the cache trims by it. Then make it pass. Verify: `./gradlew :app:testDebugUnitTest --tests "*DayCacheTest*"` passes.
+- [x] 1.3 Add a test to `DayCacheTest` first: a day with counts reports 4 bytes per pixel more, and the cache trims by it. Then make it pass. Verify: `./gradlew :app:testDebugUnitTest --tests "*DayCacheTest*"` passes.
 
 ## 2. app: colour scale and rendering
 
