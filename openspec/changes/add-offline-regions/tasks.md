@@ -55,8 +55,8 @@
 
 ## 6. app: region download
 
-- [ ] 6.1 Write `RegionProgressTest` first: 4775 of 7819 → 61 %; not 100 % while the map part is complete and one DEM tile is missing; the status text for each state (`Downloading 63 %`, `Waiting`, `Incomplete (63 %) · waiting for network`, `Incomplete (40 %) · waiting for storage`, `2026-10-02 · 183 MiB`, with 183.4 MiB rounded half up) (spec "Progress", "Region list", "Interrupted download"). Then implement the progress and status functions. Verify: `./gradlew :app:testDebugUnitTest --tests "*RegionProgressTest*"` passes.
-- [ ] 6.2 Write `RegionDownloadTest` first, with a fake map part and `DemTiles` on a fake server:
+- [x] 6.1 Write `RegionProgressTest` first: 4775 of 7819 → 61 %; not 100 % while the map part is complete and one DEM tile is missing; the status text for each state (`Downloading 63 %`, `Waiting`, `Incomplete (63 %) · waiting for network`, `Incomplete (40 %) · waiting for storage`, `2026-10-02 · 183 MiB`, with 183.4 MiB rounded half up) (spec "Progress", "Region list", "Interrupted download"). Then implement the progress and status functions. Verify: `./gradlew :app:testDebugUnitTest --tests "*RegionProgressTest*"` passes.
+- [x] 6.2 Write `RegionDownloadTest` first, with a fake map part and `DemTiles` on a fake server:
   - regions download oldest first, one at a time;
   - a region is `COMPLETE` only when both parts are;
   - a stored DEM tile is claimed without a request;
