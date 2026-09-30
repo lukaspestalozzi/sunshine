@@ -2,12 +2,12 @@
 
 ## 1. Build: Room and WorkManager
 
-- [ ] 1.1 Add Room (runtime, KTX, compiler through KSP) and `androidx.sqlite:sqlite-bundled` to `gradle/libs.versions.toml` and `app/build.gradle.kts`, at the latest stable versions compatible with AGP 9.4.1 and Kotlin 2.4.20 (design D5). Write a throwaway `@Entity`/`@Dao`/`@Database` and a JUnit 6 test that inserts and reads one row through `Room.inMemoryDatabaseBuilder` with `BundledSQLiteDriver`. Verify: `./gradlew :app:testDebugUnitTest --tests "*RoomSmokeTest*"` passes and `./gradlew assembleDebug` succeeds. If either fails, record the raw error in design D5, switch D5 to the files + index file fallback with the user's sign-off, and remove the Room dependencies. Delete the throwaway classes once group 4 has real ones.
-- [ ] 1.2 Add `androidx.work:work-runtime-ktx` at the latest stable version (design D7). Verify: `./gradlew assembleDebug` succeeds and `./scripts/verify-local.sh --quick` reports no ktlint issue.
+- [x] 1.1 Add Room (runtime, KTX, compiler through KSP) and `androidx.sqlite:sqlite-bundled` to `gradle/libs.versions.toml` and `app/build.gradle.kts`, at the latest stable versions compatible with AGP 9.4.1 and Kotlin 2.4.20 (design D5). Write a throwaway `@Entity`/`@Dao`/`@Database` and a JUnit 6 test that inserts and reads one row through `Room.inMemoryDatabaseBuilder` with `BundledSQLiteDriver`. Verify: `./gradlew :app:testDebugUnitTest --tests "*RoomSmokeTest*"` passes and `./gradlew assembleDebug` succeeds. If either fails, record the raw error in design D5, switch D5 to the files + index file fallback with the user's sign-off, and remove the Room dependencies. Delete the throwaway classes once group 4 has real ones.
+- [x] 1.2 Add `androidx.work:work-runtime-ktx` at the latest stable version (design D7). Verify: `./gradlew assembleDebug` succeeds and `./scripts/verify-local.sh --quick` reports no ktlint issue.
 
 ## 2. core: areas and tile ranges
 
-- [ ] 2.1 Write `OfflineAreaTest` first (design D8):
+- [x] 2.1 Write `OfflineAreaTest` first (design D8):
   - `tileRange` of 46.55–46.65° N, 7.85–7.95° E at z17 → 1998 tiles, and the sum over z6–z17 → 2752;
   - `regionDemTiles` of the same bounds → 63 tiles at z14, 20 at z13, 20 at z12, 30 at z11 and 169 at z10 (spec "Tiles of a fixed area");
   - `extend` by 150 km at 46.6° N moves the southern edge by 1.3490° (150 / 111.19);
