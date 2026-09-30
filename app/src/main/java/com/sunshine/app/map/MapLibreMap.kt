@@ -170,22 +170,3 @@ private const val OVERLAY_ID = "sun-shade-overlay"
 private const val TOPO_LAYER_ID = "opentopomap"
 private const val GREYSCALE = -1f
 private const val MAX_ZOOM = 17.0
-
-// Missing tiles leave the background visible: blank, never substitute imagery.
-private const val OPEN_TOPO_MAP_STYLE = """
-{
-  "version": 8,
-  "sources": {
-    "opentopomap": {
-      "type": "raster",
-      "tiles": ["https://tile.opentopomap.org/{z}/{x}/{y}.png"],
-      "tileSize": 256,
-      "maxzoom": 17
-    }
-  },
-  "layers": [
-    { "id": "background", "type": "background", "paint": { "background-color": "#E0E0E0" } },
-    { "id": "opentopomap", "type": "raster", "source": "opentopomap" }
-  ]
-}
-"""
