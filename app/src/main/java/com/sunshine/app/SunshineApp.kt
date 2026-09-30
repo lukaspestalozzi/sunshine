@@ -2,7 +2,6 @@ package com.sunshine.app
 
 import android.app.Application
 import android.net.ConnectivityManager
-import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.sunshine.app.elevation.DemTiles
 import com.sunshine.app.elevation.ElevationRepository
@@ -25,6 +24,7 @@ import com.sunshine.app.offline.RegionDownloadWorker
 import com.sunshine.app.offline.RegionDownloader
 import com.sunshine.app.offline.RegionRow
 import com.sunshine.app.offline.StorageUse
+import com.sunshine.app.offline.downloadWork
 import com.sunshine.app.sunshine.OverlayRepository
 import com.sunshine.app.sunshine.SunshineRepository
 import com.sunshine.app.sunshine.debugLog
@@ -101,6 +101,7 @@ class SunshineApp : Application() {
             dao = offlineDatabase.dao(),
             store = demTileStore,
             deleteMap = mapRegionPart::delete,
+            deleteOrphanMaps = mapRegionPart::deleteOrphans,
             cancelDownload = regionDownloader::cancel,
             onRegionBytes = ambientLimit::onRegionBytes,
         )
@@ -141,16 +142,7 @@ class SunshineApp : Application() {
         combine(
             WorkManager.getInstance(this).getWorkInfosForUniqueWorkFlow(RegionDownloadWorker.WORK_NAME),
             NetworkMonitor(getSystemService(ConnectivityManager::class.java)).isOnline,
-        ) { infos, online ->
-            val work = infos.firstOrNull { !it.state.isFinished }
-            when {
-                work == null -> DownloadWork.IDLE
-                work.state == WorkInfo.State.RUNNING -> DownloadWork.RUNNING
-                !online -> DownloadWork.WAITING_FOR_NETWORK
-                work.stopReason == WorkInfo.STOP_REASON_CONSTRAINT_STORAGE_NOT_LOW -> DownloadWork.WAITING_FOR_STORAGE
-                else -> DownloadWork.IDLE
-            }
-        }
+        ) { infos, online -> downloadWork(infos.map { it.state to it.stopReason }, online) }
 
     val elevationRepository: ElevationRepository by lazy { ElevationRepository(tileCache) }
 

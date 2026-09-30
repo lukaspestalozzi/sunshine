@@ -17,6 +17,7 @@ class RegionDeleterTest {
     private val database = inMemoryOfflineDatabase()
     private val dao = database.dao()
     private val deletedMaps = mutableListOf<Long>()
+    private val keptMapRegions = mutableListOf<Set<Long>>()
     private val cancelled = mutableListOf<Long>()
     private val limits = mutableListOf<Pair<Long, Boolean>>()
 
@@ -30,6 +31,7 @@ class RegionDeleterTest {
             dao,
             store,
             deleteMap = { deletedMaps += it },
+            deleteOrphanMaps = { keptMapRegions += it },
             cancelDownload = { cancelled += it },
             onRegionBytes = { bytes, now -> limits += bytes to now },
         )
@@ -68,6 +70,7 @@ class RegionDeleterTest {
             assertArrayEquals(BYTES, store.get(SHARED)!!.bytes) // still b's
             assertEquals(BYTES.size.toLong(), store.browsedBytes()) // ONLY_A is browsed now
             assertEquals(200L to true, limits.last())
+            assertEquals(listOf(setOf(b)), keptMapRegions) // map regions of other ids are orphans
         }
 
     @Test
@@ -83,6 +86,7 @@ class RegionDeleterTest {
             assertEquals(listOf(140L), deletedMaps)
             assertNull(dao.region(a))
             assertEquals(BYTES.size.toLong(), store.browsedBytes())
+            assertEquals(listOf(emptySet<Long>()), keptMapRegions)
         }
 
     @Test

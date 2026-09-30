@@ -5,6 +5,7 @@ import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Embedded
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
@@ -12,6 +13,9 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Transaction
+import androidx.room.migration.Migration
+import androidx.sqlite.SQLiteConnection
+import androidx.sqlite.execSQL
 import kotlinx.coroutines.flow.Flow
 
 /** A stored Mapterhorn tile (design D5 of add-offline-regions): [found] false records a 404. */
@@ -28,8 +32,11 @@ data class DemTileRow(
     val lastUsed: Long,
 )
 
-/** A region's claim on a DEM tile; a tile without any claim is browsed. */
-@Entity(tableName = "region_dem_tile", primaryKeys = ["regionId", "z", "x", "y"])
+/**
+ * A region's claim on a DEM tile; a tile without any claim is browsed. The index serves the
+ * "claimed by any region" lookups by tile of the eviction.
+ */
+@Entity(tableName = "region_dem_tile", primaryKeys = ["regionId", "z", "x", "y"], indices = [Index("z", "x", "y")])
 data class RegionDemTileRow(
     val regionId: Long,
     val z: Int,
@@ -188,6 +195,9 @@ abstract class OfflineDao {
     )
     abstract fun regions(): Flow<List<RegionSummary>>
 
+    @Query("SELECT id FROM region WHERE state != 'DELETED'")
+    abstract suspend fun regionIds(): List<Long>
+
     @Query("SELECT * FROM region WHERE state = 'DELETED'")
     abstract suspend fun deletedRegions(): List<RegionRow>
 
@@ -204,7 +214,7 @@ abstract class OfflineDao {
     }
 }
 
-@Database(entities = [DemTileRow::class, RegionDemTileRow::class, RegionRow::class], version = 1, exportSchema = false)
+@Database(entities = [DemTileRow::class, RegionDemTileRow::class, RegionRow::class], version = 2, exportSchema = false)
 abstract class OfflineDatabase : RoomDatabase() {
     abstract fun dao(): OfflineDao
 
@@ -216,6 +226,15 @@ abstract class OfflineDatabase : RoomDatabase() {
             Room
                 .databaseBuilder(context, OfflineDatabase::class.java, "offline.db")
                 .setJournalMode(JOURNAL_MODE)
+                .addMigrations(ADD_CLAIM_INDEX)
                 .build()
+
+        /** Version 2 adds the claims' index by tile. */
+        val ADD_CLAIM_INDEX =
+            object : Migration(1, 2) {
+                override fun migrate(connection: SQLiteConnection) {
+                    connection.execSQL("CREATE INDEX IF NOT EXISTS `index_region_dem_tile_z_x_y` ON `region_dem_tile` (`z`, `x`, `y`)")
+                }
+            }
     }
 }
