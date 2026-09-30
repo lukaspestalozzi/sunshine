@@ -1,7 +1,7 @@
 package com.sunshine.app
 
 import android.app.Application
-import com.sunshine.app.elevation.DemTileFetcher
+import com.sunshine.app.elevation.DemTiles
 import com.sunshine.app.elevation.ElevationRepository
 import com.sunshine.app.elevation.MapterhornTiles
 import com.sunshine.app.elevation.TileCache
@@ -10,6 +10,8 @@ import com.sunshine.app.elevation.demHttpClient
 import com.sunshine.app.map.SunshineModuleProvider
 import com.sunshine.app.network.RateLimiters
 import com.sunshine.app.network.UserAgentInterceptor
+import com.sunshine.app.offline.DemTileStore
+import com.sunshine.app.offline.OfflineDatabase
 import com.sunshine.app.sunshine.OverlayRepository
 import com.sunshine.app.sunshine.SunshineRepository
 import com.sunshine.app.sunshine.debugLog
@@ -17,6 +19,7 @@ import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import org.maplibre.android.MapLibre
@@ -29,12 +32,17 @@ class SunshineApp : Application() {
     /** One rate limiter per tile server for region downloads (design D4 of add-offline-regions). */
     private val rateLimiters = RateLimiters()
 
-    /** Shared by all screens and features, so decoded tiles and the HTTP cache are shared too (design D6). */
-    private val demTileFetcher: DemTileFetcher by lazy { DemTileFetcher(demHttpClient(File(cacheDir, "dem-tiles"), userAgent())) }
+    private val offlineDatabase: OfflineDatabase by lazy { OfflineDatabase.create(this) }
+
+    /** The persistent DEM tiles, browsed and of regions (design D5 of add-offline-regions). */
+    private val demTileStore: DemTileStore by lazy { DemTileStore(offlineDatabase.dao(), File(filesDir, "dem")) }
+
+    /** Shared by all screens and features, so decoded and stored tiles are shared too (design D6). */
+    private val demTiles: DemTiles by lazy { DemTiles(demHttpClient(userAgent()), demTileStore, rateLimiters) }
 
     private val tileCache: TileCache by lazy {
         TileCache(
-            fetch = demTileFetcher::fetch,
+            fetch = { key -> demTiles.fetch(key) },
             decode = { bytes -> decodeArgb(bytes, MapterhornTiles.TILE_SIZE) },
         )
     }
@@ -44,7 +52,7 @@ class SunshineApp : Application() {
     val sunshineRepository: SunshineRepository by lazy { SunshineRepository(tile = tileCache::tile, log = ::debugLog) }
 
     val overlayRepository: OverlayRepository by lazy {
-        OverlayRepository(tile = tileCache::tile, loads = demTileFetcher::loads, log = ::debugLog)
+        OverlayRepository(tile = tileCache::tile, loads = demTiles::loads, log = ::debugLog)
     }
 
     override fun onCreate() {
@@ -53,6 +61,11 @@ class SunshineApp : Application() {
         MapLibre.setModuleProvider(SunshineModuleProvider(rateLimiters, appScope))
         MapLibre.getInstance(this)
         HttpRequestUtil.setOkHttpClient(mapHttpClient())
+        appScope.launch {
+            // The DEM tiles' HTTP cache before add-offline-regions; the store replaces it (design D6).
+            File(cacheDir, "dem-tiles").deleteRecursively()
+            demTileStore.reconcile()
+        }
     }
 
     private fun mapHttpClient(): OkHttpClient =

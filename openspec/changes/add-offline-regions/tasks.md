@@ -29,14 +29,14 @@
 
 ## 4. app: the DEM store
 
-- [ ] 4.1 Write `DemTileStoreTest` first, with an in-memory Room database (`BundledSQLiteDriver`) and a `@TempDir` (design D5):
+- [x] 4.1 Write `DemTileStoreTest` first, with an in-memory Room database (`BundledSQLiteDriver`) and a `@TempDir` (design D5):
   - a stored tile is read back byte-identical and marked `FOUND`; a 404 is stored as `MISSING`;
   - browsed tiles above 512 MiB are evicted least recently used first, until at most 512 MiB remain; region tiles are neither counted nor evicted (spec "Limit reached");
   - a tile in regions A and B loses only A's claim when A is deleted; a tile only in A becomes browsed with its old `lastUsed` (spec "Delete a region");
   - startup deletes a file without a row and a row without a file.
 
   Then implement the entities, the DAO, `OfflineDatabase` and `DemTileStore`. Use small byte sizes and a limit passed in the constructor, so that tests stay fast. Verify: `./gradlew :app:testDebugUnitTest --tests "*DemTileStoreTest*"` passes.
-- [ ] 4.2 Write `DemTilesTest` first, against a JDK `HttpServer` as `DemTileFetcherTest` does (design D6):
+- [x] 4.2 Write `DemTilesTest` first, against a JDK `HttpServer` as `DemTileFetcherTest` does (design D6):
   - a fresh tile makes no request (spec "Fresh tile");
   - an expired tile online sends `If-Modified-Since`, and a 304 keeps it and makes it fresh for 7 days (spec "Expired tile online");
   - a 200 replaces it and keeps its regions;
