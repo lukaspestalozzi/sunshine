@@ -12,7 +12,11 @@ import com.sunshine.app.network.RateLimiters
 import com.sunshine.app.network.UserAgentInterceptor
 import com.sunshine.app.offline.AmbientLimit
 import com.sunshine.app.offline.DemTileStore
+import com.sunshine.app.offline.DownloadNotification
+import com.sunshine.app.offline.MapLibreRegionPart
 import com.sunshine.app.offline.OfflineDatabase
+import com.sunshine.app.offline.RegionDownloadWorker
+import com.sunshine.app.offline.RegionDownloader
 import com.sunshine.app.sunshine.OverlayRepository
 import com.sunshine.app.sunshine.SunshineRepository
 import com.sunshine.app.sunshine.debugLog
@@ -35,7 +39,7 @@ class SunshineApp : Application() {
     /** One rate limiter per tile server for region downloads (design D4 of add-offline-regions). */
     private val rateLimiters = RateLimiters()
 
-    private val offlineDatabase: OfflineDatabase by lazy { OfflineDatabase.create(this) }
+    val offlineDatabase: OfflineDatabase by lazy { OfflineDatabase.create(this) }
 
     /** The persistent DEM tiles, browsed and of regions (design D5 of add-offline-regions). */
     private val demTileStore: DemTileStore by lazy { DemTileStore(offlineDatabase.dao(), File(filesDir, "dem")) }
@@ -64,6 +68,17 @@ class SunshineApp : Application() {
         )
     }
 
+    /** Downloads the queued regions, one at a time (design D7 of add-offline-regions). */
+    val regionDownloader: RegionDownloader by lazy {
+        RegionDownloader(
+            dao = offlineDatabase.dao(),
+            map = MapLibreRegionPart(this, offlineDatabase.dao(), ::debugLog),
+            fetchDem = demTiles::fetch,
+            onRegionBytes = ambientLimit::onRegionBytes,
+            onProgress = { _, percent -> DownloadNotification.update(this, percent) },
+        )
+    }
+
     val elevationRepository: ElevationRepository by lazy { ElevationRepository(tileCache) }
 
     val sunshineRepository: SunshineRepository by lazy { SunshineRepository(tile = tileCache::tile, log = ::debugLog) }
@@ -85,6 +100,8 @@ class SunshineApp : Application() {
             // The DEM tiles' HTTP cache before add-offline-regions; the store replaces it (design D6).
             File(cacheDir, "dem-tiles").deleteRecursively()
             demTileStore.reconcile()
+            // Regions left incomplete by a failed run go on (design D7).
+            if (offlineDatabase.dao().nextRegionToDownload() != null) RegionDownloadWorker.enqueue(this@SunshineApp)
         }
     }
 
