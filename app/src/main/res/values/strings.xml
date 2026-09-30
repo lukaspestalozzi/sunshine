@@ -31,4 +31,6 @@
     <string name="about_version">Sunshine %1$s</string>
     <string name="about_icons">Icons: Material Symbols (Apache License 2.0)</string>
     <string name="about_button">About and attributions</string>
+    <string name="offline_notification_channel">Offline downloads</string>
+    <string name="offline_notification_title">Downloading offline map</string>
 </resources>
