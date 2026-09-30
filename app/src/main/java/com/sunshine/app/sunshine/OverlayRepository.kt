@@ -66,12 +66,12 @@ class OverlayRepository(
                 }
             val grid = sweep.assemble(parts.awaitAll())
             val reused = tiles.keys.count { it in reusable }
-            // Other features loading tiles at the same time can inflate the disk and network counts.
-            val disk = loads().disk - before.disk
+            // Other features loading tiles at the same time can inflate the store and network counts.
+            val stored = loads().store - before.store
             val network = loads().network - before.network
             log(
-                "Overlay tiles: ${tiles.size} ($reused kept, $disk from disk, $network from network, " +
-                    "${tiles.size - reused - disk - network} in memory or unavailable) in ${loaded.inWholeMilliseconds} ms; " +
+                "Overlay tiles: ${tiles.size} ($reused kept, $stored from store, $network from network, " +
+                    "${tiles.size - reused - stored - network} in memory or unavailable) in ${loaded.inWholeMilliseconds} ms; " +
                     "sweep ${(start.elapsedNow() - loaded).inWholeMilliseconds} ms on ${sweep.chunks(chunks).size} chunks",
             )
             // Unavailable tiles are not kept: the network may be back next time.
