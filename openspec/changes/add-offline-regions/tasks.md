@@ -18,14 +18,14 @@
 ## 3. app: rate limiter, MapLibre HTTP hook and the region style
 
 - [x] 3.1 Write `RateLimiterTest` first, with virtual time: 20 acquisitions that each hold for 0 ms start at 0, 200, 400, … ms, and no 1-second window holds more than 5 starts; with holds of 1 s, never more than 2 are held at once; cancelling a waiting acquisition releases nothing and does not block the next one. Then implement `RateLimiter` in `app/.../network/RateLimiter.kt` (design D4). Verify: `./gradlew :app:testDebugUnitTest --tests "*RateLimiterTest*"` passes.
-- [ ] 3.2 Move the style JSON out of `MapLibreMap.kt` into one shared constant, used by `fromJson` as before. Write `SunshineHttpRequestTest` first, against a fake delegate and a fake `HttpResponder`:
+- [x] 3.2 Move the style JSON out of `MapLibreMap.kt` into one shared constant, used by `fromJson` as before. Write `SunshineHttpRequestTest` first, against a fake delegate and a fake `HttpResponder`:
   - browsing requests reach the delegate at once, even while 2 region requests hold the limiter;
   - region requests (`offlineUsage = true`) wait for the host's limiter and release it on `onResponse` and on `handleFailure`;
   - `cancelRequest` on a waiting request never calls the delegate;
   - `https://sunshine.invalid/opentopomap-style.json` is answered with 200 and the style's bytes, without calling the delegate.
 
   Then implement `SunshineHttpRequest` and its `ModuleProvider`, and install them in `SunshineApp.onCreate` before `MapLibre.getInstance` (design D3). Verify: `./gradlew :app:testDebugUnitTest --tests "*SunshineHttpRequestTest*"` passes, and on the device the map still loads its tiles.
-- [ ] 3.3 Device spike (design D3, risk 1): in a debug build, create a MapLibre offline region for 46.60–46.62° N, 7.90–7.92° E at map zooms 5–16 with the `sunshine.invalid` style URL, and log its `OfflineRegionStatus` to completion. Verify: logcat shows `isComplete = true` with `requiredResourceCount` ≥ 100, request starts to `tile.opentopomap.org` are ≥ 200 ms apart, and after airplane mode is switched on and the app restarted, the area's map shows at zoom 16 without a blank tile. If the style is not accepted, switch D3 to `putResourceWithUrl`, and record the raw error and the switch in the design.
+- [x] 3.3 Device spike (design D3, risk 1): in a debug build, create a MapLibre offline region for 46.60–46.62° N, 7.90–7.92° E at map zooms 5–16 with the `sunshine.invalid` style URL, and log its `OfflineRegionStatus` to completion. Verify: logcat shows `isComplete = true` with `requiredResourceCount` ≥ 100, request starts to `tile.opentopomap.org` are ≥ 200 ms apart, and after airplane mode is switched on and the app restarted, the area's map shows at zoom 16 without a blank tile. If the style is not accepted, switch D3 to `putResourceWithUrl`, and record the raw error and the switch in the design.
 
 ## 4. app: the DEM store
 
@@ -47,11 +47,11 @@
   - the User-Agent test of `DemTileFetcherTest` still holds.
 
   Then replace `DemTileFetcher`'s cache with `DemTiles`, remove the OkHttp `Cache`, and delete `cacheDir/dem-tiles` once at start. Verify: `./gradlew :app:testDebugUnitTest --tests "*DemTiles*" --tests "*TileCacheTest*" --tests "*ElevationRepositoryTest*"` passes.
-- [ ] 4.3 Wire `DemTiles` into `SunshineApp` in place of `DemTileFetcher`, and split the debug `TileLoads` log into network and store. Update `CLAUDE.md`'s `app` row: `elevation/` gains the persistent store. Verify: `./scripts/verify-local.sh` passes. On the device, browse Interlaken at zoom 13 with `Sun & shade` on, switch on airplane mode and restart the app: `Altitude 568 m` is shown and the overlay has no unknown cell there (spec "Browsed area offline", elevation-data "App cache cleared").
+- [x] 4.3 Wire `DemTiles` into `SunshineApp` in place of `DemTileFetcher`, and split the debug `TileLoads` log into network and store. Update `CLAUDE.md`'s `app` row: `elevation/` gains the persistent store. Verify: `./scripts/verify-local.sh` passes. On the device, browse Interlaken at zoom 13 with `Sun & shade` on, switch on airplane mode and restart the app: `Altitude 568 m` is shown and the overlay has no unknown cell there (spec "Browsed area offline", elevation-data "App cache cleared").
 
 ## 5. app: the ambient limit for map tiles
 
-- [ ] 5.1 Write `AmbientLimitTest` first: no region → 512 MiB; regions of 183 MiB and 40 MiB → 735 MiB; the limit is set again after 16 MiB of progress, not before. Then implement it and call it in `SunshineApp.onCreate` before any map loads, using the region sizes from the database (design D2). Verify: `./gradlew :app:testDebugUnitTest --tests "*AmbientLimitTest*"` passes, and on the device logcat shows the limit set before the first map load.
+- [x] 5.1 Write `AmbientLimitTest` first: no region → 512 MiB; regions of 183 MiB and 40 MiB → 735 MiB; the limit is set again after 16 MiB of progress, not before. Then implement it and call it in `SunshineApp.onCreate` before any map loads, using the region sizes from the database (design D2). Verify: `./gradlew :app:testDebugUnitTest --tests "*AmbientLimitTest*"` passes, and on the device logcat shows the limit set before the first map load.
 
 ## 6. app: region download
 
@@ -65,7 +65,7 @@
   - after a restart the download continues without refetching stored tiles (spec "App closed").
 
   Then implement `RegionDownloader` as plain code, independent of WorkManager (design D7). Verify: `./gradlew :app:testDebugUnitTest --tests "*RegionDownloadTest*"` passes.
-- [ ] 6.3 Implement `RegionDownloadWorker` (foreground `dataSync`, notification channel `Offline downloads`, `Downloading offline map` with the progress in percent, constraints `CONNECTED` and storage not low, unique work `offline-regions` with `KEEP`), and the MapLibre map part of `RegionDownloader`. Add `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC` and `POST_NOTIFICATIONS` to the manifest. Verify: `./scripts/verify-local.sh` passes (lint clean, no new suppression). On the device: start a zoom-11 region, switch to another app and turn the screen off for 10 minutes; the notification shows progress and the download has continued (spec "App left during a download").
+- [x] 6.3 Implement `RegionDownloadWorker` (foreground `dataSync`, notification channel `Offline downloads`, `Downloading offline map` with the progress in percent, constraints `CONNECTED` and storage not low, unique work `offline-regions` with `KEEP`), and the MapLibre map part of `RegionDownloader`. Add `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC` and `POST_NOTIFICATIONS` to the manifest. Verify: `./scripts/verify-local.sh` passes (lint clean, no new suppression). On the device: start a zoom-11 region, switch to another app and turn the screen off for 10 minutes; the notification shows progress and the download has continued (spec "App left during a download").
 
 ## 7. app: the Offline page
 
@@ -78,7 +78,7 @@
   - `Delete` removes the region from the list at once, and `Cancel` leaves it.
 
   Then implement `OfflineViewModel` (design D9, D10). Verify: `./gradlew :app:testDebugUnitTest --tests "*OfflineViewModelTest*"` passes.
-- [ ] 7.2 Implement `OfflineScreen` (estimate, button, list with delete button `Delete region` and the confirmation `Delete the offline region <name>?` with `Delete`/`Cancel`, storage lines, the limit sentence), the `Screen` switch in `MainActivity`, the Offline button (`Offline maps`, 48 dp, right of ⓘ) in `MapLabels`, and the notification permission request on Android 13+. Add the strings and a Material Symbols icon as a vector drawable. Update `CLAUDE.md`'s table with the `offline/` package and `core`'s `OfflineArea.kt`. Verify: `./scripts/verify-local.sh` passes. On the device, check each of these:
+- [x] 7.2 Implement `OfflineScreen` (estimate, button, list with delete button `Delete region` and the confirmation `Delete the offline region <name>?` with `Delete`/`Cancel`, storage lines, the limit sentence), the `Screen` switch in `MainActivity`, the Offline button (`Offline maps`, 48 dp, right of ⓘ) in `MapLabels`, and the notification permission request on Android 13+. Add the strings and a Material Symbols icon as a vector drawable. Update `CLAUDE.md`'s table with the `offline/` package and `core`'s `OfflineArea.kt`. Verify: `./scripts/verify-local.sh` passes. On the device, check each of these:
   - at 360 dp, portrait and landscape, the ⓘ button, the Offline button and the toggle are fully visible and do not overlap (spec "Narrow screen");
   - Interlaken at zoom 12 with `Sun hours`, Offline page, back → unchanged (spec "Open and return");
   - deleting a region asks first, and `Cancel` keeps it.

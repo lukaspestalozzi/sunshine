@@ -102,9 +102,9 @@ whose `createHttpRequest()` returns `SunshineHttpRequest`, a wrapper around MapL
 browsing (OkHttp sees no `offlineUsage`); throttling all map requests while a download runs,
 which slows down browsing; storing the style in the database with
 `OfflineManager.putResourceWithUrl` before each download, which would also work but relies on the
-ambient entry not being evicted before the download reads it. Unverified on the device: the
-download completing with the locally answered style. That is task 2's spike, with
-`putResourceWithUrl` as the fallback.
+ambient entry not being evicted before the download reads it. The device spike (task 3.3)
+passed on 2026-09-30 (user check): a region download completes with the locally answered style
+and shows offline, so the `putResourceWithUrl` fallback is not needed.
 
 ### D4. Rate limiter: 200 ms between starts and 2 in flight, per host
 `RateLimiter(minInterval = 200 ms, maxInFlight = 2)`: a `Semaphore(2)` plus a mutex-guarded
@@ -262,8 +262,8 @@ On a restart, rows in state `DELETED` finish these steps.
 
 ## Risks / Trade-offs
 
-- [The download may not complete with the locally answered style (D3)] → task 2 is a device
-  spike before anything builds on it; `putResourceWithUrl` is the fallback.
+- [The download may not complete with the locally answered style (D3)] → resolved: the device
+  spike (task 3.3) passed on 2026-09-30.
 - [Room or KSP may not build with AGP 9.4 / Kotlin 2.4, or may not run under JUnit 6] → task 1
   checks this first; the files + index file fallback of D5 changes only the store's internals.
 - [Android 14+ restricts `dataSync` foreground services (Android 15: 6 h per day)] → a region
