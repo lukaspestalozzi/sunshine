@@ -132,11 +132,19 @@ do all the work. The fixed spacing is simpler to reason about.
   5 s. After a crash, a tile loses at most 5 s of recency, which is harmless.
 - **Startup.** A file without a row is deleted, and a row without its file is deleted. This
   covers a crash between the file and the row.
-- **Room on the JVM.** Tests use Room's `BundledSQLiteDriver` (Room ≥ 2.7). Task 1 verifies that
-  Room and KSP build with AGP 9.4.1 / Kotlin 2.4.20 and that a DAO test runs under JUnit 6. If
-  they don't, the fallback is the same model in a single index file: in memory, rewritten
-  atomically at most every 2 s and at the end of each region step. It is fully specified by the
-  same tests.
+- **Room on the JVM.** Tests use Room's `BundledSQLiteDriver` (Room ≥ 2.7). Task 1 verified
+  (2026-09-30) that Room 2.8.5 with KSP 2.3.12 builds with AGP 9.4.1 / Kotlin 2.4.20, and that a
+  DAO test runs under JUnit 6, given three things. The `app` module gets only Room's Android API,
+  so:
+  - the tests pass `ContextWrapper(null)` from the stub `android.jar`;
+  - the journal mode is set explicitly (`WRITE_AHEAD_LOGGING`, in production too), because
+    `AUTOMATIC` asks the Context's `ActivityManager`;
+  - the build extracts the host's `libsqliteJni.so` from `androidx.sqlite:sqlite-bundled-jvm` and
+    puts it on the unit tests' `java.library.path`, since the Android artifact carries only
+    Android ABIs.
+
+  Production uses Room's default Android driver; the bundled driver is a test dependency only.
+  The fallback, not needed, was the same model in a single index file.
 
 *Alternatives (asked, with the comparison table from the explore session):* files plus an index
 file (fallback), and framework SQLite (untestable on the JVM here).
