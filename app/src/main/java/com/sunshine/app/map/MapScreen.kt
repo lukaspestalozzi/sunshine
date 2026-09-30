@@ -28,12 +28,14 @@ import com.sunshine.app.BuildConfig
 import com.sunshine.app.SunshineApp
 import com.sunshine.app.network.NetworkMonitor
 import com.sunshine.app.sunshine.debugLog
+import com.sunshine.core.MapArea
 import java.time.Clock
 import kotlinx.coroutines.Dispatchers
 
 @Composable
 fun MapScreen(
     onAboutClicked: () -> Unit,
+    onOfflineClicked: (MapArea) -> Unit,
     viewModel: MapViewModel = viewModel(factory = mapViewModelFactory),
 ) {
     val camera by viewModel.camera.collectAsStateWithLifecycle()
@@ -71,6 +73,12 @@ fun MapScreen(
             camera = camera,
             isOffline = isOffline,
             onAboutClicked = onAboutClicked,
+            // The area visible now: the Offline page downloads this one (design D9 of add-offline-regions).
+            onOfflineClicked = {
+                onOfflineClicked(
+                    MapArea(camera.center, camera.zoom, maxWidth.value.toDouble(), maxHeight.value.toDouble()),
+                )
+            },
             topEnd = {
                 OverlayControl(
                     option = overlayOption(isOverlayOn, overlayMode),

@@ -1,6 +1,9 @@
 package com.sunshine.app
 
 import android.app.Application
+import android.net.ConnectivityManager
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import com.sunshine.app.elevation.DemTiles
 import com.sunshine.app.elevation.ElevationRepository
 import com.sunshine.app.elevation.MapterhornTiles
@@ -8,29 +11,40 @@ import com.sunshine.app.elevation.TileCache
 import com.sunshine.app.elevation.decodeArgb
 import com.sunshine.app.elevation.demHttpClient
 import com.sunshine.app.map.SunshineModuleProvider
+import com.sunshine.app.network.NetworkMonitor
 import com.sunshine.app.network.RateLimiters
 import com.sunshine.app.network.UserAgentInterceptor
 import com.sunshine.app.offline.AmbientLimit
 import com.sunshine.app.offline.DemTileStore
 import com.sunshine.app.offline.DownloadNotification
+import com.sunshine.app.offline.DownloadWork
 import com.sunshine.app.offline.MapLibreRegionPart
 import com.sunshine.app.offline.OfflineDatabase
+import com.sunshine.app.offline.RegionDeleter
 import com.sunshine.app.offline.RegionDownloadWorker
 import com.sunshine.app.offline.RegionDownloader
+import com.sunshine.app.offline.RegionRow
+import com.sunshine.app.offline.StorageUse
 import com.sunshine.app.sunshine.OverlayRepository
 import com.sunshine.app.sunshine.SunshineRepository
 import com.sunshine.app.sunshine.debugLog
+import com.sunshine.core.GeoBounds
+import com.sunshine.core.MapArea
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import org.maplibre.android.MapLibre
 import org.maplibre.android.module.http.HttpRequestUtil
 import org.maplibre.android.offline.OfflineManager
+import org.maplibre.android.storage.FileSource
 
 class SunshineApp : Application() {
     /** Work that outlives every screen, such as MapLibre's paced region requests. */
@@ -68,16 +82,75 @@ class SunshineApp : Application() {
         )
     }
 
+    private val mapRegionPart: MapLibreRegionPart by lazy { MapLibreRegionPart(this, offlineDatabase.dao(), ::debugLog) }
+
     /** Downloads the queued regions, one at a time (design D7 of add-offline-regions). */
     val regionDownloader: RegionDownloader by lazy {
         RegionDownloader(
             dao = offlineDatabase.dao(),
-            map = MapLibreRegionPart(this, offlineDatabase.dao(), ::debugLog),
+            map = mapRegionPart,
             fetchDem = demTiles::fetch,
             onRegionBytes = ambientLimit::onRegionBytes,
             onProgress = { _, percent -> DownloadNotification.update(this, percent) },
         )
     }
+
+    /** Deletes regions (design D10 of add-offline-regions). */
+    val regionDeleter: RegionDeleter by lazy {
+        RegionDeleter(
+            dao = offlineDatabase.dao(),
+            store = demTileStore,
+            deleteMap = mapRegionPart::delete,
+            cancelDownload = regionDownloader::cancel,
+            onRegionBytes = ambientLimit::onRegionBytes,
+        )
+    }
+
+    /** Queues the download of the visible [area] (offline-regions spec, "Download the visible area"). */
+    suspend fun downloadArea(area: MapArea) {
+        val bounds = GeoBounds.of(area)
+        offlineDatabase.dao().insertRegion(
+            RegionRow(
+                centreLat = area.center.latitude,
+                centreLon = area.center.longitude,
+                south = bounds.south,
+                west = bounds.west,
+                north = bounds.north,
+                east = bounds.east,
+                createdAt = System.currentTimeMillis(),
+            ),
+        )
+        RegionDownloadWorker.enqueue(this)
+    }
+
+    /** Stored tiles per kind, regions and browsed together (design D9 of add-offline-regions). */
+    suspend fun storageUse(): StorageUse {
+        val mapBytes =
+            withContext(Dispatchers.IO) {
+                // MapLibre's database and its journal files.
+                File(FileSource.getResourcesCachePath(this@SunshineApp))
+                    .listFiles { file -> file.name.startsWith(MAP_DATABASE) }
+                    .orEmpty()
+                    .sumOf { it.length() }
+            }
+        return StorageUse(mapBytes, demTileStore.totalBytes())
+    }
+
+    /** The state of the region download work, for the region list's status lines (design D7). */
+    fun downloadWork(): Flow<DownloadWork> =
+        combine(
+            WorkManager.getInstance(this).getWorkInfosForUniqueWorkFlow(RegionDownloadWorker.WORK_NAME),
+            NetworkMonitor(getSystemService(ConnectivityManager::class.java)).isOnline,
+        ) { infos, online ->
+            val work = infos.firstOrNull { !it.state.isFinished }
+            when {
+                work == null -> DownloadWork.IDLE
+                work.state == WorkInfo.State.RUNNING -> DownloadWork.RUNNING
+                !online -> DownloadWork.WAITING_FOR_NETWORK
+                work.stopReason == WorkInfo.STOP_REASON_CONSTRAINT_STORAGE_NOT_LOW -> DownloadWork.WAITING_FOR_STORAGE
+                else -> DownloadWork.IDLE
+            }
+        }
 
     val elevationRepository: ElevationRepository by lazy { ElevationRepository(tileCache) }
 
@@ -100,6 +173,7 @@ class SunshineApp : Application() {
             // The DEM tiles' HTTP cache before add-offline-regions; the store replaces it (design D6).
             File(cacheDir, "dem-tiles").deleteRecursively()
             demTileStore.reconcile()
+            regionDeleter.finishPending()
             // Regions left incomplete by a failed run go on (design D7).
             if (offlineDatabase.dao().nextRegionToDownload() != null) RegionDownloadWorker.enqueue(this@SunshineApp)
         }
@@ -118,5 +192,6 @@ class SunshineApp : Application() {
     private companion object {
         const val MAX_TILE_REQUESTS_PER_HOST = 20
         const val MEBIBYTE = 1024L * 1024
+        const val MAP_DATABASE = "mbgl-offline"
     }
 }

@@ -12,6 +12,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.sunshine.app.about.AboutScreen
 import com.sunshine.app.map.MapScreen
+import com.sunshine.app.offline.OfflineScreen
+import com.sunshine.core.GeoPoint
+import com.sunshine.core.MapArea
+
+/** The app's screens, switched without a navigation library (design D8 of add-sun-exposure-heatmap, D9 of add-offline-regions). */
+private enum class Screen { MAP, ABOUT, OFFLINE }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -19,14 +25,29 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MaterialTheme {
-                // Two screens, switched without a navigation library (design D8 of add-sun-exposure-heatmap).
                 // The map's view model belongs to the activity, so the map is as it was on return.
-                var showAbout by rememberSaveable { mutableStateOf(false) }
-                if (showAbout) {
-                    BackHandler { showAbout = false }
-                    AboutScreen()
-                } else {
-                    MapScreen(onAboutClicked = { showAbout = true })
+                var screen by rememberSaveable { mutableStateOf(Screen.MAP) }
+                // The area visible when the Offline page was opened: centre, zoom, width and height in dp.
+                var offlineArea by rememberSaveable { mutableStateOf(arrayListOf<Double>()) }
+                when (screen) {
+                    Screen.MAP ->
+                        MapScreen(
+                            onAboutClicked = { screen = Screen.ABOUT },
+                            onOfflineClicked = { area ->
+                                offlineArea =
+                                    arrayListOf(area.center.latitude, area.center.longitude, area.zoom, area.widthDp, area.heightDp)
+                                screen = Screen.OFFLINE
+                            },
+                        )
+                    Screen.ABOUT -> {
+                        BackHandler { screen = Screen.MAP }
+                        AboutScreen()
+                    }
+                    Screen.OFFLINE -> {
+                        BackHandler { screen = Screen.MAP }
+                        val (latitude, longitude, zoom, width, height) = offlineArea
+                        OfflineScreen(MapArea(GeoPoint(latitude, longitude), zoom, width, height))
+                    }
                 }
             }
         }
