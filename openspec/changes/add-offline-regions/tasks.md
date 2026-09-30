@@ -17,7 +17,7 @@
 
 ## 3. app: rate limiter, MapLibre HTTP hook and the region style
 
-- [ ] 3.1 Write `RateLimiterTest` first, with virtual time: 20 acquisitions that each hold for 0 ms start at 0, 200, 400, … ms, and no 1-second window holds more than 5 starts; with holds of 1 s, never more than 2 are held at once; cancelling a waiting acquisition releases nothing and does not block the next one. Then implement `RateLimiter` in `app/.../network/RateLimiter.kt` (design D4). Verify: `./gradlew :app:testDebugUnitTest --tests "*RateLimiterTest*"` passes.
+- [x] 3.1 Write `RateLimiterTest` first, with virtual time: 20 acquisitions that each hold for 0 ms start at 0, 200, 400, … ms, and no 1-second window holds more than 5 starts; with holds of 1 s, never more than 2 are held at once; cancelling a waiting acquisition releases nothing and does not block the next one. Then implement `RateLimiter` in `app/.../network/RateLimiter.kt` (design D4). Verify: `./gradlew :app:testDebugUnitTest --tests "*RateLimiterTest*"` passes.
 - [ ] 3.2 Move the style JSON out of `MapLibreMap.kt` into one shared constant, used by `fromJson` as before. Write `SunshineHttpRequestTest` first, against a fake delegate and a fake `HttpResponder`:
   - browsing requests reach the delegate at once, even while 2 region requests hold the limiter;
   - region requests (`offlineUsage = true`) wait for the host's limiter and release it on `onResponse` and on `handleFailure`;
