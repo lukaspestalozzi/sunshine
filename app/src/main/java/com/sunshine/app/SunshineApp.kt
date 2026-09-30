@@ -10,6 +10,7 @@ import com.sunshine.app.elevation.demHttpClient
 import com.sunshine.app.map.SunshineModuleProvider
 import com.sunshine.app.network.RateLimiters
 import com.sunshine.app.network.UserAgentInterceptor
+import com.sunshine.app.offline.AmbientLimit
 import com.sunshine.app.offline.DemTileStore
 import com.sunshine.app.offline.OfflineDatabase
 import com.sunshine.app.sunshine.OverlayRepository
@@ -20,10 +21,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import org.maplibre.android.MapLibre
 import org.maplibre.android.module.http.HttpRequestUtil
+import org.maplibre.android.offline.OfflineManager
 
 class SunshineApp : Application() {
     /** Work that outlives every screen, such as MapLibre's paced region requests. */
@@ -36,6 +39,20 @@ class SunshineApp : Application() {
 
     /** The persistent DEM tiles, browsed and of regions (design D5 of add-offline-regions). */
     private val demTileStore: DemTileStore by lazy { DemTileStore(offlineDatabase.dao(), File(filesDir, "dem")) }
+
+    /** Browsed map tiles' limit, plus the regions' size (design D2 of add-offline-regions). */
+    private val ambientLimit: AmbientLimit by lazy {
+        AmbientLimit { bytes ->
+            OfflineManager.getInstance(this).setMaximumAmbientCacheSize(
+                bytes,
+                object : OfflineManager.FileSourceCallback {
+                    override fun onSuccess() = debugLog("Map tile limit set to ${bytes / MEBIBYTE} MiB")
+
+                    override fun onError(message: String) = debugLog("Map tile limit not set: $message")
+                },
+            )
+        }
+    }
 
     /** Shared by all screens and features, so decoded and stored tiles are shared too (design D6). */
     private val demTiles: DemTiles by lazy { DemTiles(demHttpClient(userAgent()), demTileStore, rateLimiters) }
@@ -61,6 +78,9 @@ class SunshineApp : Application() {
         MapLibre.setModuleProvider(SunshineModuleProvider(rateLimiters, appScope))
         MapLibre.getInstance(this)
         HttpRequestUtil.setOkHttpClient(mapHttpClient())
+        // Before any map loads, or MapLibre starts with its default of 50 MB and trims the browsed
+        // tiles to it (design D2). A single sum over the few region rows.
+        ambientLimit.onRegionBytes(runBlocking(Dispatchers.IO) { offlineDatabase.dao().regionMapBytes() }, now = true)
         appScope.launch {
             // The DEM tiles' HTTP cache before add-offline-regions; the store replaces it (design D6).
             File(cacheDir, "dem-tiles").deleteRecursively()
@@ -80,5 +100,6 @@ class SunshineApp : Application() {
 
     private companion object {
         const val MAX_TILE_REQUESTS_PER_HOST = 20
+        const val MEBIBYTE = 1024L * 1024
     }
 }
