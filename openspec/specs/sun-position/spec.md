@@ -122,10 +122,10 @@ Tolerance: ±2 minutes.
 - **THEN** the day length is 24:00 − sunrise
 
 ### Requirement: Sun information panel
-The map screen SHALL permanently show a panel, without covering the crosshair or the map
-attribution, with the following values for the selected location and time. It SHALL update while
-the map moves and whenever the selected time changes. All numbers SHALL be formatted independently
-of the device locale.
+The map screen SHALL permanently show a panel, without covering the crosshair or the ⓘ button
+(map-view "About and attributions"), with the following values for the selected location and time.
+It SHALL update while the map moves and whenever the selected time changes. All numbers SHALL be
+formatted independently of the device locale.
 - Azimuth: rounded to whole degrees (half up; 360 shown as 0), followed by the 8-point compass
   direction of the rounded value (N, NE, E, SE, S, SW, W, NW; each covers 45° centred on its
   direction), e.g. `173° S`.
