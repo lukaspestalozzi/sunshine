@@ -139,7 +139,7 @@ class DemTileStore(
     }
 
     /** Removes the least recently used browsed tiles until they fit [browsedLimitBytes]. */
-    private suspend fun evict() {
+    suspend fun evict() {
         flushUses()
         var excess = dao.browsedBytes() - browsedLimitBytes
         while (excess > 0) {
