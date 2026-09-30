@@ -59,7 +59,8 @@ the same pixels.
 
 The pass runs on the day's background dispatcher once `computed == steps.size`. Its result is
 stored on the `DayOverlay` (`sunHours`, volatile) and counted in `DayOverlay.bytes` (4 bytes per
-pixel, ~1.4 MB at 400 × 850 dp), so `DayCache` budgets it. A day computed anew is a new
+pixel, ~1.4 MB at 400 × 850 dp at one pixel per dp; ~22 KB since D9 counts one pixel per 8 dp
+cell), so `DayCache` budgets it. A day computed anew is a new
 `DayOverlay`, so its old counts go with it.
 
 The pass runs only when the mode is `Sun hours` (on completion, or on switching to that mode with
@@ -113,17 +114,25 @@ The image is rendered when a `Ready` heatmap state is created (off the main thre
 overlay's). It is not stored in the cache, because the counts suffice to render it again (~340k
 pixels, cheap next to the pass).
 
-### D5. View-model state (the heatmap's own day since D9)
-- The overlay flow publishes its current day as `currentDay: StateFlow<DayOverlay?>`. This
-  replaces nothing, because its local `day` stays the owner.
+### D5. View-model state (rewritten for the heatmap's own day of D9)
 - `heatmap: StateFlow<HeatmapUiState>` has the states `Off`, `ZoomedOut`, `Computing(kept: Ready?)`
-  and `Ready(area, date, hours, image, bands)`. It combines `currentDay`, the day's `computed`,
-  the mode and the overlay's on/zoom state:
-  - The state is `Ready` when the mode is `Sun hours` and the current day is complete with counts.
-  - The state is `Computing(kept = the last Ready)` while the current day is incomplete, or while
-    its counts are being built. After a pan or date change, the kept heatmap stays on its own
-    corners (spec "Heatmap updates").
-- A time change within the day changes neither `currentDay` nor its completion, so the heatmap
+  and `Ready(hours, date, bands, image)`. It runs its own `DayOverlay` (8 dp, 10 minutes; D9) from
+  the camera, the selected date, `sunHoursShown` (overlay on and mode, as a pair), the map size and
+  the network:
+  - no area (overlay off, another mode, zoomed out, size unknown) → its job is cancelled and the
+    state is `Off` or `ZoomedOut`; the kept heatmap is dropped only when the overlay is switched off,
+    so that switching back from `Sun & shade` shows it at once;
+  - the same area and date → nothing, unless the network returns while the day has unknown cells;
+  - otherwise the day comes from `DayCache` (key: area, date, cell size) or is created; a cached day
+    with unknown cells is computed anew while online. A day already counted is `Ready` at once;
+    else the state is `Computing(kept = the last Ready)` and `buildHeatmap` runs.
+- `buildHeatmap` waits for the camera to rest (only for a new day), computes the missing steps on
+  the background dispatcher (`DayOverlay.computeAll`), counts them (`DayOverlay.sunHours`), trims
+  the cache (the counts add to the day's bytes), renders the image and logs both timings.
+- The `Sun & shade` overlay flow runs only while `sunAndShadeShown`, so only the shown mode's day
+  runs. Each flow reports its own progress (`overlayDayProgress`, `heatmapDayProgress`);
+  `dayProgress` shows the one of the selected mode.
+- A time change within the day changes neither the heatmap's area nor its date, so the heatmap
   stays.
 - `MapScreen` passes MapLibre the image of the mode: `overlay.image()` in `Sun & shade`, and the
   heatmap's `Ready` or kept image in `Sun hours`.
@@ -274,6 +283,9 @@ coarse heatmap day (D9) and the greyscale map under the heatmap only (D10). The 
 were not reported, so the day's duration and the counting pass remain unmeasured; the heatmap's
 speed was accepted as it is on the device. A partial heatmap and incremental counting stay
 unneeded (proposal, Non-goals).
+The sun hours at Interlaken on 2025-12-21 (spec "Winter day in Interlaken", 5 h 23 min ± 40 min)
+were neither read on the device nor covered by a unit test with real terrain; the user accepted
+this as unverified (2026-09-30).
 
 ### Verification strategy
 - `SunHoursTest` (JVM, app): `ShadeGrid`s built through `SunShadeSweep` on flat or missing tiles,

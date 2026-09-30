@@ -145,4 +145,4 @@
   - the controls were crowded and overlapping, and the attributions took up the map: redesigned in group 7;
   - the heatmap was far too slow and too faint: its own coarse day, the greyscale map under the heatmap and a stronger overlay in group 9.
 
-  The logcat timings were not reported; design.md, "Performance budget", records them as unmeasured.
+  The logcat timings and the Interlaken value (5 h 23 min ± 40 min) were not reported; design.md, "Performance budget", records them as unmeasured, accepted by the user as unverified (2026-09-30).
