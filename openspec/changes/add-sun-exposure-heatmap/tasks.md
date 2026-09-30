@@ -127,7 +127,7 @@
 ## 10. Docs and integration after the speed revision
 
 - [x] 10.1 Update `CLAUDE.md` (`SunShadeSweep`'s cell size; the heatmap's own day; the greyscale map), then run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, all unit tests and the debug APK pass, and validation reports no failures.
-- [ ] 10.2 On-device check with the CI APK. Expected:
+- [x] 10.2 On-device check with the CI APK. Expected:
   - at launch the toggle shows `Off` selected and no status card; the ⓘ button sits in the top-left corner with the coordinates below it, and no attribution covers the map;
   - at 360 dp width, in portrait and landscape, the toggle's three icons stay in one row on screen, the status card has the toggle's width and right edge, and nothing overlaps;
   - at Interlaken (46.6863° N, 7.8632° E), zoom 12, 2025-12-21, `Sun hours`: the card shows `Sun hours`, `Computing sun hours …` and directly below it the progress bar until the heatmap's day is complete, then the heatmap over the whole screen, and the panel reads `Sun hours ≈` 5 h 23 min ± 40 min;
@@ -140,3 +140,9 @@
   - zoom 10.5 shows `Zoom in to see sun and shade` in the card;
   - ⓘ opens the About page with the version and both attributions; each attribution opens its page in the browser; back returns to the same map, time and mode;
   - record in design.md, "Performance budget": the logged `Overlay day` totals at zoom 12 of both days (2 dp / 5 min and 8 dp / 10 min) and the `Sun hours` pass and rendering times, against the ~20–30 s, 2 s and 100 ms budgets. If the pass exceeds 2 s, ask the user about incremental counting; if the day is too slow, ask about a partial heatmap (proposal, Non-goals).
+
+  Result (2026-09-30): confirmed on the device by the user ("Now it is ok. phone check done"), after two device rounds whose findings were fixed in this change:
+  - the controls were crowded and overlapping, and the attributions took up the map: redesigned in group 7;
+  - the heatmap was far too slow and too faint: its own coarse day, the greyscale map under the heatmap and a stronger overlay in group 9.
+
+  The logcat timings were not reported; design.md, "Performance budget", records them as unmeasured.
