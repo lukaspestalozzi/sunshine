@@ -7,17 +7,28 @@ import com.sunshine.app.elevation.MapterhornTiles
 import com.sunshine.app.elevation.TileCache
 import com.sunshine.app.elevation.decodeArgb
 import com.sunshine.app.elevation.demHttpClient
+import com.sunshine.app.map.SunshineModuleProvider
+import com.sunshine.app.network.RateLimiters
 import com.sunshine.app.network.UserAgentInterceptor
 import com.sunshine.app.sunshine.OverlayRepository
 import com.sunshine.app.sunshine.SunshineRepository
 import com.sunshine.app.sunshine.debugLog
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import org.maplibre.android.MapLibre
 import org.maplibre.android.module.http.HttpRequestUtil
 
 class SunshineApp : Application() {
+    /** Work that outlives every screen, such as MapLibre's paced region requests. */
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /** One rate limiter per tile server for region downloads (design D4 of add-offline-regions). */
+    private val rateLimiters = RateLimiters()
+
     /** Shared by all screens and features, so decoded tiles and the HTTP cache are shared too (design D6). */
     private val demTileFetcher: DemTileFetcher by lazy { DemTileFetcher(demHttpClient(File(cacheDir, "dem-tiles"), userAgent())) }
 
@@ -38,6 +49,8 @@ class SunshineApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Before MapLibre starts, so that every map request goes through it (design D3 of add-offline-regions).
+        MapLibre.setModuleProvider(SunshineModuleProvider(rateLimiters, appScope))
         MapLibre.getInstance(this)
         HttpRequestUtil.setOkHttpClient(mapHttpClient())
     }
