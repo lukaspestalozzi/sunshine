@@ -69,7 +69,7 @@
 
 ## 7. app: the Offline page
 
-- [ ] 7.1 Write `OfflineViewModelTest` first:
+- [x] 7.1 Write `OfflineViewModelTest` first:
   - the estimate text for the phone area of 2.1;
   - below zoom 11, the button is disabled and `Zoom in to map zoom 11 or more to download an area` is shown (at 10.9);
   - `No offline regions yet` with no region;

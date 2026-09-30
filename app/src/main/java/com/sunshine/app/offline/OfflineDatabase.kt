@@ -3,6 +3,7 @@ package com.sunshine.app.offline
 import android.content.Context
 import androidx.room.Dao
 import androidx.room.Database
+import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -11,6 +12,7 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Transaction
+import kotlinx.coroutines.flow.Flow
 
 /** A stored Mapterhorn tile (design D5 of add-offline-regions): [found] false records a 404. */
 @Entity(tableName = "dem_tile", primaryKeys = ["z", "x", "y"])
@@ -53,6 +55,12 @@ data class RegionRow(
     val mapBytes: Long = 0,
     val progress: Int = 0,
     val state: RegionState = RegionState.QUEUED,
+)
+
+/** A region with the size of the DEM tiles it claims, for the region list. */
+data class RegionSummary(
+    @Embedded val region: RegionRow,
+    val demBytes: Long,
 )
 
 @Dao
@@ -171,6 +179,24 @@ abstract class OfflineDao {
 
     @Query("UPDATE region SET state = 'DELETED' WHERE id = :id")
     abstract suspend fun markDeleted(id: Long)
+
+    /** The regions of the list, newest first; regions being deleted are gone from it at once. */
+    @Query(
+        "SELECT region.*, (SELECT COALESCE(SUM(t.bytes), 0) FROM region_dem_tile c JOIN dem_tile t " +
+            "ON t.z = c.z AND t.x = c.x AND t.y = c.y WHERE c.regionId = region.id) AS demBytes " +
+            "FROM region WHERE state != 'DELETED' ORDER BY createdAt DESC, id DESC",
+    )
+    abstract fun regions(): Flow<List<RegionSummary>>
+
+    @Query("SELECT * FROM region WHERE state = 'DELETED'")
+    abstract suspend fun deletedRegions(): List<RegionRow>
+
+    @Query("DELETE FROM region WHERE id = :id")
+    abstract suspend fun deleteRegion(id: Long)
+
+    /** Claims whose region is gone, e.g. added by a download racing its deletion. */
+    @Query("DELETE FROM region_dem_tile WHERE regionId NOT IN (SELECT id FROM region)")
+    abstract suspend fun deleteOrphanClaims()
 
     private companion object {
         const val NOT_CLAIMED =
