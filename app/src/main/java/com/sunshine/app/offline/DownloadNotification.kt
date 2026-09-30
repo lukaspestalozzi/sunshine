@@ -46,4 +46,6 @@ object DownloadNotification {
         }
         context.getSystemService(NotificationManager::class.java).notify(ID, build(context, percent))
     }
+
+    fun cancel(context: Context) = context.getSystemService(NotificationManager::class.java).cancel(ID)
 }

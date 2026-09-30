@@ -40,6 +40,9 @@ class RegionDownloadWorker(
             // E.g. no space left or a MapLibre error: tried again later, with WorkManager's backoff.
             debugLog("Region download failed: $failed")
             Result.retry()
+        } finally {
+            // Without a foreground service nothing else removes the progress notification.
+            DownloadNotification.cancel(applicationContext)
         }
     }
 
