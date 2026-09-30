@@ -133,6 +133,45 @@ abstract class OfflineDao {
     @Query("SELECT * FROM dem_tile WHERE found")
     abstract suspend fun foundTiles(): List<DemTileRow>
 
+    /** The map size of all regions not being deleted (design D2). */
+    @Query("SELECT COALESCE(SUM(mapBytes), 0) FROM region WHERE state != 'DELETED'")
+    abstract suspend fun regionMapBytes(): Long
+
+    @Insert
+    abstract suspend fun insertRegion(region: RegionRow): Long
+
+    @Query("SELECT * FROM region WHERE id = :id")
+    abstract suspend fun region(id: Long): RegionRow?
+
+    /** The oldest region still to download (design D7). */
+    @Query("SELECT * FROM region WHERE state = 'QUEUED' ORDER BY createdAt, id LIMIT 1")
+    abstract suspend fun nextRegionToDownload(): RegionRow?
+
+    @Query("UPDATE region SET mapRegionId = :mapRegionId WHERE id = :id")
+    abstract suspend fun updateMapRegionId(
+        id: Long,
+        mapRegionId: Long,
+    )
+
+    @Query("UPDATE region SET progress = :progress, mapBytes = :mapBytes WHERE id = :id AND state = 'QUEUED'")
+    abstract suspend fun updateProgress(
+        id: Long,
+        progress: Int,
+        mapBytes: Long,
+    )
+
+    @Query(
+        "UPDATE region SET state = 'COMPLETE', progress = 100, completedAt = :completedAt, mapBytes = :mapBytes WHERE id = :id AND state = 'QUEUED'",
+    )
+    abstract suspend fun complete(
+        id: Long,
+        completedAt: Long,
+        mapBytes: Long,
+    )
+
+    @Query("UPDATE region SET state = 'DELETED' WHERE id = :id")
+    abstract suspend fun markDeleted(id: Long)
+
     private companion object {
         const val NOT_CLAIMED =
             "NOT EXISTS (SELECT 1 FROM region_dem_tile c WHERE c.z = dem_tile.z AND c.x = dem_tile.x AND c.y = dem_tile.y)"
