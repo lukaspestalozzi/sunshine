@@ -269,6 +269,12 @@ in a follow-up. The whole day's duration at zoom 12 is also logged (the existing
 line) and recorded in the device check. It is what decides whether a partial heatmap is needed
 later (proposal, Non-goals).
 
+Device check (2026-09-30): confirmed by the user ("Now it is ok. phone check done") after the
+coarse heatmap day (D9) and the greyscale map under the heatmap only (D10). The logcat timings
+were not reported, so the day's duration and the counting pass remain unmeasured; the heatmap's
+speed was accepted as it is on the device. A partial heatmap and incremental counting stay
+unneeded (proposal, Non-goals).
+
 ### Verification strategy
 - `SunHoursTest` (JVM, app): `ShadeGrid`s built through `SunShadeSweep` on flat or missing tiles,
   as `RenderOverlayTest` and `DayOverlayTest` already do (the `ShadeGrid` constructor is internal
