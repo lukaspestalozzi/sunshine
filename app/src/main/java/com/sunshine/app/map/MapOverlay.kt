@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -41,7 +42,8 @@ fun Crosshair(modifier: Modifier = Modifier) {
 
 /**
  * The ⓘ button opening the About page with the attributions ([onAboutClicked]; map-view spec, "About
- * and attributions"), below it the selected-location coordinates and the offline notice, the
+ * and attributions") and to its right the Offline button ([onOfflineClicked]; offline-regions spec,
+ * "Offline button"), below them the selected-location coordinates and the offline notice, the
  * [topEnd] controls and the [bottomPanel], kept clear of the system bars.
  */
 @Composable
@@ -49,6 +51,7 @@ fun MapLabels(
     camera: CameraState,
     isOffline: Boolean,
     onAboutClicked: () -> Unit,
+    onOfflineClicked: () -> Unit,
     modifier: Modifier = Modifier,
     topEnd: @Composable () -> Unit = {},
     bottomPanel: @Composable () -> Unit = {},
@@ -63,11 +66,19 @@ fun MapLabels(
             modifier = Modifier.align(Alignment.TopStart),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // Alone in the corner: in one row with the coordinates it did not fit beside the overlay
-            // toggle on narrow phones (design D8 of add-sun-exposure-heatmap).
-            Surface(color = floatingSurfaceColor(), shape = MaterialTheme.shapes.medium) {
-                IconButton(onClick = onAboutClicked) {
-                    Icon(painterResource(R.drawable.ic_info), contentDescription = stringResource(R.string.about_button))
+            // Not in one row with the coordinates: they did not fit beside the overlay toggle on narrow
+            // phones (design D8 of add-sun-exposure-heatmap). The two buttons are narrower than the
+            // coordinates (design D9 of add-offline-regions).
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(color = floatingSurfaceColor(), shape = MaterialTheme.shapes.medium) {
+                    IconButton(onClick = onAboutClicked) {
+                        Icon(painterResource(R.drawable.ic_info), contentDescription = stringResource(R.string.about_button))
+                    }
+                }
+                Surface(color = floatingSurfaceColor(), shape = MaterialTheme.shapes.medium) {
+                    IconButton(onClick = onOfflineClicked) {
+                        Icon(painterResource(R.drawable.ic_offline), contentDescription = stringResource(R.string.offline_button))
+                    }
                 }
             }
             Label(text = formatCoordinates(camera.center))

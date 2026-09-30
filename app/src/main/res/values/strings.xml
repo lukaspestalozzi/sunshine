@@ -31,6 +31,19 @@
     <string name="about_version">Sunshine %1$s</string>
     <string name="about_icons">Icons: Material Symbols (Apache License 2.0)</string>
     <string name="about_button">About and attributions</string>
+    <string name="offline_button">Offline maps</string>
+    <string name="offline_title">Offline maps</string>
+    <string name="offline_download">Download visible area</string>
+    <string name="offline_zoom_in">Zoom in to map zoom 11 or more to download an area</string>
+    <string name="offline_regions">Regions</string>
+    <string name="offline_no_regions">No offline regions yet</string>
+    <string name="offline_delete">Delete region</string>
+    <string name="offline_delete_question">Delete the offline region %1$s?</string>
+    <string name="offline_delete_confirm">Delete</string>
+    <string name="offline_delete_cancel">Cancel</string>
+    <string name="offline_storage_map">Map tiles: %1$s</string>
+    <string name="offline_storage_elevation">Elevation tiles: %1$s</string>
+    <string name="offline_storage_limit">Browsed tiles are kept up to 512 MiB each for map and elevation; the least recently used are removed first.</string>
     <string name="offline_notification_channel">Offline downloads</string>
     <string name="offline_notification_title">Downloading offline map</string>
 </resources>
