@@ -84,18 +84,24 @@ other default height for missing data.
 - **THEN** every cell is unknown
 
 ### Requirement: Overlay coverage and zoom range
-While the overlay is switched on and the map zoom is 11 or more, the app SHALL show every cell of
-the visible map area. It SHALL NOT limit the number of cells or leave part of the visible area out
-because of the amount of work. Below map zoom 11 the overlay SHALL NOT be shown, and a notice SHALL
-read `Zoom in to see sun and shade`.
+While the overlay is switched on in the mode `Sun & shade` (sun-exposure-heatmap "Overlay mode")
+and the map zoom is 11 or more, the app SHALL show every cell of the visible map area. It SHALL NOT
+limit the number of cells or leave part of the visible area out because of the amount of work. In
+the mode `Sun hours` the heatmap is shown instead (sun-exposure-heatmap "Heatmap coverage and zoom
+range"). Below map zoom 11 the overlay SHALL NOT be shown in either mode, and a notice SHALL read
+`Zoom in to see sun and shade`.
 
 #### Scenario: Whole screen covered
-- **WHEN** the overlay is on, the map zoom is 12 and the computation has finished
+- **WHEN** the overlay is on in the mode `Sun & shade`, the map zoom is 12 and the computation has finished
 - **THEN** every point of the visible map area lies in a cell that is shown as sun, shade or unknown
 
 #### Scenario: Zoomed out
 - **WHEN** the overlay is on and the map zoom is 10.5
 - **THEN** no overlay is drawn and the notice `Zoom in to see sun and shade` is visible
+
+#### Scenario: Heatmap mode
+- **WHEN** the overlay is on in the mode `Sun hours` and the map zoom is 12
+- **THEN** no sun, shade or unknown cells of the selected time are drawn
 
 ### Requirement: Overlay appearance
 The overlay SHALL draw:
@@ -103,39 +109,57 @@ The overlay SHALL draw:
 - sun cells without a tint;
 - unknown cells with grey diagonal hatching.
 
-It SHALL NOT cover the crosshair, the sun direction line, the sun information panel or the map
-attributions. While the overlay is on, a legend SHALL show the shade tint labelled `Shade` and
-the hatching labelled `Unknown`.
+It SHALL NOT cover the crosshair, the sun direction line, the sun information panel or the ⓘ
+button (map-view "About and attributions"). While the overlay is on in the mode `Sun & shade`, a
+legend in the status card ("Overlay status card") SHALL show the shade tint labelled `Shade` and
+the hatching labelled `Unknown`, drawn opaque so that they read clearly on the card. In the mode
+`Sun hours` the heatmap's legend is shown instead (sun-exposure-heatmap "Heatmap legend").
 
 #### Scenario: Legend
-- **WHEN** the overlay is switched on
-- **THEN** a legend with `Shade` and `Unknown` is visible
+- **WHEN** the overlay is switched on in the mode `Sun & shade`
+- **THEN** a legend with `Shade` and `Unknown` is visible in the status card
+
+#### Scenario: Legend in heatmap mode
+- **WHEN** the overlay is on in the mode `Sun hours`
+- **THEN** no legend entry `Shade` is visible
 
 #### Scenario: Crosshair stays visible
 - **WHEN** the cell under the crosshair is shade
 - **THEN** the crosshair and the sun direction line are drawn above the tint
 
 ### Requirement: Overlay toggle
-A map control SHALL switch the overlay on and off. The overlay SHALL be off when the app is
-launched. While the app process is alive, including across screen rotation, the on/off state
-SHALL be preserved. While the overlay is off, no overlay computation and no DEM tile request for
-it SHALL take place.
+A three-way toggle on the map SHALL select what the overlay shows: `Off`, `Sun & shade` (the
+overlay of the selected time) or `Sun hours` (the heatmap of the selected day, sun-exposure-heatmap
+"Overlay mode"). Its three options SHALL be icons without text, each at least 48 × 48 dp to touch,
+with the content descriptions `Overlay off`, `Sun and shade now` and `Sun hours of the day`; the
+selected option SHALL be highlighted. The toggle SHALL sit in the map's top-right corner and SHALL
+NOT wrap or extend beyond the screen. `Off` SHALL be selected when the app is launched. While the
+app process is alive, including across screen rotation, the selection SHALL be preserved. While
+`Off` is selected, no overlay computation and no DEM tile request for it SHALL take place.
 
 #### Scenario: Off at launch
 - **WHEN** the app is launched
-- **THEN** the overlay is off and no overlay is drawn
+- **THEN** `Off` is selected and no overlay is drawn
 
 #### Scenario: Switch on
-- **WHEN** the map zoom is 12 and the user switches the overlay on
+- **WHEN** the map zoom is 12 and the user selects `Sun & shade`
 - **THEN** the overlay for the visible area is computed and drawn
 
+#### Scenario: Straight to sun hours
+- **WHEN** `Off` is selected and the user selects `Sun hours`
+- **THEN** the day of the visible area is computed and its heatmap is shown once it is complete
+
 #### Scenario: Screen rotation
-- **WHEN** the overlay is on and the device is rotated
-- **THEN** the overlay is still on
+- **WHEN** `Sun hours` is selected and the device is rotated
+- **THEN** `Sun hours` is still selected
+
+#### Scenario: Narrow screen
+- **WHEN** the screen is 360 dp wide, in portrait or landscape
+- **THEN** the toggle shows its three icons in one row, fully on screen
 
 ### Requirement: Overlay updates
 The overlay SHALL be computed off the main thread; the map SHALL stay responsive while it is
-computed. It SHALL be recomputed:
+computed. It SHALL be recomputed, in either mode:
 - when the camera has rested for 300 ms after a move;
 - when the selected date changes to a day that is not in the cache of days ("Overlay of the
   whole day");
@@ -143,36 +167,44 @@ computed. It SHALL be recomputed:
 
 A change of the selected time within the selected day SHALL show that time's overlay if it has
 already been computed ("Overlay of the whole day"); otherwise that time SHALL be computed next. A
-newer trigger SHALL replace a computation still running. While a new overlay is being computed:
+newer trigger SHALL replace a computation still running. In the mode `Sun & shade`, while a new
+overlay is being computed:
 - **After a camera move**, the previous overlay stays on its geographic area until the new one is
   ready. Newly visible areas stay untinted meanwhile.
 - **After a change of the selected time or date**, the previous overlay also stays until the new
   one is ready. Meanwhile the notice `Computing sun and shade …` SHALL be shown, because the
   overlay on screen belongs to another time.
 
+In the mode `Sun hours`, the heatmap's own update rules and notice apply instead
+(sun-exposure-heatmap "Heatmap updates"); `Computing sun and shade …` SHALL NOT be shown.
+
 #### Scenario: Pan
-- **WHEN** the overlay is on and the user pans the map by half a screen
+- **WHEN** the overlay is on in the mode `Sun & shade` and the user pans the map by half a screen
 - **THEN** the previous overlay stays aligned with the terrain it was computed for, and the new overlay replaces it after the camera has rested for 300 ms and the computation has finished
 
 #### Scenario: Time change to a time not yet computed
-- **WHEN** the overlay is on, shows 12:00, and the user moves the time slider to 15:00 before 15:00 has been computed
+- **WHEN** the overlay is on in the mode `Sun & shade`, shows 12:00, and the user moves the time slider to 15:00 before 15:00 has been computed
 - **THEN** the overlay for 12:00 stays and `Computing sun and shade …` is shown until the overlay for 15:00 replaces it
 
 #### Scenario: Time change to a time already computed
-- **WHEN** the overlay is on and the user moves the time slider to a time of the selected day whose overlay has been computed
+- **WHEN** the overlay is on in the mode `Sun & shade` and the user moves the time slider to a time of the selected day whose overlay has been computed
 - **THEN** that overlay is drawn within 100 ms, without the notice
 
 #### Scenario: Date change
-- **WHEN** the overlay is on and the user picks another date whose day has not been computed
+- **WHEN** the overlay is on in the mode `Sun & shade` and the user picks another date whose day has not been computed
 - **THEN** the previous overlay stays and `Computing sun and shade …` is shown until the overlay for the new date and time replaces it
 
 #### Scenario: Slider dragged continuously
-- **WHEN** the user drags the time slider across many positions while the overlay is on
+- **WHEN** the user drags the time slider across many positions while the overlay is on in the mode `Sun & shade`
 - **THEN** the overlay drawn when the drag ends is the one for the final slider position
 
 #### Scenario: Connectivity returns
 - **WHEN** some cells are unknown because the device was offline and the network connection returns
 - **THEN** the overlay is recomputed without the user moving the map or changing the time
+
+#### Scenario: Time change in heatmap mode
+- **WHEN** the overlay is on in the mode `Sun hours` and the user moves the time slider to a time not yet computed
+- **THEN** `Computing sun and shade …` is not shown
 
 ### Requirement: Overlay of the whole day
 Once the overlay of the selected time is ready, the app SHALL compute in the background the overlay
@@ -187,18 +219,19 @@ of the day, over its actual length; time-selection "Choose the time of day"):
   ground at least 1000 m below sea level, lies above −2.9°, so this is exact.
 - **Stop and resume:** only the day of the selected date and the visible area SHALL be computed.
   The computation SHALL stop when the overlay is switched off, another date is selected or the
-  camera rests on another area. When a day is selected again, its computed positions SHALL be shown
-  without being computed again, and only its missing positions SHALL be computed, the selected
-  time first. A change of the selected time within the day SHALL NOT restart it; if that time has
+  camera rests on another area. It SHALL pause while the mode `Sun hours` is shown, which computes
+  its own day (sun-exposure-heatmap "Overlay mode"), and resume when `Sun & shade` is selected
+  again. When a day is selected again, its computed positions SHALL be shown without being computed
+  again, and only its missing positions SHALL be computed, the selected time first. A change of the selected time within the day SHALL NOT restart it; if that time has
   not been computed yet, it is computed next. Leaving the app SHALL NOT discard the computed steps;
   the computation continues in the background.
 - **Cache of days:** computed days SHALL be kept by visible area and date, up to a quarter of the
   app's heap limit. Beyond it, the least recently used days SHALL be dropped, never the day being
   shown. A day with unknown cells SHALL be computed anew when it is selected while the network is
   available, and after a reconnect while it is shown.
-- **Progress:** while the background computation runs, a determinate progress bar directly below
-  the overlay toggle SHALL show the share of the day's slider positions already computed. It SHALL
-  disappear when every position is computed or the computation stops.
+- **Progress:** while the background computation runs, a determinate progress bar in the status
+  card ("Overlay status card") SHALL show the share of the day's slider positions already
+  computed. It SHALL disappear when every position is computed or the computation stops.
 
 #### Scenario: Scrubbing a computed day
 - **WHEN** the overlay is on at Lauterbrunnen, 46.5935° N, 7.9091° E, map zoom 12, on 2025-12-21 at 12:00, and the day's computation has finished
@@ -234,8 +267,40 @@ of the day, over its actual length; time-selection "Choose the time of day"):
 
 #### Scenario: Progress of the day
 - **WHEN** the overlay is on and 72 of the day's 288 slider positions are computed
-- **THEN** a progress bar below the toggle shows 25 %, and once all 288 are computed no bar is shown
+- **THEN** a progress bar in the status card shows 25 %, and once all 288 are computed no bar is shown
 
 #### Scenario: Responsive while computing the day
 - **WHEN** the day is being computed in the background
 - **THEN** the map can be panned and the time slider moved without delay
+
+### Requirement: Overlay status card
+While `Sun & shade` or `Sun hours` is selected, a status card SHALL be shown directly below the
+overlay toggle, exactly as wide as the toggle and aligned with its right edge. From top to bottom
+it SHALL hold:
+1. the name of the selected mode, `Sun & shade` or `Sun hours`;
+2. the mode's notice, if any: `Zoom in to see sun and shade` ("Overlay coverage and zoom range"),
+   `Computing sun and shade …` ("Overlay updates") or `Computing sun hours …`
+   (sun-exposure-heatmap "Heatmap updates");
+3. while the day of the selected mode is computed ("Overlay of the whole day", sun-exposure-heatmap
+   "Heatmap updates"), its progress bar, directly below the notice, or directly below the mode's
+   name when there is no notice;
+4. the mode's legend ("Overlay appearance", sun-exposure-heatmap "Heatmap legend").
+
+These notices SHALL appear only in the status card. While `Off` is selected, no status card SHALL
+be shown. The card SHALL NOT cover the crosshair, the sun information panel or the ⓘ button.
+
+#### Scenario: Computing sun hours
+- **WHEN** `Sun hours` is selected and 72 of the day's 288 slider positions are computed
+- **THEN** the card shows, from top to bottom, `Sun hours`, `Computing sun hours …`, a progress bar at 25 %, and the heatmap legend
+
+#### Scenario: Day computing without a notice
+- **WHEN** `Sun & shade` is selected, the overlay of the selected time is shown and the rest of the day is computed
+- **THEN** the card shows `Sun & shade`, directly below it the progress bar, and the `Shade` / `Unknown` legend
+
+#### Scenario: Zoomed out
+- **WHEN** `Sun & shade` is selected and the map zoom is 10.5
+- **THEN** the card shows `Sun & shade` and `Zoom in to see sun and shade`
+
+#### Scenario: Off
+- **WHEN** `Off` is selected
+- **THEN** no status card is shown

@@ -52,22 +52,6 @@ while the map moves.
 - **WHEN** the device locale is German (de-CH) and the map centre is at latitude 46.68630, longitude 7.86320
 - **THEN** the selected location still reads `46.6863° N, 7.8632° E`
 
-### Requirement: Map attribution
-The app SHALL permanently show the attribution text
-`© OpenStreetMap contributors, SRTM | Map style: © OpenTopoMap (CC-BY-SA)` on the map screen,
-and next to it the elevation attribution `Elevation: © Mapterhorn and its sources`. Both SHALL be
-visible without any user interaction and SHALL NOT be covered by other elements. Tapping the
-elevation attribution SHALL open `https://mapterhorn.com/attribution/` in the device's browser;
-the page lists every source Mapterhorn's elevation data is built from.
-
-#### Scenario: Attribution visible
-- **WHEN** the map screen is shown, at any zoom level
-- **THEN** the map attribution text and the elevation attribution are visible on screen without tapping anything
-
-#### Scenario: Elevation sources
-- **WHEN** the user taps the elevation attribution
-- **THEN** the browser opens `https://mapterhorn.com/attribution/`
-
 ### Requirement: Tile request identification
 Every map tile request SHALL carry the User-Agent header
 `Sunshine/<versionName> (Android; com.sunshine.app)`, where `<versionName>` is the app's version
@@ -93,7 +77,7 @@ non-blocking notice that it is offline and map tiles may be missing.
 
 #### Scenario: Launch without network
 - **WHEN** the app is launched without a network connection
-- **THEN** the map area is blank, the crosshair, coordinates and attribution are shown, and the offline notice is visible
+- **THEN** the map area is blank, the crosshair, coordinates and ⓘ button are shown, and the offline notice is visible
 
 ### Requirement: Map orientation
 The map SHALL always be shown north-up and flat: bearing 0° and no tilt. Rotation and tilt
@@ -106,3 +90,60 @@ gestures SHALL have no effect, so that up on the screen is always north.
 #### Scenario: Tilt gesture
 - **WHEN** the user makes a two-finger vertical drag gesture on the map
 - **THEN** the map does not tilt
+
+### Requirement: About and attributions
+The map screen SHALL show an ⓘ button in the map's top-left corner, directly above the
+selected-location coordinates, with the content description `About and attributions`. It SHALL be
+at least 48 × 48 dp to touch and SHALL NOT be covered by other elements. The attributions SHALL NOT
+be shown on the map itself (user decision, 2026-09-29).
+
+Tapping the ⓘ button SHALL open an About page that shows:
+- the app name and its version name;
+- the map attribution `© OpenStreetMap contributors, SRTM | Map style: © OpenTopoMap (CC-BY-SA)`;
+  tapping it SHALL open `https://www.openstreetmap.org/copyright` in the device's browser;
+- the elevation attribution `Elevation: © Mapterhorn and its sources`; tapping it SHALL open
+  `https://mapterhorn.com/attribution/`, which lists every source Mapterhorn's elevation data is
+  built from;
+- the icon credit `Icons: Material Symbols (Apache License 2.0)`.
+
+The system back gesture or button SHALL return from the About page to the map, with the camera,
+the selected time and the overlay as they were.
+
+#### Scenario: Attribution reachable
+- **WHEN** the map screen is shown, at any zoom level
+- **THEN** the ⓘ button is visible, and no attribution text covers the map
+
+#### Scenario: About page
+- **WHEN** the user taps the ⓘ button
+- **THEN** the About page shows the app version, the map attribution, the elevation attribution and the icon credit
+
+#### Scenario: Elevation sources
+- **WHEN** the user taps the elevation attribution on the About page
+- **THEN** the browser opens `https://mapterhorn.com/attribution/`
+
+#### Scenario: Map licence
+- **WHEN** the user taps the map attribution on the About page
+- **THEN** the browser opens `https://www.openstreetmap.org/copyright`
+
+#### Scenario: Back to the map
+- **WHEN** the user has moved the map to Interlaken at zoom 12, selected `Sun hours`, opened the About page and goes back
+- **THEN** the map shows Interlaken at zoom 12 with `Sun hours` selected
+
+### Requirement: Map colours under the heatmap
+While the sun-shade overlay shows `Sun hours` (sun-shade-overlay "Overlay toggle"), the map tiles
+SHALL be shown in greyscale, so that the heatmap's colours stand out against the map's own greens
+and blues (user decisions, 2026-09-29). While `Off` or `Sun & shade` is selected, the map tiles
+SHALL be shown in their own colours. Lines, labels and contour lines SHALL stay readable in
+greyscale.
+
+#### Scenario: Heatmap
+- **WHEN** the user selects `Sun hours`
+- **THEN** the map tiles are shown in greyscale, with the heatmap on top
+
+#### Scenario: Sun and shade
+- **WHEN** the user selects `Sun & shade`
+- **THEN** the map tiles are shown in their own colours, with the shade tint on top
+
+#### Scenario: Overlay off
+- **WHEN** the user selects `Off`
+- **THEN** the map tiles are shown in their own colours
