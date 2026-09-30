@@ -33,7 +33,10 @@ class MapLibreRegionPart(
         region: RegionRow,
         onStatus: suspend (MapStatus) -> Unit,
     ): Long {
-        val offlineRegion = region.mapRegionId?.let { find(it) } ?: create(region).also { dao.updateMapRegionId(region.id, it.id) }
+        // A map region created but not yet recorded (the download was cancelled in between) is
+        // found by its metadata, so a resumed download never creates a second one.
+        val offlineRegion = region.mapRegionId?.let { find(it) } ?: list().firstOrNull { regionIdOf(it) == region.id } ?: create(region)
+        if (offlineRegion.id != region.mapRegionId) dao.updateMapRegionId(region.id, offlineRegion.id)
         return statuses(offlineRegion)
             .onEach { onStatus(MapStatus(it.completedResourceCount, it.requiredResourceCount, it.completedResourceSize)) }
             .first { it.isComplete }
@@ -42,7 +45,10 @@ class MapLibreRegionPart(
 
     /** Deletes the map region; its tiles no other region uses become browsed tiles (design D10). */
     suspend fun delete(mapRegionId: Long) {
-        val offlineRegion = find(mapRegionId) ?: return
+        find(mapRegionId)?.let { delete(it) }
+    }
+
+    private suspend fun delete(offlineRegion: OfflineRegion) {
         withContext(Dispatchers.Main) {
             suspendCancellableCoroutine { continuation ->
                 offlineRegion.delete(
@@ -53,6 +59,16 @@ class MapLibreRegionPart(
                     },
                 )
             }
+        }
+    }
+
+    /**
+     * Deletes the map regions of regions that no longer exist: e.g. one created while its region was
+     * being deleted, before its id was recorded. [regionIds] are the regions that exist.
+     */
+    suspend fun deleteOrphans(regionIds: Set<Long>) {
+        for (offlineRegion in list()) {
+            if (regionIdOf(offlineRegion) !in regionIds) delete(offlineRegion)
         }
     }
 
@@ -100,6 +116,22 @@ class MapLibreRegionPart(
                 )
             }
         }
+
+    private suspend fun list(): List<OfflineRegion> =
+        withContext(Dispatchers.Main) {
+            suspendCancellableCoroutine { continuation ->
+                OfflineManager.getInstance(context).listOfflineRegions(
+                    object : OfflineManager.ListOfflineRegionsCallback {
+                        override fun onList(offlineRegions: Array<OfflineRegion>?) = continuation.resume(offlineRegions.orEmpty().toList())
+
+                        override fun onError(error: String) = continuation.resumeWithException(IllegalStateException(error))
+                    },
+                )
+            }
+        }
+
+    /** Our region's id, which [create] stores as the map region's metadata. */
+    private fun regionIdOf(offlineRegion: OfflineRegion): Long? = String(offlineRegion.metadata).toLongOrNull()
 
     private suspend fun find(mapRegionId: Long): OfflineRegion? =
         withContext(Dispatchers.Main) {

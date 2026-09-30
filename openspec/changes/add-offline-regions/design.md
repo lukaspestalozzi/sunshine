@@ -123,7 +123,9 @@ do all the work. The fixed spacing is simpler to reason about.
     primary key (z, x, y);
   - `region(id, centreLat, centreLon, south, west, north, east, createdAt, completedAt,
     mapRegionId, mapBytes, state)`;
-  - `region_dem_tile(regionId, z, x, y)`, primary key of all four.
+  - `region_dem_tile(regionId, z, x, y)`, primary key of all four, and an index on `(z, x, y)` for
+    the eviction's "claimed by any region" lookups (version 2, with a migration from 1; review of
+    PR #31).
 - **Browsed** = a `dem_tile` without a `region_dem_tile` row. Browsed size = the `bytes` of those
   rows.
 - **Eviction** runs after each insert of a browsed tile when the browsed size exceeds 512 MiB. It
@@ -169,7 +171,9 @@ the same transaction. The OkHttp `Cache` is removed from the DEM client. The old
 
 ### D7. Region download: one WorkManager worker for all regions, oldest first
 - **Start.** `Download visible area` inserts a `region` row with state `QUEUED` and enqueues the
-  unique work `offline-regions` with `ExistingWorkPolicy.KEEP`.
+  unique work `offline-regions` with `ExistingWorkPolicy.APPEND_OR_REPLACE`: a worker finishing
+  after it saw an empty queue gets a successor, so a region queued in that moment is not stranded
+  (review of PR #31).
   - Constraints: `NetworkType.CONNECTED` (user decision: any network) and
     `setRequiresStorageNotLow(true)`.
 - **Worker.** `RegionDownloadWorker` is a `CoroutineWorker` that calls `setForeground` with a
@@ -195,8 +199,9 @@ the same transaction. The OkHttp `Cache` is removed from the DEM client. The old
 - **Status texts.** The Offline page derives them from the row and `WorkInfo`:
   - `Downloading <p> %` for the region being downloaded while the work is running;
   - `Waiting` for a queued region behind it;
-  - when the work is enqueued but blocked: `waiting for network` if `NetworkMonitor` reports
-    offline, else `waiting for storage`.
+  - `waiting for network` whenever `NetworkMonitor` reports no validated internet, even while
+    WorkManager (which only needs a connection) still runs the work; else `waiting for storage`
+    when the work was stopped for low storage; `Downloading` if any entry of the work runs.
 
 *Alternatives:* a plain foreground `Service` (the resume after network, storage, process death
 and reboot would all be ours to write); one work request per region (cancelling or ordering them
@@ -242,7 +247,10 @@ them oldest first (user decision: they become browsed tiles).
 
 Then, off the transaction:
 - if the worker is downloading this region, it notices the state and moves on;
-- `OfflineRegion.delete` on the map region (its unshared tiles become ambient; verified);
+- `OfflineRegion.delete` on the map region (its unshared tiles become ambient; verified), and on
+  every map region whose metadata names no existing region: one created by the cancelled
+  download before its id was recorded. The download finds such a region by its metadata
+  before creating one, so a resumed download never creates a second (review of PR #31);
 - update the ambient maximum (D2);
 - run the DEM eviction;
 - delete the `region` row.

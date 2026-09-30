@@ -8,6 +8,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.sunshine.app.SunshineApp
@@ -56,7 +57,11 @@ class RegionDownloadWorker(
     companion object {
         const val WORK_NAME = "offline-regions"
 
-        /** Starts the downloads unless they already run; any network will do (user decision). */
+        /**
+         * Starts the downloads; any network will do (user decision). Appended rather than kept, so
+         * that a region queued while a finishing worker has already seen an empty queue still gets
+         * a worker after it.
+         */
         fun enqueue(context: Context) {
             val request =
                 OneTimeWorkRequestBuilder<RegionDownloadWorker>()
@@ -67,7 +72,28 @@ class RegionDownloadWorker(
                             .setRequiresStorageNotLow(true)
                             .build(),
                     ).build()
-            WorkManager.getInstance(context).enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.KEEP, request)
+            WorkManager.getInstance(context).enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
         }
+    }
+}
+
+/**
+ * The region list's view of the download work (design D7 of add-offline-regions), from the states
+ * and stop reasons of its entries. Without validated internet it waits for the network, even while
+ * WorkManager, which only needs a connection, still runs it.
+ */
+fun downloadWork(
+    entries: List<Pair<WorkInfo.State, Int>>,
+    online: Boolean,
+): DownloadWork {
+    val unfinished = entries.filter { (state, _) -> !state.isFinished }
+    return when {
+        unfinished.isEmpty() -> DownloadWork.IDLE
+        !online -> DownloadWork.WAITING_FOR_NETWORK
+        unfinished.any { (state, _) -> state == WorkInfo.State.RUNNING } -> DownloadWork.RUNNING
+        unfinished.any { (_, stopReason) ->
+            stopReason == WorkInfo.STOP_REASON_CONSTRAINT_STORAGE_NOT_LOW
+        } -> DownloadWork.WAITING_FOR_STORAGE
+        else -> DownloadWork.IDLE
     }
 }
