@@ -35,6 +35,7 @@
     <string name="offline_title">Offline maps</string>
     <string name="offline_download">Download visible area</string>
     <string name="offline_zoom_in">Zoom in to map zoom 11 or more to download an area</string>
+    <string name="offline_across_180">Areas across the 180° meridian cannot be downloaded</string>
     <string name="offline_regions">Regions</string>
     <string name="offline_no_regions">No offline regions yet</string>
     <string name="offline_delete">Delete region</string>

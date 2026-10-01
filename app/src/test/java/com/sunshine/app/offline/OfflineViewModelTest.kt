@@ -61,6 +61,16 @@ class OfflineViewModelTest {
 
         assertNull(state.estimate)
         assertFalse(state.canDownload)
+        assertEquals(DownloadBlock.ZOOMED_OUT, state.blocked)
+    }
+
+    @Test
+    fun `an area across the 180 degree meridian cannot be downloaded`() {
+        val state = viewModel(MapArea(GeoPoint(-17.0, 179.99), zoom = 12.0, widthDp = 400.0, heightDp = 850.0)).uiState.value
+
+        assertNull(state.estimate)
+        assertFalse(state.canDownload)
+        assertEquals(DownloadBlock.ACROSS_180, state.blocked)
     }
 
     @Test

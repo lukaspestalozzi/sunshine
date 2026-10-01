@@ -209,7 +209,9 @@ is harder than one queue).
 
 ### D8. Area and tile ranges in `core`
 New `OfflineArea.kt`:
-- `GeoBounds(south, west, north, east)`, from `MapArea.corners()`;
+- `GeoBounds(south, west, north, east)`, from `MapArea.corners()`; an area that crosses the 180°
+  meridian (`MapArea.crossesAntimeridian`) is not downloaded (user decision, 2026-10-01: refuse
+  rather than split into two regions; review of PR #31);
 - `extend(bounds, marginMetres)` with 111.19 km per degree (EARTH_RADIUS) and cos φ at the
   extended edge farther from the equator;
 - `tileRange(bounds, zoom)`: the x/y range of the Web-Mercator tiles intersecting the bounds;

@@ -7,6 +7,7 @@ import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.ln
 import kotlin.math.max
+import kotlin.math.pow
 import kotlin.math.tan
 
 /** A latitude/longitude rectangle in decimal degrees (design D8 of add-offline-regions). */
@@ -38,6 +39,15 @@ data class GeoBounds(
             )
         }
     }
+}
+
+/**
+ * Whether this visible area crosses the 180° meridian. Such an area is not downloaded
+ * (offline-regions spec, "Download the visible area"): its wrapped corners would span almost 360°.
+ */
+fun MapArea.crossesAntimeridian(): Boolean {
+    val halfWidthDegrees = widthDp / 2 / (MAP_TILE_DP * 2.0.pow(zoom)) * 360
+    return center.longitude - halfWidthDegrees < -180 || center.longitude + halfWidthDegrees > 180
 }
 
 /** The Web-Mercator tiles from [minX] to [maxX] and [minY] to [maxY] (inclusive) at [zoom]. */
@@ -105,6 +115,7 @@ const val REQUESTS_PER_SECOND = 5.0
 
 private const val SECONDS_PER_MINUTE = 60.0
 private const val MAX_MAP_LATITUDE = 85.0511287798
+private const val MAP_TILE_DP = 512.0
 private const val METRES_PER_DEGREE = 2 * PI * EARTH_RADIUS / 360
 private const val MIN_MAP_TILE_ZOOM = 6
 private const val MAX_MAP_TILE_ZOOM = 17
