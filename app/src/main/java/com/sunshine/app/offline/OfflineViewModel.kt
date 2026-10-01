@@ -7,6 +7,7 @@ import com.sunshine.core.DownloadEstimate
 import com.sunshine.core.GeoBounds
 import com.sunshine.core.GeoPoint
 import com.sunshine.core.MapArea
+import com.sunshine.core.crossesAntimeridian
 import com.sunshine.core.downloadEstimate
 import java.time.Instant
 import java.time.ZoneId
@@ -35,9 +36,13 @@ data class RegionItem(
     val status: String,
 )
 
-/** The Offline page (offline-regions spec). [estimate] is `null` below map zoom 11. */
+/** Why the visible area cannot be downloaded (offline-regions spec, "Download the visible area"). */
+enum class DownloadBlock { ZOOMED_OUT, ACROSS_180 }
+
+/** The Offline page (offline-regions spec). [estimate] is `null` when the area is [blocked]. */
 data class OfflineUiState(
     val estimate: String?,
+    val blocked: DownloadBlock? = null,
     val regions: List<RegionItem> = emptyList(),
     val mapStorage: String = formatMebibytes(0),
     val demStorage: String = formatMebibytes(0),
@@ -63,19 +68,26 @@ class OfflineViewModel(
     // Deleted regions leave the list at once, before the database says so.
     private val deleted = MutableStateFlow(emptySet<Long>())
     private val confirmDelete = MutableStateFlow<RegionItem?>(null)
-    private val estimate = if (area.zoom >= MIN_DOWNLOAD_ZOOM) formatEstimate(downloadEstimate(GeoBounds.of(area))) else null
+    private val blocked =
+        when {
+            area.zoom < MIN_DOWNLOAD_ZOOM -> DownloadBlock.ZOOMED_OUT
+            area.crossesAntimeridian() -> DownloadBlock.ACROSS_180
+            else -> null
+        }
+    private val estimate = if (blocked == null) formatEstimate(downloadEstimate(GeoBounds.of(area))) else null
 
     val uiState: StateFlow<OfflineUiState> =
         combine(regions, work, deleted, confirmDelete) { summaries, work, deleted, confirm ->
             val use = storage()
             OfflineUiState(
                 estimate = estimate,
+                blocked = blocked,
                 regions = items(summaries.filter { it.region.id !in deleted }, work),
                 mapStorage = formatMebibytes(use.mapBytes),
                 demStorage = formatMebibytes(use.demBytes),
                 confirmDelete = confirm,
             )
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, OfflineUiState(estimate))
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, OfflineUiState(estimate, blocked))
 
     fun onDownload() {
         viewModelScope.launch { download(area) }

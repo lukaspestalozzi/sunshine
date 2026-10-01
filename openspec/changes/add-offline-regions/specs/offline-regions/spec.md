@@ -64,6 +64,9 @@ device locale, without a thousands separator.
 
 When the map zoom was below 11 when the page was opened, the button SHALL be disabled and the
 page SHALL show `Zoom in to map zoom 11 or more to download an area` instead (user decision).
+When the visible area crosses the 180° meridian, the button SHALL be disabled and the page SHALL
+show `Areas across the 180° meridian cannot be downloaded` instead (user decision, 2026-10-01,
+after the review of PR #31: its wrapped bounds would span almost 360°).
 Tapping the enabled button SHALL start the download of the region and add it to the region list.
 
 #### Scenario: Phone at zoom 11
@@ -73,6 +76,10 @@ Tapping the enabled button SHALL start the download of the region and add it to 
 #### Scenario: Zoomed out
 - **WHEN** the Offline page is opened while the map zoom is 10.9
 - **THEN** `Download visible area` is disabled and `Zoom in to map zoom 11 or more to download an area` is shown
+
+#### Scenario: Across the 180° meridian
+- **WHEN** the map on a 400 × 850 dp screen is centred on 17.0° S, 179.99° E at zoom 12 and the Offline page is opened
+- **THEN** `Download visible area` is disabled and `Areas across the 180° meridian cannot be downloaded` is shown
 
 ### Requirement: Region contents
 A region SHALL consist of the following tiles:

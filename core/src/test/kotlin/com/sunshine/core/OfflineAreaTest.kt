@@ -1,6 +1,8 @@
 package com.sunshine.core
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class OfflineAreaTest {
@@ -42,5 +44,14 @@ class OfflineAreaTest {
         assertEquals(10.5, estimate.widthKm, 0.05)
         assertEquals(22.3, estimate.heightKm, 0.05)
         assertEquals(25L, estimate.minutes)
+    }
+
+    @Test
+    fun `an area across the 180 degree meridian is recognised on both sides`() {
+        // At zoom 11, 400 dp span 0.137° of longitude.
+        assertTrue(MapArea(GeoPoint(-17.0, 179.99), zoom = 11.0, widthDp = 400.0, heightDp = 850.0).crossesAntimeridian())
+        assertTrue(MapArea(GeoPoint(65.0, -179.99), zoom = 11.0, widthDp = 400.0, heightDp = 850.0).crossesAntimeridian())
+        assertFalse(MapArea(GeoPoint(-17.0, 179.9), zoom = 11.0, widthDp = 400.0, heightDp = 850.0).crossesAntimeridian())
+        assertFalse(MapArea(GeoPoint(46.5935, 7.9091), zoom = 11.0, widthDp = 400.0, heightDp = 850.0).crossesAntimeridian())
     }
 }

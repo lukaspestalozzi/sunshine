@@ -76,7 +76,8 @@ fun OfflineScreen(
         ) {
             Text(stringResource(R.string.offline_title), style = MaterialTheme.typography.headlineSmall)
             Button(onClick = onDownload, enabled = state.canDownload) { Text(stringResource(R.string.offline_download)) }
-            Text(state.estimate ?: stringResource(R.string.offline_zoom_in), style = MaterialTheme.typography.bodyMedium)
+            val notice = if (state.blocked == DownloadBlock.ACROSS_180) R.string.offline_across_180 else R.string.offline_zoom_in
+            Text(state.estimate ?: stringResource(notice), style = MaterialTheme.typography.bodyMedium)
             Text(stringResource(R.string.offline_regions), style = MaterialTheme.typography.titleMedium)
             if (state.regions.isEmpty()) {
                 Text(stringResource(R.string.offline_no_regions), style = MaterialTheme.typography.bodyLarge)
