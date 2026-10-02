@@ -14,6 +14,7 @@ Ordered list of planned OpenSpec changes. Each row becomes one change under `ope
 | 6 | `add-offline-regions` | offline-regions | Every fetched map and DEM tile kept (browsed limit 512 + 512 MiB, least recently used out); download of the visible area at map zoom ≥ 11 (map tiles to z17, DEM with the full 150 km margin), rate-limited to 5 requests/s and 2 in flight per server, in the background; per-region delete; storage usage; fully offline use | resolved in its design.md (visible area instead of a region list; the user contacts OpenTopoMap and Mapterhorn separately; areas across the 180° meridian are refused) | archived 2026-10-02 |
 | 7 | `add-sun-exposure-heatmap` | sun-exposure-heatmap | Hours of direct sun per cell for the selected day, as a second overlay mode counted from the day's sun-shade grids; done before #6 by user decision (2026-09-28), as #6 waits on the tile servers' bulk-download policies | resolved in its design.md (partial heatmap while computing deferred until measured on the device; the change also redesigned the overlay controls and moved the attributions to an About page) | archived 2026-09-30 |
 | 8 | `add-settings` | settings (new) | A settings page for what #6 fixes as constants: the browsed-tile limits (512 MiB map, 512 MiB DEM), the region map depth (map zoom 16) and the download rate limit. Candidates: clearing the browsed tiles, renaming regions, the resolution of the shade calculation (user idea, 2026-10-01; today 2 dp cells every 5 min for `Sun & shade`, 8 dp every 10 min for `Sun hours`; whether cell size, time step or both is open) | to be decided in its design.md | planned |
+| 9 | `add-gps-location` | gps-location (new) | The device's position as a dot with its accuracy circle (MapLibre's location component and default engine, no Google Play Services), grey when older than 30 s; a location button that centres the map on a fresh position, or waits for one with an animation; permission asked on the first tap; online and offline alike. Done before #8 by user decision (2026-10-02) | resolved in its design.md | proposed |
 
 Polishing after the v1 features (#1–#8):
 - **Overlay on pans (from #5, deferred by user decision 2026-09-28).** Today a pan computes the
@@ -25,7 +26,7 @@ Polishing after the v1 features (#1–#8):
   - showing the previous day's grids while the new day computes: no extra CPU, scrubbing stays
     instant after a pan, the computation still restarts.
 
-Post-1.0 candidates: GPS location, bookmarks, time playback animation, home-screen widget,
+Post-1.0 candidates: bookmarks, time playback animation, home-screen widget,
 photo planning mode.
 
 Tooling follow-up: reintroduce detekt once detekt 2.0 is stable (1.23.x does not support
