@@ -62,8 +62,9 @@ name, so that tile servers can identify the app as their usage policies require.
 - **THEN** the request's User-Agent header is exactly `Sunshine/0.1.0 (Android; com.sunshine.app)`
 
 ### Requirement: Missing map tiles
-When map tiles cannot be loaded, the affected map area SHALL stay blank; the app SHALL NOT show
-substitute imagery that could be mistaken for map data. The crosshair and the selected-location
+When a map tile is neither stored (offline-regions "Kept tiles") nor loadable, the affected map
+area SHALL stay blank; the app SHALL NOT show substitute imagery that could be mistaken for map
+data. Stored tiles SHALL be shown without network. The crosshair and the selected-location
 coordinates SHALL keep working. While the device has no network connection, the app SHALL show a
 non-blocking notice that it is offline and map tiles may be missing.
 
@@ -76,8 +77,12 @@ non-blocking notice that it is offline and map tiles may be missing.
 - **THEN** the notice disappears within 5 seconds and tiles for the visible area are loaded
 
 #### Scenario: Launch without network
-- **WHEN** the app is launched without a network connection
-- **THEN** the map area is blank, the crosshair, coordinates and ⓘ button are shown, and the offline notice is visible
+- **WHEN** the app is launched without a network connection and no map tile of the visible area is stored
+- **THEN** the map area is blank, the crosshair, coordinates, ⓘ button and Offline button are shown, and the offline notice is visible
+
+#### Scenario: Launch without network in a stored area
+- **WHEN** the app is launched without a network connection and the tiles of the visible area are stored
+- **THEN** the map shows those tiles, and the offline notice is visible
 
 ### Requirement: Map orientation
 The map SHALL always be shown north-up and flat: bearing 0° and no tilt. Rotation and tilt
