@@ -302,4 +302,21 @@ On a restart, rows in state `DELETED` finish these steps.
 ## Open Questions
 
 - The real sizes of map tiles at z16–z17 and of DEM tiles at z10–z14 in the Alps. They affect only
-  the proposal's estimates, not the design; the device check records them.
+  the proposal's estimates, not the design. Partly answered by the device check (task 8.1,
+  2026-10-02, user): the Offline page shows both sizes (so MapLibre's database files are found),
+  but the values were not noted.
+
+## Device check of a whole region (task 8.1, answered 2026-10-02)
+
+User check on the device: the zoom-11 region around Lauterbrunnen downloaded, resumed after the
+network was cut, and works in airplane mode, also after an overlapping region was deleted. The
+storage sizes show.
+
+The download took **20 minutes**. That is less than the 24.6 minutes the "Request pace" scenario
+expects for 7406 map tiles, which assumes a 400 × 850 dp screen and no stored tiles. Both
+assumptions may not hold here, and either explains it without a faster pace:
+- a 360 × 780 dp screen covers 6181 map tiles, i.e. at least 20.6 minutes;
+- tiles already stored (the area of the task 3.3 spike lies inside the region, and Interlaken was
+  browsed for task 4.3) are claimed without a request.
+
+The 200 ms spacing itself was verified on the device in task 3.3.
