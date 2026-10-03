@@ -1,7 +1,18 @@
 package com.sunshine.app.map
 
+import android.Manifest
 import android.app.ActivityManager
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.res.Resources
+import android.location.LocationManager
 import android.net.ConnectivityManager
+import android.net.Uri
+import android.provider.Settings
+import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -9,28 +20,47 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.sunshine.app.BuildConfig
+import com.sunshine.app.R
 import com.sunshine.app.SunshineApp
 import com.sunshine.app.network.NetworkMonitor
 import com.sunshine.app.sunshine.debugLog
 import com.sunshine.core.MapArea
 import java.time.Clock
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.launch
 
 @Composable
 fun MapScreen(
@@ -49,7 +79,35 @@ fun MapScreen(
     val dayProgress by viewModel.dayProgress.collectAsStateWithLifecycle()
     val overlayMode by viewModel.overlayMode.collectAsStateWithLifecycle()
     val heatmap by viewModel.heatmap.collectAsStateWithLifecycle()
+    val locationButton by viewModel.locationButton.collectAsStateWithLifecycle()
     val sunshine = computedSunshine.at(camera.center)
+
+    val context = LocalContext.current
+    val activity = checkNotNull(LocalActivity.current) { "MapScreen needs its Activity for the permission dialog" }
+    val resources = LocalResources.current
+    // Read again on every resume: the user may have changed it in the system settings meanwhile.
+    var locationAllowed by remember { mutableStateOf(context.locationAccess() != LocationAccess.NONE) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { locationAllowed = context.locationAccess() != LocationAccess.NONE }
+    val permissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            val access = context.locationAccess()
+            locationAllowed = access != LocationAccess.NONE
+            // After a refusal, Android shows the dialog again only while it offers a rationale (design D4).
+            val dialogAvailable = LOCATION_PERMISSIONS.any { ActivityCompat.shouldShowRequestPermissionRationale(activity, it) }
+            viewModel.onLocationPermissionAnswered(access, context.isLocationOn(), dialogAvailable)
+        }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val centreRequests = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
+    LaunchedEffect(viewModel) {
+        viewModel.locationActions.collect { action ->
+            when (action) {
+                LocationAction.AskPermission -> permissionLauncher.launch(LOCATION_PERMISSIONS)
+                LocationAction.Centre -> centreRequests.tryEmit(Unit)
+                // Its own coroutine: a shown snackbar waits for its end, and the next action must not.
+                is LocationAction.Notice -> launch { snackbarHostState.showNotice(action.notice, resources, context) }
+            }
+        }
+    }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val startInset = WindowInsets.safeDrawing.asPaddingValues().calculateStartPadding(LocalLayoutDirection.current)
@@ -66,6 +124,9 @@ fun MapScreen(
                     OverlayMode.SUN_HOURS -> heatmap.image()
                 },
             saturation = mapSaturation(overlayOption(isOverlayOn, overlayMode)),
+            locationAllowed = locationAllowed,
+            onLocationStale = viewModel::onLocationStale,
+            centreRequests = centreRequests,
         )
         sun?.let { SunLine(it.position, (sunshine as? SunshineUiState.Ready)?.atSelectedTime) }
         Crosshair(Modifier.align(Alignment.Center))
@@ -79,6 +140,8 @@ fun MapScreen(
                     MapArea(camera.center, camera.zoom, maxWidth.value.toDouble(), maxHeight.value.toDouble()),
                 )
             },
+            locationButton = locationButton,
+            onLocationClicked = { viewModel.onLocationTapped(context.locationAccess(), context.isLocationOn()) },
             topEnd = {
                 OverlayControl(
                     option = overlayOption(isOverlayOn, overlayMode),
@@ -105,8 +168,65 @@ fun MapScreen(
                 modifier = Modifier.widthIn(max = panelMaxWidth),
             )
         }
+        SnackbarHost(
+            snackbarHostState,
+            Modifier
+                .align(Alignment.BottomCenter)
+                .windowInsetsPadding(WindowInsets.safeDrawing),
+        ) { data ->
+            // Swipe to dismiss (gps-location spec, "Location permission"); a fresh state per notice.
+            key(data) {
+                SwipeToDismissBox(
+                    state = rememberSwipeToDismissBoxState(),
+                    backgroundContent = {},
+                    onDismiss = { data.dismiss() },
+                ) { Snackbar(data) }
+            }
+        }
     }
 }
+
+private val LOCATION_PERMISSIONS = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+
+/** The location access the user allowed: precise (fine) wins over approximate (coarse). */
+private fun Context.locationAccess(): LocationAccess =
+    when {
+        checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED -> LocationAccess.PRECISE
+        checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED -> LocationAccess.APPROXIMATE
+        else -> LocationAccess.NONE
+    }
+
+private fun Context.isLocationOn(): Boolean =
+    checkNotNull(getSystemService(LocationManager::class.java)) { "LocationManager is not available" }.isLocationEnabled
+
+/**
+ * Shows [notice] for 10 s (`SnackbarDuration.Long`) with `Settings`, which opens the settings that
+ * fix it (design D5 of add-gps-location).
+ */
+private suspend fun SnackbarHostState.showNotice(
+    notice: LocationNotice,
+    resources: Resources,
+    context: Context,
+) {
+    val (message, settings) =
+        when (notice) {
+            LocationNotice.ACCESS_OFF -> R.string.location_notice_access_off to context.appSettings()
+            LocationNotice.APPROXIMATE_ONLY -> R.string.location_notice_approximate to context.appSettings()
+            LocationNotice.SWITCHED_OFF -> R.string.location_notice_switched_off to Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+        }
+    // The new notice replaces the shown one: repeated taps must not queue notices of 10 s each.
+    currentSnackbarData?.dismiss()
+    val result =
+        showSnackbar(
+            message = resources.getString(message),
+            actionLabel = resources.getString(R.string.location_notice_settings),
+            duration = SnackbarDuration.Long,
+        )
+    if (result == SnackbarResult.ActionPerformed) context.startActivity(settings)
+}
+
+private fun Context.appSettings(): Intent =
+    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null))
 
 /**
  * Widest the sun panel may be. It sits bottom-start; in landscape it must end left of the centre
