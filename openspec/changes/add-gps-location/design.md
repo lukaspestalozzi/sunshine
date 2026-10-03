@@ -168,7 +168,9 @@ manifest say what it uses. No background location permission.
   large accuracy circle, which is honest. Offline it gives nothing and GPS alone answers.
 - [GPS at 1 Hz drains the battery while the map is open] → Updates run only while the map screen
   is visible (spec "Location updates only while visible"); MapLibre's `MapView` lifecycle stops
-  the engine in `onStop`. Checked on the device in task 5.
+  the engine in `onStop`. The About and Offline pages replace the map while the activity stays
+  resumed, so `MapLibreMap` brings its `MapView` down (pause, stop, destroy) when it leaves the
+  composition (found in review, 2026-10-03). Checked on the device in task 4.2.
 - [Approximate access offline gives no position at all] (the network provider needs network and
   GPS needs precise access) → The button waits without a limit, as decided; the approximate notice
   on each tap points to the setting that fixes it.
