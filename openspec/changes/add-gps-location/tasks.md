@@ -11,12 +11,12 @@
   - with `Sun & shade` on, the dot is drawn above the overlay;
   - panning and zooming never move the camera back to the dot.
 
-  Keep the activation code for group 3; remove the logging there.
+  Keep the activation code for group 3. The stale state stays logged through `MapViewModel`'s `log` (`debugLog`, debug builds only, tag `Sunshine`), so that these checks run on the same debug APK as group 3 (one device session, user decision 2026-10-03).
 
 ## 2. app: the button's state machine
 
-- [ ] 2.1 Write `LocationButtonTest` first, one case per row of the table in design D3, plus: a fresh position while IDLE turns READY without any action (spec "Ready without a tap"); a stale event while WAITING stays WAITING; a tap with only approximate access in READY gives the centre action and the approximate notice. Run it and see it fail to compile. Then implement `LocationButton` in `app/.../map/LocationButton.kt` (pure Kotlin, no Android types). Verify: `./gradlew :app:testDebugUnitTest --tests "*LocationButtonTest*"` passes.
-- [ ] 2.2 Wire `LocationButton` into `MapViewModel`: a `StateFlow` of the button state, `onLocationTapped(access, dialogAvailable, locationOn)`, `onLocationStale(stale)`, and a flow of one-off actions (design D3). Add to `MapViewModelTest`: a tap without a fresh position, then `onLocationStale(false)` → state READY and no centre action; a second tap → one centre action. Verify: `./gradlew :app:testDebugUnitTest --tests "*MapViewModel*"` passes.
+- [x] 2.1 Write `LocationButtonTest` first, one case per row of the table in design D3, plus: a fresh position while IDLE turns READY without any action (spec "Ready without a tap"); a stale event while WAITING stays WAITING; a tap with only approximate access in READY gives the centre action and the approximate notice. Run it and see it fail to compile. Then implement `LocationButton` in `app/.../map/LocationButton.kt` (pure Kotlin, no Android types). Verify: `./gradlew :app:testDebugUnitTest --tests "*LocationButtonTest*"` passes.
+- [x] 2.2 Wire `LocationButton` into `MapViewModel`: a `StateFlow` of the button state, `onLocationTapped(access, locationOn)`, `onLocationPermissionAnswered(access, locationOn, dialogAvailable)`, `onLocationStale(stale)`, and a flow of one-off actions (design D3). Add to `MapViewModelTest`: a tap without a fresh position, then `onLocationStale(false)` → state READY and no centre action; a second tap → one centre action. Verify: `./gradlew :app:testDebugUnitTest --tests "*MapViewModel*"` passes.
 
 ## 3. app: button, permission, notices, centring
 
@@ -28,13 +28,13 @@
   - allow approximate only, tap: the approximate notice with `Settings`;
   - allow precise, location switched off in quick settings, tap: `Location is switched off.` with `Settings` opening the location settings, the button stays idle;
   - each notice disappears after about 10 s or when swiped away.
-- [ ] 3.3 Connect the stale listener to `onLocationStale` and the centre action to `animateCamera(CameraUpdateFactory.newLatLng(lastKnownLocation))` in `MapLibreMap`; remove the spike's logging (design D1, D4). Verify on the device:
+- [ ] 3.3 Connect the stale listener to `onLocationStale` and the centre action to `animateCamera(CameraUpdateFactory.newLatLng(lastKnownLocation))` in `MapLibreMap` (design D1, D4). Verify on the device:
   - with a coloured dot, map at zoom 12 elsewhere: a tap moves the centre to the dot, the zoom stays 12, and the coordinates match the dot's position to 4 decimals (spec "Tap when ready");
   - with no dot, a tap starts the pulse, the map does not move; when the dot turns coloured the pulse stops and the button shows `my_location`; a second tap centres (spec "Wait for a position");
   - a tap while pulsing stops the pulse (spec "Stop waiting");
   - while waiting, rotate the device and open and close the About page: still waiting;
   - walking 200 m after centring: the dot moves, the map does not (spec "Walking after centring").
-- [ ] 3.4 Run `./scripts/verify-local.sh`. Verify: ktlint, Android lint, unit tests and the debug APK all pass with zero issues.
+- [x] 3.4 Run `./scripts/verify-local.sh`. Verify: ktlint, Android lint, unit tests and the debug APK all pass with zero issues.
 
 ## 4. Integration checks
 
@@ -43,4 +43,4 @@
 
 ## 5. Documentation
 
-- [ ] 5.1 Update `CLAUDE.md`'s `app/` row with `map/LocationButton.kt` and the location component in `MapLibreMap`, and `docs/roadmap.md`'s row #9 to "in progress" when apply starts. Verify: `openspec validate --all --strict` passes and the row and paths match the code.
+- [x] 5.1 Update `CLAUDE.md`'s `app/` row with `map/LocationButton.kt` and the location component in `MapLibreMap`, and `docs/roadmap.md`'s row #9 to "in progress" when apply starts. Verify: `openspec validate --all --strict` passes and the row and paths match the code.

@@ -78,24 +78,29 @@ Task 1 checks this on the device first (see Risks).
 
 ### D3. The button's states are a pure state machine in `map/LocationButton.kt`
 
-A small class without Android dependencies holds the button state (`IDLE`, `WAITING`, `READY`) and
-turns events into a new state and at most one action:
+Pure functions on the button state (`IDLE`, `WAITING`, `READY`), without Android dependencies, turn
+events into a new state and the actions to take in order (`LocationStep`):
 
-| Event | From | To | Action |
+| Event | From | To | Actions |
 |---|---|---|---|
-| tap, access not asked or Android would ask again | any | unchanged | ask for access |
-| tap, access refused and no dialog any more | any | IDLE | notice "access off" |
+| tap, no access | any | unchanged | ask for access |
+| permission answer: refused, Android would ask again | any | unchanged | none |
+| permission answer: refused, no dialog any more | any | IDLE | notice "access off" |
+| permission answer: allowed | any | as for a tap with that access | as for a tap |
 | tap, location switched off | any | IDLE | notice "switched off" |
 | tap | READY | READY | centre (+ notice "approximate" if only approximate access) |
-| tap | IDLE | WAITING | (+ notice "approximate" if only approximate access) |
-| tap | WAITING | IDLE | none |
-| fresh position (not stale) | IDLE, WAITING | READY | none |
-| stale | READY | IDLE | none |
+| tap | IDLE | WAITING | (notice "approximate" if only approximate access) |
+| tap | WAITING | IDLE | (notice "approximate" if only approximate access) |
+| fresh position (not stale) | any | READY | none |
+| stale | READY, IDLE | IDLE | none |
+| stale | WAITING | WAITING | none |
 
-After a permission answer, `MapScreen` replays the tap with the new access. `MapViewModel` owns the
-instance, so the state survives rotation and the About and Offline pages (spec "Wait for a
-position"); it exposes the state as a `StateFlow` and the actions as a `Channel`-backed flow of
-one-off events, which `MapScreen` handles. The table is unit-tested in
+The permission answer is its own event (changed while applying, 2026-10-03): Android tells whether
+it still shows the dialog only after a request, so a tap without access always asks, and only the
+answer can say "refused for good". Replaying the tap after a refusal would ask again in a loop.
+`MapViewModel` holds the state, so it survives rotation and the About and Offline pages (spec
+"Wait for a position"); it exposes the state as a `StateFlow` and the actions as a
+`Channel`-backed flow of one-off events, which `MapScreen` handles. The table is unit-tested in
 `LocationButtonTest`.
 
 Alternatives considered: the logic inside `MapViewModel` directly (it is already over 600 lines,
