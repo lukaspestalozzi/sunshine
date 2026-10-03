@@ -74,9 +74,23 @@ fun MapLibreMap(
         }
 
     DisposableEffect(lifecycle, mapView) {
-        val observer = LifecycleEventObserver { _, event -> mapView.forward(event) }
+        // The state the map view was brought to. Leaving the composition (the About or Offline page
+        // replaces the map while the activity stays resumed) brings it down from there; otherwise it
+        // keeps running, its location engine included (gps-location spec, "Location updates only
+        // while visible").
+        var state = Lifecycle.State.INITIALIZED
+        val observer =
+            LifecycleEventObserver { _, event ->
+                mapView.forward(event)
+                state = event.targetState
+            }
         lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer) }
+        onDispose {
+            lifecycle.removeObserver(observer)
+            if (state.isAtLeast(Lifecycle.State.RESUMED)) mapView.onPause()
+            if (state.isAtLeast(Lifecycle.State.STARTED)) mapView.onStop()
+            if (state.isAtLeast(Lifecycle.State.CREATED)) mapView.onDestroy()
+        }
     }
 
     DisposableEffect(context, mapView) {

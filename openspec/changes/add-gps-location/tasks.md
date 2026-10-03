@@ -39,7 +39,7 @@
 ## 4. Integration checks
 
 - [ ] 4.1 Layout on a 360 dp wide screen (emulator `-skin 720x1520` at 320 dpi, or a device with display size set to 360 dp), portrait and landscape: the ⓘ, Offline and location buttons and the overlay toggle are fully on screen and do not overlap, and the coordinates label is not covered (spec offline-regions "Narrow screen", gps-location "Location button"). Verify by screenshot.
-- [ ] 4.2 Offline and battery on the device: airplane mode, location on, app launched in a stored region: the map, the crosshair, the coordinates, the ⓘ, Offline and location buttons and the offline notice are shown (spec map-view "Launch without network"); a GPS position arrives and a tap centres on it. Then switch to another app for 1 minute and check `adb shell dumpsys location | grep -A3 com.sunshine.app` shows no active request (spec "App to the background"). Verify: all observations as stated.
+- [ ] 4.2 Offline and battery on the device: airplane mode, location on, app launched in a stored region: the map, the crosshair, the coordinates, the ⓘ, Offline and location buttons and the offline notice are shown (spec map-view "Launch without network"); a GPS position arrives and a tap centres on it. Then switch to another app for 1 minute and check `adb shell dumpsys location | grep -A3 com.sunshine.app` shows no active request (spec "App to the background"); back on the map, open the About page for 1 minute and check the same (spec "Location updates only while visible"). Verify: all observations as stated.
 
 ## 5. Documentation
 
