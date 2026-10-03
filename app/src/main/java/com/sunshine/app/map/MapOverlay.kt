@@ -1,5 +1,10 @@
 package com.sunshine.app.map
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,8 +22,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -43,8 +50,9 @@ fun Crosshair(modifier: Modifier = Modifier) {
 /**
  * The ⓘ button opening the About page with the attributions ([onAboutClicked]; map-view spec, "About
  * and attributions") and to its right the Offline button ([onOfflineClicked]; offline-regions spec,
- * "Offline button"), below them the selected-location coordinates and the offline notice, the
- * [topEnd] controls and the [bottomPanel], kept clear of the system bars.
+ * "Offline button") and the location button in its [locationButton] state ([onLocationClicked];
+ * gps-location spec, "Location button"), below them the selected-location coordinates and the offline
+ * notice, the [topEnd] controls and the [bottomPanel], kept clear of the system bars.
  */
 @Composable
 fun MapLabels(
@@ -52,6 +60,8 @@ fun MapLabels(
     isOffline: Boolean,
     onAboutClicked: () -> Unit,
     onOfflineClicked: () -> Unit,
+    locationButton: LocationButtonState,
+    onLocationClicked: () -> Unit,
     modifier: Modifier = Modifier,
     topEnd: @Composable () -> Unit = {},
     bottomPanel: @Composable () -> Unit = {},
@@ -79,6 +89,9 @@ fun MapLabels(
                     IconButton(onClick = onOfflineClicked) {
                         Icon(painterResource(R.drawable.ic_offline), contentDescription = stringResource(R.string.offline_button))
                     }
+                }
+                Surface(color = floatingSurfaceColor(), shape = MaterialTheme.shapes.medium) {
+                    IconButton(onClick = onLocationClicked) { LocationIcon(locationButton) }
                 }
             }
             Label(text = formatCoordinates(camera.center))
@@ -111,4 +124,30 @@ private fun Label(
     }
 }
 
+/**
+ * The location button's icon: `my_location` (filled) when ready, `location_searching` otherwise,
+ * pulsing while waiting (design D6 of add-gps-location).
+ */
+@Composable
+private fun LocationIcon(state: LocationButtonState) {
+    val alpha =
+        if (state == LocationButtonState.WAITING) {
+            val pulse by rememberInfiniteTransition(label = "location pulse").animateFloat(
+                initialValue = 1f,
+                targetValue = PULSE_MIN_ALPHA,
+                animationSpec = infiniteRepeatable(tween(PULSE_HALF_MILLIS), RepeatMode.Reverse),
+                label = "location pulse alpha",
+            )
+            pulse
+        } else {
+            1f
+        }
+    val icon = if (state == LocationButtonState.READY) R.drawable.ic_my_location else R.drawable.ic_location_searching
+    Icon(painterResource(icon), contentDescription = stringResource(R.string.location_button), Modifier.alpha(alpha))
+}
+
 private const val LABEL_ALPHA = 0.85f
+
+// One pulse per second: half a second down to 0.3 and back.
+private const val PULSE_MIN_ALPHA = 0.3f
+private const val PULSE_HALF_MILLIS = 500

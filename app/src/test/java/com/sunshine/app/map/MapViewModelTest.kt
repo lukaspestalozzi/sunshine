@@ -85,6 +85,38 @@ class MapViewModelTest {
     }
 
     @Test
+    fun `a position arriving while waiting makes the button ready without centring, and a second tap centres`() =
+        runTest {
+            val viewModel = newViewModel()
+            val actions = mutableListOf<LocationAction>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.locationActions.collect { actions += it } }
+
+            viewModel.onLocationTapped(LocationAccess.PRECISE, locationOn = true)
+            assertEquals(LocationButtonState.WAITING, viewModel.locationButton.value)
+
+            viewModel.onLocationStale(false)
+            assertEquals(LocationButtonState.READY, viewModel.locationButton.value)
+            assertEquals(emptyList<LocationAction>(), actions)
+
+            viewModel.onLocationTapped(LocationAccess.PRECISE, locationOn = true)
+            assertEquals(listOf<LocationAction>(LocationAction.Centre), actions)
+        }
+
+    @Test
+    fun `a tap without access asks, and a refusal for good shows the access notice`() =
+        runTest {
+            val viewModel = newViewModel()
+            val actions = mutableListOf<LocationAction>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.locationActions.collect { actions += it } }
+
+            viewModel.onLocationTapped(LocationAccess.NONE, locationOn = true)
+            viewModel.onLocationPermissionAnswered(LocationAccess.NONE, locationOn = true, dialogAvailable = false)
+
+            assertEquals(listOf(LocationAction.AskPermission, LocationAction.Notice(LocationNotice.ACCESS_OFF)), actions)
+            assertEquals(LocationButtonState.IDLE, viewModel.locationButton.value)
+        }
+
+    @Test
     fun `isOffline follows the network monitor`() =
         runTest {
             val viewModel = newViewModel()
