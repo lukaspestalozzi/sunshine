@@ -47,4 +47,9 @@
     <string name="offline_storage_limit">Browsed tiles are kept up to 512 MiB each for map and elevation; the least recently used are removed first.</string>
     <string name="offline_notification_channel">Offline downloads</string>
     <string name="offline_notification_title">Downloading offline map</string>
+    <string name="location_button">My location</string>
+    <string name="location_notice_access_off">Location access is off for Sunshine.</string>
+    <string name="location_notice_switched_off">Location is switched off.</string>
+    <string name="location_notice_approximate">Approximate location only. Allow precise location for your exact position.</string>
+    <string name="location_notice_settings">Settings</string>
 </resources>

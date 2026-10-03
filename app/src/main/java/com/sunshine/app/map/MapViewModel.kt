@@ -32,6 +32,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -47,6 +48,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -579,6 +581,41 @@ class MapViewModel(
         isOnline
             .map { online -> !online }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), initialValue = false)
+
+    // Held here, not in Compose, so that waiting survives rotation and the About and Offline pages
+    // (gps-location spec, "Wait for a position"; design D3 of add-gps-location).
+    private val mutableLocationButton = MutableStateFlow(LocationButtonState.IDLE)
+    val locationButton: StateFlow<LocationButtonState> = mutableLocationButton.asStateFlow()
+
+    private val locationActionChannel = Channel<LocationAction>(Channel.BUFFERED)
+
+    /** One-off actions of the location button, each delivered once to the screen. */
+    val locationActions: Flow<LocationAction> = locationActionChannel.receiveAsFlow()
+
+    /** A tap of the location button, with the [access] allowed now and whether location is switched on. */
+    fun onLocationTapped(
+        access: LocationAccess,
+        locationOn: Boolean,
+    ) = applyLocationStep(mutableLocationButton.value.onTap(access, locationOn))
+
+    /** The answer to the permission dialog a tap asked for. */
+    fun onLocationPermissionAnswered(
+        access: LocationAccess,
+        locationOn: Boolean,
+        dialogAvailable: Boolean,
+    ) = applyLocationStep(mutableLocationButton.value.onPermissionAnswer(access, locationOn, dialogAvailable))
+
+    /** The map's position turned [stale] (old) or fresh. */
+    fun onLocationStale(stale: Boolean) {
+        // Logged in debug builds for the device checks of the stale state (task 1.1 of add-gps-location).
+        log("Location stale=$stale")
+        mutableLocationButton.value = mutableLocationButton.value.onStale(stale)
+    }
+
+    private fun applyLocationStep(step: LocationStep) {
+        mutableLocationButton.value = step.state
+        step.actions.forEach { locationActionChannel.trySend(it) }
+    }
 
     /** Called on every camera movement; saved so the viewport survives rotation and process death. */
     fun onCameraMoved(camera: CameraState) {
