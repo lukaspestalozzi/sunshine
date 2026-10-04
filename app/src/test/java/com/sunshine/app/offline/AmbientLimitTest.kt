@@ -38,6 +38,33 @@ class AmbientLimitTest {
         assertEquals(listOf(612 * MIB, 607 * MIB), limits)
     }
 
+    @Test
+    fun `a new browsed limit applies at once, with the regions' size`() {
+        limit.onRegionBytes(100 * MIB)
+
+        limit.setBrowsedLimit(128 * MIB)
+
+        assertEquals(listOf(612 * MIB, 228 * MIB), limits)
+    }
+
+    @Test
+    fun `a browsed limit set before the regions' size is known applies with it`() {
+        limit.setBrowsedLimit(256 * MIB)
+        assertEquals(emptyList<Long>(), limits)
+
+        limit.onRegionBytes(0)
+
+        assertEquals(listOf(256 * MIB), limits)
+    }
+
+    @Test
+    fun `the browsed limit given at creation is used`() {
+        val limits = mutableListOf<Long>()
+        AmbientLimit(set = { limits += it }, browsedBytes = 2048 * MIB).onRegionBytes(0)
+
+        assertEquals(listOf(2048 * MIB), limits)
+    }
+
     private companion object {
         const val MIB = 1024L * 1024
     }

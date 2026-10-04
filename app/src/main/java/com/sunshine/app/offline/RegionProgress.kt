@@ -52,4 +52,4 @@ fun formatRegionStatus(status: RegionStatus): String =
 fun formatMebibytes(bytes: Long): String = "${(bytes + MEBIBYTE / 2) / MEBIBYTE} MiB"
 
 private const val FULL = 100
-private const val MEBIBYTE = 1024L * 1024
+internal const val MEBIBYTE = 1024L * 1024

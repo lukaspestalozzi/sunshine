@@ -29,9 +29,12 @@ class StoredTile(
 class DemTileStore(
     private val dao: OfflineDao,
     private val directory: File,
-    private val browsedLimitBytes: Long = BROWSED_LIMIT_BYTES,
+    browsedLimitBytes: Long = BROWSED_LIMIT_BYTES,
     private val now: () -> Long = System::currentTimeMillis,
 ) {
+    @Volatile
+    private var browsedLimitBytes: Long = browsedLimitBytes
+
     // Uses since the last flush; written in batches, so that reading a tile needs no write.
     private val uses = HashMap<TileKey, Long>()
     private var lastFlush = 0L
@@ -90,6 +93,29 @@ class DemTileStore(
     }
 
     suspend fun browsedBytes(): Long = dao.browsedBytes()
+
+    /** A new limit for the browsed tiles, evicted down to it at once (design D9 of add-settings). */
+    suspend fun setBrowsedLimit(bytes: Long) {
+        browsedLimitBytes = bytes
+        evict()
+    }
+
+    /**
+     * Removes every browsed tile and browsed 404 record; region tiles stay (offline-regions spec,
+     * "Clear browsed tiles"). The caller makes sure that no region download runs meanwhile.
+     */
+    suspend fun clearBrowsed() {
+        flushUses()
+        while (true) {
+            val batch = dao.browsedTiles(EVICT_BATCH)
+            if (batch.isEmpty()) return
+            for (row in batch) {
+                if (dao.deleteBrowsed(row.z, row.x, row.y) == 1) {
+                    withContext(Dispatchers.IO) { fileOf(TileKey(row.z, row.x, row.y)).delete() }
+                }
+            }
+        }
+    }
 
     suspend fun totalBytes(): Long = dao.totalBytes()
 
@@ -171,7 +197,7 @@ class DemTileStore(
     private fun fileOf(key: TileKey) = File(directory, "${key.zoom}/${key.x}/${key.y}.webp")
 
     companion object {
-        /** Browsed DEM tiles are kept up to this size (offline-regions spec, "Kept tiles"). */
+        /** Browsed DEM tiles are kept up to this size by default (offline-regions spec, "Kept tiles"). */
         const val BROWSED_LIMIT_BYTES = 512L * 1024 * 1024
         private const val FLUSH_EVERY_MILLIS = 5_000L
         private const val EVICT_BATCH = 50

@@ -89,7 +89,7 @@ fun OfflineScreen(
                 Text(stringResource(R.string.offline_storage_map, state.mapStorage), style = MaterialTheme.typography.bodyLarge)
                 Text(stringResource(R.string.offline_storage_elevation, state.demStorage), style = MaterialTheme.typography.bodyLarge)
             }
-            Text(stringResource(R.string.offline_storage_limit), style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.offline_storage_limit, state.browsedLimit), style = MaterialTheme.typography.bodySmall)
         }
     }
     state.confirmDelete?.let { region ->

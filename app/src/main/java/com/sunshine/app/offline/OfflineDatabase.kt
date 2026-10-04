@@ -130,6 +130,10 @@ abstract class OfflineDao {
     @Query("SELECT * FROM dem_tile WHERE bytes > 0 AND $NOT_CLAIMED ORDER BY lastUsed LIMIT :limit")
     abstract suspend fun oldestBrowsed(limit: Int): List<DemTileRow>
 
+    /** Browsed tiles and 404 records, in no particular order. */
+    @Query("SELECT * FROM dem_tile WHERE $NOT_CLAIMED LIMIT :limit")
+    abstract suspend fun browsedTiles(limit: Int): List<DemTileRow>
+
     /** Deletes the tile unless a region claims it; 1 if it was deleted. */
     @Query("DELETE FROM dem_tile WHERE z = :z AND x = :x AND y = :y AND $NOT_CLAIMED")
     abstract suspend fun deleteBrowsed(

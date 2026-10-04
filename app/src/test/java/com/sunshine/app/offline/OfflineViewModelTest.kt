@@ -1,5 +1,7 @@
 package com.sunshine.app.offline
 
+import com.sunshine.app.settings.CoordinateFormat
+import com.sunshine.app.settings.Settings
 import com.sunshine.core.GeoPoint
 import com.sunshine.core.MapArea
 import java.time.LocalDate
@@ -7,6 +9,7 @@ import java.time.ZoneId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -36,16 +39,38 @@ class OfflineViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun viewModel(area: MapArea = PHONE_AT_11) =
-        OfflineViewModel(
-            area = area,
-            regions = regions,
-            work = work,
-            storage = { storage },
-            download = { downloads += it },
-            delete = { deletions += it },
-            zone = ZURICH,
-        )
+    private fun viewModel(
+        area: MapArea = PHONE_AT_11,
+        settings: Settings = Settings(),
+    ) = OfflineViewModel(
+        area = area,
+        regions = regions,
+        work = work,
+        storage = { storage },
+        download = { downloads += it },
+        delete = { deletions += it },
+        zone = ZURICH,
+        settings = flowOf(settings),
+    )
+
+    @Test
+    fun `the storage note names the browsed tiles limit`() {
+        assertEquals("512 MiB", viewModel().uiState.value.browsedLimit)
+        assertEquals("1024 MiB", viewModel(settings = Settings(browsedLimitMib = 1024)).uiState.value.browsedLimit)
+    }
+
+    @Test
+    fun `region names follow the coordinate format`() {
+        regions.value = listOf(summary(id = 1, createdAt = 1))
+
+        val name =
+            viewModel(settings = Settings(coordinates = CoordinateFormat.LV95))
+                .uiState.value.regions
+                .single()
+                .name
+
+        assertEquals("2'636'053, 1'160'356", name)
+    }
 
     @Test
     fun `shows what downloading the visible area takes`() {
