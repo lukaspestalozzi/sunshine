@@ -27,8 +27,9 @@ import kotlinx.coroutines.withContext
 
 /**
  * The overlays of [area] at every step of [date] (design D11 of add-sun-shade-overlay), in cells of
- * [cellDp] dp every [stepMinutes] minutes: 2 dp and 5 minutes for `Sun & shade`, 8 dp and 10 minutes
- * for the heatmap (design D9 of add-sun-exposure-heatmap). [compute] gives the selected time on the
+ * [cellDp] dp every [stepMinutes] minutes, from the shade resolution: with `Normal`, 2 dp and 5
+ * minutes for `Sun & shade`, 8 dp and 10 minutes for the heatmap (design D9 of
+ * add-sun-exposure-heatmap, D3 of add-settings). [compute] gives the selected time on the
  * caller's dispatcher; [computeRest] then fills in the other steps on [background], nearest to the
  * selected time first. One grid is computed at a time: a selected time waiting in [compute] goes
  * before the next background step.
@@ -42,7 +43,7 @@ class DayOverlay(
     val stepMinutes: Int = SLIDER_STEP_MINUTES,
     val cellDp: Double = SunShadeSweep.CELL_DP,
 ) {
-    /** Every [stepMinutes] minutes over the day's real length: the slider positions for 5 minutes. */
+    /** Every [stepMinutes] minutes over the day's real length: the slider's positions for that step. */
     val steps: List<ZonedDateTime> =
         List((sliderPositions(date, zone) * SLIDER_STEP_MINUTES + stepMinutes - 1) / stepMinutes) {
             sliderTime(date, zone, it * stepMinutes.toFloat())

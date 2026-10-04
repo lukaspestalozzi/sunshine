@@ -47,7 +47,8 @@ fun renderOverlay(grid: ShadeGrid): OverlayImage {
  * The pixel centres of the north-up raster of [area] at one pixel per [pixelDp] dp: [latitudes] by
  * row, [longitudes] by column. The raster starts at the area's north-west corner and covers it
  * whole, so a last row or column may reach past the area. The overlay uses 1 dp, the heatmap's
- * counts one pixel per 8 dp cell (design D2, D9 of add-sun-exposure-heatmap).
+ * counts one pixel per cell of the shade resolution, 8 dp with `Normal` (design D2, D9 of
+ * add-sun-exposure-heatmap, D3 of add-settings).
  */
 class OverlayRaster(
     area: MapArea,

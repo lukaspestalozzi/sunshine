@@ -60,6 +60,7 @@ import kotlin.math.roundToInt
  */
 @Composable
 fun SettingsScreen(
+    onCustomResolution: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = viewModel(factory = settingsViewModelFactory),
 ) {
@@ -100,6 +101,9 @@ fun SettingsScreen(
 
             Section(R.string.settings_calculation)
             ChoiceEntry(R.string.settings_resolution, PRESET_LABELS, settings.preset, viewModel::onPreset)
+            if (settings.preset == Preset.CUSTOM) {
+                LinkEntry(R.string.settings_custom_resolution, onCustomResolution)
+            }
 
             Section(R.string.settings_storage)
             ChoiceEntry(
@@ -195,6 +199,25 @@ private fun SwitchEntry(
     }
 }
 
+/** An entry that opens another page. */
+@Composable
+private fun LinkEntry(
+    @StringRes label: Int,
+    onClick: () -> Unit,
+) {
+    Text(
+        stringResource(label),
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.primary,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .clickable(onClick = onClick)
+                .padding(vertical = 12.dp),
+    )
+}
+
 /** A slider of 20 % to 90 % in steps of 10 %, stored when the drag ends. */
 @Composable
 private fun OpacityEntry(
@@ -242,7 +265,7 @@ private val PRESET_LABELS: List<Pair<Preset, @Composable () -> String>> =
         Preset.CUSTOM to { stringResource(R.string.settings_resolution_custom) },
     )
 
-private val settingsViewModelFactory =
+internal val settingsViewModelFactory =
     viewModelFactory {
         initializer {
             val application = checkNotNull(this[APPLICATION_KEY]) { "SettingsViewModel needs the Application" } as SunshineApp

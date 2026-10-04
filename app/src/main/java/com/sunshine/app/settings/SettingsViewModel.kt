@@ -23,6 +23,11 @@ class SettingsViewModel(
 
     fun onBrowsedLimit(mib: Int) = write { store.setBrowsedLimit(mib) }
 
+    /** The values of `Custom resolution`, stored when its page is left. */
+    fun onCustom(custom: Resolution) {
+        if (custom != store.settings.value.custom) write { store.setCustom(custom) }
+    }
+
     private fun write(change: suspend () -> Unit) {
         viewModelScope.launch { change() }
     }
