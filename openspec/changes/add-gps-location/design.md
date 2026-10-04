@@ -126,8 +126,10 @@ reports through `onCameraMoved` as for a pan.
 
 A `SnackbarHost` in `MapScreen`, `SnackbarDuration.Long` (10 s in Material 3, the spec's 10 s),
 swipe to dismiss. `Settings` opens `Settings.ACTION_APPLICATION_DETAILS_SETTINGS` for the app or
-`Settings.ACTION_LOCATION_SOURCE_SETTINGS`. The offline notice stays a label, as it describes a
-lasting state; these notices answer a tap.
+`Settings.ACTION_LOCATION_SOURCE_SETTINGS`. A new notice replaces the one shown instead of
+queueing behind it, so repeated taps never line up notices of 10 s each (added while applying,
+2026-10-03). The offline notice stays a label, as it describes a lasting state; these notices
+answer a tap.
 
 Alternative considered: labels below the coordinates like the offline notice. They would need
 their own dismiss rule and crowd the top-left column on narrow screens.
