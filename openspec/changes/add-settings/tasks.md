@@ -15,9 +15,9 @@
 
 ## 3. Coordinate formats
 
-- [ ] 3.1 Write `SwissGridTest` in `core` first with the values of design D6: swisstopo's worked example (E 2 699 999.76, N 1 099 999.97, ±0.01 m), Interlaken (2 632 479.47, 1 170 652.02, ±0.01 m), `null` just outside each edge of 45.81–47.81° N, 5.95–10.50° E and non-null on the edges. Then implement `core/SwissGrid.kt`. Verify: `./gradlew :core:test --tests "*SwissGridTest*"` passes.
+- [x] 3.1 Write `SwissGridTest` in `core` first with the values of design D6: swisstopo's worked example (E 2 699 999.76, N 1 099 999.97, ±0.01 m), Interlaken (2 632 479.47, 1 170 652.02, ±0.01 m), `null` just outside each edge of 45.81–47.81° N, 5.95–10.50° E and non-null on the edges. Then implement `core/Lv95.kt`. Verify: `./gradlew :core:test --tests "*SwissGridTest*"` passes.
 - [ ] 3.2 Extend `CoordinateFormatTest` first with every scenario of map-view "Selected location crosshair" (decimal unchanged, DMS `46°49′05.5″ N, 8°13′39.0″ E`, carry `47°00′00.0″ N, 0°30′00.0″ W`, LV95 `2'700'000, 1'100'000` and `2'632'479, 1'170'652`, Zugspitze falls back to `47.4211° N, 10.9853° E`). Then add the format parameter to `formatCoordinates` (design D6) and pass the setting to `MapLabels` and to the Offline page's region names. Verify: `./gradlew :app:testDebugUnitTest --tests "*CoordinateFormat*"` passes; on the device, switching to `Swiss grid LV95` shows `2'632'479, 1'170'652` (±1) at Interlaken and decimal coordinates at the Zugspitze.
-- [ ] 3.3 Add `SwissGrid.kt` to `CLAUDE.md`'s `core/` row. Verify: the row names the file.
+- [x] 3.3 Add `Lv95.kt` to `CLAUDE.md`'s `core/` row. Verify: the row names the file.
 
 ## 4. Keep screen on
 

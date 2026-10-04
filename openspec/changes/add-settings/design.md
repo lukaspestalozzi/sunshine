@@ -130,7 +130,7 @@ Alternative considered: baking the alpha into the bitmaps (re-render on every ch
 
 ### D6. LV95 and DMS formatting
 
-`core/SwissGrid.kt`: `fun toLv95(point: GeoPoint): Lv95?` with swisstopo's approximate formulas
+`core/Lv95.kt` (named after its one class, as ktlint requires): `fun toLv95(point: GeoPoint): Lv95?` with swisstopo's approximate formulas
 (December 2016 edition), returning `null` outside 45.81–47.81° N, 5.95–10.50° E (EPSG:2056 area
 of use). Tests: swisstopo's worked example (46°02′38.87″ N, 8°43′49.79″ E → E 2 699 999.76,
 N 1 099 999.97, ±0.01 m against the formula, ±1 m against the reference 2 700 000 /

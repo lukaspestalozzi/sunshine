@@ -134,6 +134,7 @@ private fun offlineViewModelFactory(area: MapArea) =
                 download = application::downloadArea,
                 delete = application.regionDeleter::delete,
                 zone = ZoneId.systemDefault(),
+                settings = application.settingsStore.settings,
             )
         }
     }
