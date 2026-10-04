@@ -42,6 +42,7 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.room.runtime)
     implementation(libs.work.runtime)
+    implementation(libs.datastore.preferences)
     ksp(libs.room.compiler)
 
     testImplementation(platform(libs.junit.bom))
