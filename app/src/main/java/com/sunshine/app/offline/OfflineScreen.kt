@@ -25,6 +25,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,6 +55,8 @@ fun OfflineScreen(
     viewModel: OfflineViewModel = viewModel(key = area.toString(), factory = offlineViewModelFactory(area)),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // The view model outlives the page; the storage may have changed since it was last shown.
+    LaunchedEffect(viewModel) { viewModel.onShown() }
     val context = LocalContext.current
     // On Android 13+ the download asks for notifications first; it starts whatever the answer.
     val askForNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { viewModel.onDownload() }

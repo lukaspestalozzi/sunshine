@@ -8,7 +8,9 @@ browsed map tile and every browsed DEM tile ("Kept tiles") from the app's storag
 for confirmation (user decision, 2026-10-04). Tiles of regions ("Region contents") SHALL be kept.
 A removed tile is fetched again when it is needed and the network is available; without network,
 the areas it covered are treated as never visited ("Offline use of a region", scenario "Outside
-the region"). When the tiles are removed, the page SHALL show `Browsed tiles cleared`.
+the region"). When the tiles are removed, the page SHALL show `Browsed tiles cleared`. When some
+browsed tiles could not be removed, the page SHALL show `Browsed tiles could not be cleared`
+instead; the tiles that were removed stay removed (added after the review of PR #33).
 
 While any region is not complete ("Region list": downloading, waiting or incomplete), the button
 SHALL be disabled and the page SHALL show `Not available while a region is downloading` (user
@@ -25,6 +27,10 @@ decision), so that no tile that a region download is about to claim is removed.
 #### Scenario: Browsed area offline after clearing
 - **WHEN** the user browsed Interlaken outside any region, cleared the browsed tiles, and restarts the app without network
 - **THEN** the map area of Interlaken is blank and its altitude is unknown
+
+#### Scenario: Clearing fails
+- **WHEN** the map's storage reports an error while the browsed map tiles are being cleared
+- **THEN** `Browsed tiles could not be cleared` is shown, not `Browsed tiles cleared`, and the browsed DEM tiles are removed all the same
 
 #### Scenario: During a download
 - **WHEN** a region shows `Downloading 20 %` and the Settings page is opened

@@ -67,7 +67,8 @@ fun SettingsScreen(
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val canClear by viewModel.canClear.collectAsStateWithLifecycle()
-    var cleared by remember { mutableStateOf(false) }
+    // Whether the last clear removed every browsed tile; `null` before any clear on this page.
+    var cleared by remember { mutableStateOf<Boolean?>(null) }
     val context = LocalContext.current
     // Read again on every resume: the user may have changed it in the system settings meanwhile.
     var locationAllowed by remember { mutableStateOf(context.locationAccess() != LocationAccess.NONE) }
@@ -118,12 +119,13 @@ fun SettingsScreen(
             Text(stringResource(R.string.settings_browsed_limit_note), style = MaterialTheme.typography.bodySmall)
             // No dialog (user decision); disabled while a region is not complete (offline-regions spec,
             // "Clear browsed tiles").
-            OutlinedButton(onClick = { viewModel.onClearBrowsed { cleared = true } }, enabled = canClear) {
+            OutlinedButton(onClick = { viewModel.onClearBrowsed { cleared = it } }, enabled = canClear) {
                 Text(stringResource(R.string.settings_clear_browsed))
             }
             when {
                 !canClear -> Text(stringResource(R.string.settings_clear_unavailable), style = MaterialTheme.typography.bodySmall)
-                cleared -> Text(stringResource(R.string.settings_cleared), style = MaterialTheme.typography.bodySmall)
+                cleared == true -> Text(stringResource(R.string.settings_cleared), style = MaterialTheme.typography.bodySmall)
+                cleared == false -> Text(stringResource(R.string.settings_clear_failed), style = MaterialTheme.typography.bodySmall)
             }
 
             Section(R.string.about_title)

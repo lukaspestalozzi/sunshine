@@ -64,6 +64,7 @@
     <string name="settings_mib">%1$d MiB</string>
     <string name="settings_clear_browsed">Clear browsed tiles</string>
     <string name="settings_cleared">Browsed tiles cleared</string>
+    <string name="settings_clear_failed">Browsed tiles could not be cleared</string>
     <string name="settings_clear_unavailable">Not available while a region is downloading</string>
     <string name="settings_browsed_limit_note">Lowering the limit removes the least recently used browsed tiles now.</string>
     <string name="settings_cancel">Cancel</string>

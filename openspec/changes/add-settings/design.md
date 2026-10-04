@@ -178,7 +178,14 @@ the flag is off there; Android drops it in the background.
 - `Clear browsed tiles`: `OfflineManager.clearAmbientCache` for the map tiles and a new
   `DemTileStore.clearBrowsed()` (delete the rows no region claims, then their files) for the DEM
   tiles. The button is enabled only while every region row is complete (from the DAO's region
-  flow), so no region download can claim a tile while it is being removed.
+  flow), so no region download can claim a tile while it is being removed. A MapLibre error is
+  reported as `Browsed tiles could not be cleared`; the DEM tiles are cleared all the same.
+- The Offline page's view model outlives the page (it is kept per area), so it reads the storage
+  again each time the page is shown: clearing or browsing meanwhile changes it without a change of
+  the regions (review of PR #33).
+- The `Custom resolution` draft is held in `SettingsViewModel`, which survives a rotation, and is
+  stored from the page's own back handler, not when the page leaves the composition, which a
+  rotation also does (review of PR #33).
 
 ### D10. Pages
 

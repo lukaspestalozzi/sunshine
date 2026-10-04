@@ -6,6 +6,7 @@ import com.sunshine.app.elevation.ElevationRepository
 import com.sunshine.app.elevation.TileCache
 import com.sunshine.app.settings.LastView
 import com.sunshine.app.settings.Preset
+import com.sunshine.app.settings.Resolution
 import com.sunshine.app.settings.Settings
 import com.sunshine.app.settings.StartAt
 import com.sunshine.core.AZIMUTH_COUNT
@@ -1471,6 +1472,26 @@ class MapViewModelTest {
             assertEquals(144, suns.size)
             assertEquals(setOf(4.0), cells.toSet())
             assertTrue(viewModel.overlay.value is OverlayUiState.Ready, "${viewModel.overlay.value}")
+        }
+
+    @Test
+    fun `a change of only the step shows the computing notice too`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val settings = MutableStateFlow(Settings(preset = Preset.CUSTOM, custom = Resolution(2, 5, 8, 10)))
+            val viewModel = dayViewModel(suns, settings = settings)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceUntilIdle()
+            val states = mutableListOf<OverlayUiState>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.overlay.collect { states += it } }
+
+            // 12:00 lies on both grids; the cell size stays 2 dp.
+            settings.value = Settings(preset = Preset.CUSTOM, custom = Resolution(2, 10, 8, 10))
+            advanceUntilIdle()
+
+            val computing = states.filterIsInstance<OverlayUiState.Computing>()
+            assertTrue(computing.isNotEmpty() && computing.all { it.resolutionChanged }, "$states")
         }
 
     @Test
