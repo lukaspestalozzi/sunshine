@@ -4,6 +4,9 @@ import androidx.lifecycle.SavedStateHandle
 import com.sunshine.app.elevation.DemTile
 import com.sunshine.app.elevation.ElevationRepository
 import com.sunshine.app.elevation.TileCache
+import com.sunshine.app.settings.LastView
+import com.sunshine.app.settings.Settings
+import com.sunshine.app.settings.StartAt
 import com.sunshine.core.AZIMUTH_COUNT
 import com.sunshine.core.DEFAULT_LOCATION
 import com.sunshine.core.GeoPoint
@@ -72,6 +75,111 @@ class MapViewModelTest {
 
         assertEquals(CameraState(center = DEFAULT_LOCATION, zoom = 10.0), viewModel.camera.value)
     }
+
+    @Test
+    fun `starts at the stored last view`() {
+        val viewModel = newViewModel(settings = Settings(lastView = LastView(46.6863, 7.8632, 13.0)))
+
+        assertEquals(CameraState(center = GeoPoint(46.6863, 7.8632), zoom = 13.0), viewModel.camera.value)
+    }
+
+    @Test
+    fun `starts at the Alps overview when no view is stored`() {
+        val viewModel = newViewModel(settings = Settings(startAt = StartAt.LAST_VIEW, lastView = null))
+
+        assertEquals(CameraState(center = DEFAULT_LOCATION, zoom = 10.0), viewModel.camera.value)
+    }
+
+    @Test
+    fun `starts at the Alps overview when chosen, whatever view is stored`() {
+        val viewModel =
+            newViewModel(settings = Settings(startAt = StartAt.ALPS_OVERVIEW, lastView = LastView(46.6863, 7.8632, 13.0)))
+
+        assertEquals(CameraState(center = DEFAULT_LOCATION, zoom = 10.0), viewModel.camera.value)
+    }
+
+    @Test
+    fun `My location also opens at the last view`() {
+        val viewModel =
+            newViewModel(settings = Settings(startAt = StartAt.MY_LOCATION, lastView = LastView(46.9480, 7.4474, 12.0)))
+
+        assertEquals(CameraState(center = GeoPoint(46.9480, 7.4474), zoom = 12.0), viewModel.camera.value)
+    }
+
+    @Test
+    fun `saved state wins over the stored last view, as after a rotation`() {
+        val savedState = SavedStateHandle()
+        val moved = CameraState(center = GeoPoint(46.5935, 7.9091), zoom = 14.0)
+        newViewModel(savedState).onCameraMoved(moved)
+
+        val recreated = newViewModel(savedState, settings = Settings(lastView = LastView(46.6863, 7.8632, 13.0)))
+
+        assertEquals(moved, recreated.camera.value)
+    }
+
+    @Test
+    fun `going to the background stores the camera as the last view`() {
+        val stored = mutableListOf<LastView>()
+        val viewModel = newViewModel(saveLastView = { stored += it })
+        viewModel.onCameraMoved(CameraState(center = GeoPoint(46.6863, 7.8632), zoom = 13.0))
+
+        viewModel.storeLastView()
+
+        assertEquals(listOf(LastView(46.6863, 7.8632, 13.0)), stored)
+    }
+
+    @Test
+    fun `My location centres once on the first fresh position after launch`() =
+        runTest {
+            val viewModel = newViewModel(settings = Settings(startAt = StartAt.MY_LOCATION))
+            val actions = mutableListOf<LocationAction>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.locationActions.collect { actions += it } }
+
+            viewModel.onLocationStale(false)
+            viewModel.onLocationStale(true)
+            viewModel.onLocationStale(false)
+
+            assertEquals(listOf<LocationAction>(LocationAction.Centre), actions)
+        }
+
+    @Test
+    fun `My location does not centre after the user moved the map`() =
+        runTest {
+            val viewModel = newViewModel(settings = Settings(startAt = StartAt.MY_LOCATION))
+            val actions = mutableListOf<LocationAction>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.locationActions.collect { actions += it } }
+
+            viewModel.onCameraGesture()
+            viewModel.onLocationStale(false)
+
+            assertEquals(emptyList<LocationAction>(), actions)
+        }
+
+    @Test
+    fun `Last view never centres on a position`() =
+        runTest {
+            val viewModel = newViewModel(settings = Settings(startAt = StartAt.LAST_VIEW))
+            val actions = mutableListOf<LocationAction>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.locationActions.collect { actions += it } }
+
+            viewModel.onLocationStale(false)
+
+            assertEquals(emptyList<LocationAction>(), actions)
+        }
+
+    @Test
+    fun `My location does not centre again after a rotation`() =
+        runTest {
+            val savedState = SavedStateHandle()
+            newViewModel(savedState).onCameraMoved(CameraState(center = GeoPoint(46.9480, 7.4474), zoom = 12.0))
+            val recreated = newViewModel(savedState, settings = Settings(startAt = StartAt.MY_LOCATION))
+            val actions = mutableListOf<LocationAction>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { recreated.locationActions.collect { actions += it } }
+
+            recreated.onLocationStale(false)
+
+            assertEquals(emptyList<LocationAction>(), actions)
+        }
 
     @Test
     fun `a moved camera is restored from saved state, as after a rotation`() {
@@ -1402,7 +1510,19 @@ class MapViewModelTest {
         horizon: suspend (GeoPoint) -> HorizonProfile? = { null },
         overlayGrid: suspend (MapArea, SunPosition, Double) -> ShadeGrid = { _, _, _ -> awaitCancellation() },
         computeDispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(),
-    ) = MapViewModel(savedState, isOnline, clock, repository, horizon, overlayGrid, computeDispatcher)
+        settings: Settings = Settings(),
+        saveLastView: suspend (LastView) -> Unit = {},
+    ) = MapViewModel(
+        savedState,
+        isOnline,
+        clock,
+        repository,
+        horizon,
+        overlayGrid,
+        computeDispatcher,
+        settings = MutableStateFlow(settings),
+        saveLastView = saveLastView,
+    )
 
     private fun horizonOf(
         angle: Double,

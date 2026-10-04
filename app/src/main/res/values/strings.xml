@@ -45,6 +45,7 @@
     <string name="settings_start_last_view">Last view</string>
     <string name="settings_start_my_location">My location</string>
     <string name="settings_start_alps">Alps overview</string>
+    <string name="settings_location_off">Location access is off: the map opens at the last view.</string>
     <string name="settings_overlay_opacity">Overlay opacity</string>
     <string name="settings_percent">%1$d %%</string>
     <string name="settings_resolution">Shade resolution</string>
