@@ -20,6 +20,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -65,6 +66,8 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel(factory = settingsViewModelFactory),
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val canClear by viewModel.canClear.collectAsStateWithLifecycle()
+    var cleared by remember { mutableStateOf(false) }
     val context = LocalContext.current
     // Read again on every resume: the user may have changed it in the system settings meanwhile.
     var locationAllowed by remember { mutableStateOf(context.locationAccess() != LocationAccess.NONE) }
@@ -113,6 +116,15 @@ fun SettingsScreen(
                 viewModel::onBrowsedLimit,
             )
             Text(stringResource(R.string.settings_browsed_limit_note), style = MaterialTheme.typography.bodySmall)
+            // No dialog (user decision); disabled while a region is not complete (offline-regions spec,
+            // "Clear browsed tiles").
+            OutlinedButton(onClick = { viewModel.onClearBrowsed { cleared = true } }, enabled = canClear) {
+                Text(stringResource(R.string.settings_clear_browsed))
+            }
+            when {
+                !canClear -> Text(stringResource(R.string.settings_clear_unavailable), style = MaterialTheme.typography.bodySmall)
+                cleared -> Text(stringResource(R.string.settings_cleared), style = MaterialTheme.typography.bodySmall)
+            }
 
             Section(R.string.about_title)
             AboutSection()
@@ -269,6 +281,10 @@ internal val settingsViewModelFactory =
     viewModelFactory {
         initializer {
             val application = checkNotNull(this[APPLICATION_KEY]) { "SettingsViewModel needs the Application" } as SunshineApp
-            SettingsViewModel(application.settingsStore)
+            SettingsViewModel(
+                store = application.settingsStore,
+                regionNotComplete = application.regionNotComplete,
+                clearBrowsed = application::clearBrowsedTiles,
+            )
         }
     }

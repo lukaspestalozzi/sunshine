@@ -23,6 +23,7 @@ import com.sunshine.app.offline.RegionDeleter
 import com.sunshine.app.offline.RegionDownloadWorker
 import com.sunshine.app.offline.RegionDownloader
 import com.sunshine.app.offline.RegionRow
+import com.sunshine.app.offline.RegionState
 import com.sunshine.app.offline.StorageUse
 import com.sunshine.app.offline.downloadWork
 import com.sunshine.app.settings.SettingsStore
@@ -32,13 +33,19 @@ import com.sunshine.app.sunshine.debugLog
 import com.sunshine.core.GeoBounds
 import com.sunshine.core.MapArea
 import java.io.File
+import kotlin.coroutines.resume
+import kotlin.time.measureTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
@@ -61,20 +68,57 @@ class SunshineApp : Application() {
         private set
 
     /** The persistent DEM tiles, browsed and of regions (design D5 of add-offline-regions). */
-    private val demTileStore: DemTileStore by lazy { DemTileStore(offlineDatabase.dao(), File(filesDir, "dem")) }
+    private val demTileStore: DemTileStore by lazy {
+        DemTileStore(offlineDatabase.dao(), File(filesDir, "dem"), browsedLimitBytes = browsedLimitBytes())
+    }
 
     /** Browsed map tiles' limit, plus the regions' size (design D2 of add-offline-regions). */
     private val ambientLimit: AmbientLimit by lazy {
-        AmbientLimit { bytes ->
-            OfflineManager.getInstance(this).setMaximumAmbientCacheSize(
-                bytes,
-                object : OfflineManager.FileSourceCallback {
-                    override fun onSuccess() = debugLog("Map tile limit set to ${bytes / MEBIBYTE} MiB")
+        AmbientLimit(
+            set = { bytes ->
+                OfflineManager.getInstance(this).setMaximumAmbientCacheSize(
+                    bytes,
+                    object : OfflineManager.FileSourceCallback {
+                        override fun onSuccess() = debugLog("Map tile limit set to ${bytes / MEBIBYTE} MiB")
 
-                    override fun onError(message: String) = debugLog("Map tile limit not set: $message")
-                },
-            )
-        }
+                        override fun onError(message: String) = debugLog("Map tile limit not set: $message")
+                    },
+                )
+            },
+            browsedBytes = browsedLimitBytes(),
+        )
+    }
+
+    /** The browsed tiles' limit per kind, from the settings (settings spec, "Settings page"). */
+    private fun browsedLimitBytes(): Long = settingsStore.settings.value.browsedLimitMib * MEBIBYTE
+
+    /** Whether some region is not complete: downloading, waiting or interrupted (offline-regions spec, "Region list"). */
+    val regionNotComplete: Flow<Boolean> by lazy {
+        offlineDatabase.dao().regions().map { regions -> regions.any { it.region.state == RegionState.QUEUED } }
+    }
+
+    /**
+     * Removes every browsed map and DEM tile; region tiles stay (offline-regions spec, "Clear browsed
+     * tiles"; design D9 of add-settings). Only while every region is complete.
+     */
+    suspend fun clearBrowsedTiles() {
+        val took =
+            measureTime {
+                suspendCancellableCoroutine { done ->
+                    OfflineManager.getInstance(this).clearAmbientCache(
+                        object : OfflineManager.FileSourceCallback {
+                            override fun onSuccess() = done.resume(Unit)
+
+                            override fun onError(message: String) {
+                                debugLog("Browsed map tiles not cleared: $message")
+                                done.resume(Unit)
+                            }
+                        },
+                    )
+                }
+                demTileStore.clearBrowsed()
+            }
+        debugLog("Browsed tiles cleared in ${took.inWholeMilliseconds} ms")
     }
 
     /** Shared by all screens and features, so decoded and stored tiles are shared too (design D6). */
@@ -169,6 +213,17 @@ class SunshineApp : Application() {
         // Before any map loads, or MapLibre starts with its default of 50 MB and trims the browsed
         // tiles to it (design D2). A single sum over the few region rows.
         ambientLimit.onRegionBytes(runBlocking(Dispatchers.IO) { offlineDatabase.dao().regionMapBytes() }, now = true)
+        // A changed limit applies at once to both kinds (offline-regions spec, "Kept tiles").
+        appScope.launch {
+            settingsStore.settings.map { it.browsedLimitMib }.distinctUntilChanged().drop(1).collect { mib ->
+                val took =
+                    measureTime {
+                        ambientLimit.setBrowsedLimit(mib * MEBIBYTE)
+                        demTileStore.setBrowsedLimit(mib * MEBIBYTE)
+                    }
+                debugLog("Browsed limit $mib MiB applied in ${took.inWholeMilliseconds} ms")
+            }
+        }
         appScope.launch {
             // The DEM tiles' HTTP cache before add-offline-regions; the store replaces it (design D6).
             File(cacheDir, "dem-tiles").deleteRecursively()

@@ -62,6 +62,9 @@
     <string name="settings_minutes">%1$d min</string>
     <string name="settings_browsed_limit">Browsed tiles limit</string>
     <string name="settings_mib">%1$d MiB</string>
+    <string name="settings_clear_browsed">Clear browsed tiles</string>
+    <string name="settings_cleared">Browsed tiles cleared</string>
+    <string name="settings_clear_unavailable">Not available while a region is downloading</string>
     <string name="settings_browsed_limit_note">Lowering the limit removes the least recently used browsed tiles now.</string>
     <string name="settings_cancel">Cancel</string>
     <string name="offline_button">Offline maps</string>
@@ -77,7 +80,7 @@
     <string name="offline_delete_cancel">Cancel</string>
     <string name="offline_storage_map">Map tiles: %1$s</string>
     <string name="offline_storage_elevation">Elevation tiles: %1$s</string>
-    <string name="offline_storage_limit">Browsed tiles are kept up to 512 MiB each for map and elevation; the least recently used are removed first.</string>
+    <string name="offline_storage_limit">Browsed tiles are kept up to %1$s each for map and elevation; the least recently used are removed first.</string>
     <string name="offline_notification_channel">Offline downloads</string>
     <string name="offline_notification_title">Downloading offline map</string>
     <string name="location_button">My location</string>

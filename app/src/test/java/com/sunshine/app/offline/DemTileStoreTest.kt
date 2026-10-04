@@ -86,6 +86,56 @@ class DemTileStoreTest {
         }
 
     @Test
+    fun `lowering the limit evicts least recently used browsed tiles at once and keeps region tiles`() =
+        runTest {
+            val store = store()
+            at(1) { store.putFound(R, BIG, validators(), region = 7) }
+            at(2) { store.putFound(A, BYTES, validators(), region = null) }
+            at(3) { store.putFound(B, BYTES, validators(), region = null) }
+
+            store.setBrowsedLimit(4)
+
+            assertNull(store.get(A))
+            assertArrayEquals(BYTES, store.get(B)!!.bytes)
+            assertArrayEquals(BIG, store.get(R)!!.bytes)
+            assertEquals(4, store.browsedBytes())
+        }
+
+    @Test
+    fun `raising the limit evicts nothing, and the new limit holds for later tiles`() =
+        runTest {
+            val store = store()
+            at(1) { store.putFound(A, BYTES, validators(), region = null) }
+            at(2) { store.putFound(B, BYTES, validators(), region = null) }
+
+            store.setBrowsedLimit(12)
+            at(3) { store.putFound(C, BYTES, validators(), region = null) }
+
+            assertEquals(12, store.browsedBytes())
+            assertArrayEquals(BYTES, store.get(A)!!.bytes)
+        }
+
+    @Test
+    fun `clearing removes every browsed tile, its file and browsed 404s, and keeps region tiles`() =
+        runTest {
+            val store = store()
+            at(1) { store.putFound(R, BIG, validators(), region = 7) }
+            at(2) { store.putFound(A, BYTES, validators(), region = null) }
+            at(3) { store.putMissing(B, validators(), region = null) }
+            at(4) { store.putMissing(D, validators(), region = 7) }
+
+            store.clearBrowsed()
+
+            assertNull(store.get(A))
+            assertNull(store.get(B))
+            assertFalse(File(directory, "12/1/1.webp").exists())
+            assertArrayEquals(BIG, store.get(R)!!.bytes)
+            assertFalse(store.get(D)!!.isFound)
+            assertEquals(0, store.browsedBytes())
+            assertEquals(BIG.size.toLong(), store.totalBytes())
+        }
+
+    @Test
     fun `startup deletes a file without a row and a row without a file`() =
         runTest {
             store().putFound(A, BYTES, validators(), region = null)

@@ -50,6 +50,8 @@ data class OfflineUiState(
     val mapStorage: String = formatMebibytes(0),
     val demStorage: String = formatMebibytes(0),
     val confirmDelete: RegionItem? = null,
+    /** The browsed tiles' limit per kind, e.g. `512 MiB` (offline-regions spec, "Storage usage"). */
+    val browsedLimit: String = formatMebibytes(Settings().browsedLimitMib * MEBIBYTE),
 ) {
     val canDownload: Boolean get() = estimate != null
 }
@@ -90,6 +92,7 @@ class OfflineViewModel(
                 mapStorage = formatMebibytes(use.mapBytes),
                 demStorage = formatMebibytes(use.demBytes),
                 confirmDelete = confirm,
+                browsedLimit = formatMebibytes(settings.browsedLimitMib * MEBIBYTE),
             )
         }.stateIn(viewModelScope, SharingStarted.Eagerly, OfflineUiState(estimate, blocked))
 

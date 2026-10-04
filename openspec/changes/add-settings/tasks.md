@@ -1,5 +1,10 @@
 # Tasks
 
+Device checks pending (no emulator in the cloud session; one device session by the user, as for
+add-gps-location). The code and unit tests of these tasks are done and pass
+(`./scripts/verify-local.sh`, 2026-10-04); each stays open until its device check is reported:
+1.4 (log line), 2.1, 2.2, 3.2, 4.1, 5.1, 5.2, 5.3, 6.1, 7.4, 8.2, 9.1, 9.2, 9.3.
+
 ## 1. Settings store
 
 - [x] 1.1 Set `docs/roadmap.md` row #8 to "in progress" and its scope to the proposal's (rate limit and region depth out; coordinates, start view, opacity, resolution, keep screen on in). Add `androidx.datastore:datastore-preferences` (latest stable at apply time) to `gradle/libs.versions.toml` and `app/build.gradle.kts`. Verify: `./gradlew :app:dependencies --configuration debugRuntimeClasspath | grep datastore-preferences` lists the version, and `./gradlew assembleDebug` succeeds.
@@ -43,7 +48,7 @@
 
 ## 8. Browsed tiles
 
-- [ ] 8.1 Extend `DemTileStoreTest` first: lowering the limit evicts least recently used browsed tiles until within it and keeps region tiles (offline-regions "Limit lowered"); raising evicts nothing; `clearBrowsed()` removes every browsed row and file and keeps region tiles. Extend `AmbientLimitTest`: a new browsed limit applies at once as limit + regions' bytes. Then implement `setBrowsedLimit` in both and `clearBrowsed()` (design D9). Verify: `./gradlew :app:testDebugUnitTest --tests "*DemTileStore*" --tests "*AmbientLimit*"` passes.
+- [x] 8.1 Extend `DemTileStoreTest` first: lowering the limit evicts least recently used browsed tiles until within it and keeps region tiles (offline-regions "Limit lowered"); raising evicts nothing; `clearBrowsed()` removes every browsed row and file and keeps region tiles. Extend `AmbientLimitTest`: a new browsed limit applies at once as limit + regions' bytes. Then implement `setBrowsedLimit` in both and `clearBrowsed()` (design D9). Verify: `./gradlew :app:testDebugUnitTest --tests "*DemTileStore*" --tests "*AmbientLimit*"` passes.
 - [ ] 8.2 Wire the setting to both stores in `SunshineApp`, the `Clear browsed tiles` button (`clearAmbientCache` and `clearBrowsed`, then `Browsed tiles cleared`), its disabled state with `Not available while a region is downloading` while any region is not complete, and the limit in the Offline page's text. Extend `OfflineViewModelTest`: the text shows `1024 MiB` when that limit is set (offline-regions "Limit in the text"). Verify: `./gradlew :app:testDebugUnitTest --tests "*OfflineViewModel*"` passes; on the device, `Clear browsed tiles` is disabled during a download, and after a download it clears: the Offline page then shows only the region's size, within 10 s (offline-regions "Clear"), and the region still works in airplane mode ("Region still works offline").
 
 ## 9. Integration checks
@@ -51,4 +56,4 @@
 - [ ] 9.1 Layout on a 360 dp wide screen, portrait and landscape: the gear, Offline and location buttons and the overlay toggle are fully on screen and do not overlap, and the coordinates label is not covered also in LV95 and DMS format (offline-regions "Narrow screen", gps-location "Location button"). Verify by screenshot.
 - [ ] 9.2 Performance on the device at Lauterbrunnen, map zoom 12, 2025-12-21, for `Fast`, `Normal` and `Detailed`: record from logcat the selected time's sweep and the `Sun & shade` and `Sun hours` days, and `Settings read in <n> ms`. Verify: each value is within design.md "Performance budget"; any value outside it is reported with the raw log line and the presets are adjusted only with the user's OK.
 - [ ] 9.3 Lower `Browsed tiles limit` from 512 to 128 MiB after browsing more than 128 MiB of each kind; record the Offline page's `Map tiles` and `Elevation tiles` before, 10 s after, and after a restart (design, Open Questions). Verify: the browsed DEM tiles are at most 128 MiB within 10 s; the map number is recorded as observed.
-- [ ] 9.4 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, unit tests, the debug APK and the spec validation all pass with zero issues.
+- [x] 9.4 Run `./scripts/verify-local.sh` and `openspec validate --all --strict`. Verify: ktlint, Android lint, unit tests, the debug APK and the spec validation all pass with zero issues.
