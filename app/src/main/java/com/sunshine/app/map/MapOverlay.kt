@@ -48,8 +48,8 @@ fun Crosshair(modifier: Modifier = Modifier) {
 }
 
 /**
- * The ⓘ button opening the About page with the attributions ([onAboutClicked]; map-view spec, "About
- * and attributions") and to its right the Offline button ([onOfflineClicked]; offline-regions spec,
+ * The Settings button opening the Settings page with the attributions at its end ([onSettingsClicked];
+ * settings spec, "Settings button") and to its right the Offline button ([onOfflineClicked]; offline-regions spec,
  * "Offline button") and the location button in its [locationButton] state ([onLocationClicked];
  * gps-location spec, "Location button"), below them the selected-location coordinates and the offline
  * notice, the [topEnd] controls and the [bottomPanel], kept clear of the system bars.
@@ -58,7 +58,7 @@ fun Crosshair(modifier: Modifier = Modifier) {
 fun MapLabels(
     camera: CameraState,
     isOffline: Boolean,
-    onAboutClicked: () -> Unit,
+    onSettingsClicked: () -> Unit,
     onOfflineClicked: () -> Unit,
     locationButton: LocationButtonState,
     onLocationClicked: () -> Unit,
@@ -81,8 +81,8 @@ fun MapLabels(
             // coordinates (design D9 of add-offline-regions).
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Surface(color = floatingSurfaceColor(), shape = MaterialTheme.shapes.medium) {
-                    IconButton(onClick = onAboutClicked) {
-                        Icon(painterResource(R.drawable.ic_info), contentDescription = stringResource(R.string.about_button))
+                    IconButton(onClick = onSettingsClicked) {
+                        Icon(painterResource(R.drawable.ic_settings), contentDescription = stringResource(R.string.settings_button))
                     }
                 }
                 Surface(color = floatingSurfaceColor(), shape = MaterialTheme.shapes.medium) {

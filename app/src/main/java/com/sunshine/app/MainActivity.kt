@@ -10,14 +10,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import com.sunshine.app.about.AboutScreen
 import com.sunshine.app.map.MapScreen
 import com.sunshine.app.offline.OfflineScreen
+import com.sunshine.app.settings.SettingsScreen
 import com.sunshine.core.GeoPoint
 import com.sunshine.core.MapArea
 
-/** The app's screens, switched without a navigation library (design D8 of add-sun-exposure-heatmap, D9 of add-offline-regions). */
-private enum class Screen { MAP, ABOUT, OFFLINE }
+/** The app's screens, switched without a navigation library (design D8 of add-sun-exposure-heatmap, D9 of add-offline-regions, D10 of add-settings). */
+private enum class Screen { MAP, SETTINGS, OFFLINE }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,16 +32,16 @@ class MainActivity : ComponentActivity() {
                 when (screen) {
                     Screen.MAP ->
                         MapScreen(
-                            onAboutClicked = { screen = Screen.ABOUT },
+                            onSettingsClicked = { screen = Screen.SETTINGS },
                             onOfflineClicked = { area ->
                                 offlineArea =
                                     arrayListOf(area.center.latitude, area.center.longitude, area.zoom, area.widthDp, area.heightDp)
                                 screen = Screen.OFFLINE
                             },
                         )
-                    Screen.ABOUT -> {
+                    Screen.SETTINGS -> {
                         BackHandler { screen = Screen.MAP }
-                        AboutScreen()
+                        SettingsScreen()
                     }
                     Screen.OFFLINE -> {
                         BackHandler { screen = Screen.MAP }

@@ -4,7 +4,7 @@ import com.sunshine.app.R
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
-// The About page (map-view spec, "About and attributions"; design D8 of add-sun-exposure-heatmap).
+// The About section of the Settings page (map-view spec, "About and attributions"; design D1 of add-settings).
 class AboutEntriesTest {
     @Test
     fun `the about page lists the version, both attributions with their links, and the icon credit`() {
