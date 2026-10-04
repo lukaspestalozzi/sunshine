@@ -12,12 +12,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.sunshine.app.map.MapScreen
 import com.sunshine.app.offline.OfflineScreen
+import com.sunshine.app.settings.CustomResolutionScreen
 import com.sunshine.app.settings.SettingsScreen
 import com.sunshine.core.GeoPoint
 import com.sunshine.core.MapArea
 
 /** The app's screens, switched without a navigation library (design D8 of add-sun-exposure-heatmap, D9 of add-offline-regions, D10 of add-settings). */
-private enum class Screen { MAP, SETTINGS, OFFLINE }
+private enum class Screen { MAP, SETTINGS, CUSTOM_RESOLUTION, OFFLINE }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,7 +42,11 @@ class MainActivity : ComponentActivity() {
                         )
                     Screen.SETTINGS -> {
                         BackHandler { screen = Screen.MAP }
-                        SettingsScreen()
+                        SettingsScreen(onCustomResolution = { screen = Screen.CUSTOM_RESOLUTION })
+                    }
+                    Screen.CUSTOM_RESOLUTION -> {
+                        BackHandler { screen = Screen.SETTINGS }
+                        CustomResolutionScreen()
                     }
                     Screen.OFFLINE -> {
                         BackHandler { screen = Screen.MAP }

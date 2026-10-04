@@ -107,8 +107,9 @@ internal class GnomonicFrame(
  *
  * Frame: the gnomonic plane of the map centre. Lines run towards the sun's azimuth at the centre;
  * `s` is the position along a line, growing downwind (away from the sun), and `w` the position
- * across the lines. Cells are [cellDp] dp squares (2 dp for the overlay, 8 dp for the heatmap; design
- * D9 of add-sun-exposure-heatmap); cell `j` of line `k` has its sample point at
+ * across the lines. Cells are [cellDp] dp squares (with the `Normal` shade resolution 2 dp for the
+ * overlay, 8 dp for the heatmap; design D9 of add-sun-exposure-heatmap, D3 of add-settings); cell `j`
+ * of line `k` has its sample point at
  * `s = lineStart[k] + (j + 0.5) · spacing`.
  */
 class SunShadeSweep(
