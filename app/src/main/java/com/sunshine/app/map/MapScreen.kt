@@ -142,6 +142,7 @@ fun MapScreen(
             onLocationStale = viewModel::onLocationStale,
             centreRequests = centreRequests,
             onCameraGesture = viewModel::onCameraGesture,
+            overlayOpacity = settings.overlayOpacityPercent / PERCENT,
         )
         sun?.let { SunLine(it.position, (sunshine as? SunshineUiState.Ready)?.atSelectedTime) }
         Crosshair(Modifier.align(Alignment.Center))
@@ -265,6 +266,7 @@ private val SUN_PANEL_MAX_WIDTH = 360.dp
 private val CROSSHAIR_CLEARANCE = 32.dp
 
 private const val MEBIBYTE = 1024L * 1024
+private const val PERCENT = 100f
 
 private val mapViewModelFactory =
     viewModelFactory {

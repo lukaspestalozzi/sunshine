@@ -32,15 +32,16 @@ class HeatmapColourTest {
     }
 
     @Test
-    fun `the first band is the shade tint, the last light amber, all at the shade tint's alpha`() {
+    fun `the first band is the shade tint, the last light amber, all opaque`() {
+        // The overlay layer applies the chosen opacity (design D5 of add-settings).
         for (count in listOf(hm(8, 33), hm(15, 51))) {
             val colours = HeatmapBands(count).colours
 
-            assertEquals(0x99455A64.toInt(), colours.first())
-            assertEquals(0x99FFE0A3.toInt(), colours.last())
-            assertTrue(colours.all { it ushr 24 == 0x99 }, colours.joinToString { Integer.toHexString(it) })
+            assertEquals(0xFF455A64.toInt(), colours.first())
+            assertEquals(0xFFFFE0A3.toInt(), colours.last())
+            assertTrue(colours.all { it ushr 24 == 0xFF }, colours.joinToString { Integer.toHexString(it) })
         }
-        assertEquals(listOf(0x99455A64.toInt()), HeatmapBands(Duration.ZERO).colours.toList())
+        assertEquals(listOf(0xFF455A64.toInt()), HeatmapBands(Duration.ZERO).colours.toList())
     }
 
     @Test

@@ -19,11 +19,11 @@ class HeatmapBands(
     /** Number of bands: at least one. */
     val count: Int = max(1, ceil(dayLength.seconds / BAND_SECONDS).toInt())
 
-    /** ARGB colour of each band, all at the shade tint's alpha. */
+    /** ARGB colour of each band, opaque; the overlay layer applies the chosen opacity. */
     val colours: IntArray =
         IntArray(count) { band ->
             val t = if (count == 1) 0.0 else band.toDouble() / (count - 1)
-            ALPHA or oklabToRgb(interpolate(t))
+            OPAQUE or oklabToRgb(interpolate(t))
         }
 
     /** The band of [sunMinutes] minutes of sun: 30 minutes per band, the last band at or beyond the day length. */
@@ -32,7 +32,7 @@ class HeatmapBands(
     private companion object {
         const val BAND_SECONDS = 30.0 * 60.0
         const val BAND_MINUTES = 30
-        const val ALPHA = SHADE_ARGB and 0xFF000000.toInt()
+        const val OPAQUE = 0xFF000000.toInt()
 
         // Slate (the shade tint), blue, yellow, light amber; OKLab L 0.454, 0.584, 0.824, 0.918.
         val STOPS: List<DoubleArray> = listOf(0x455A64, 0x3F7FBF, 0xD9C84A, 0xFFE0A3).map(::rgbToOklab)

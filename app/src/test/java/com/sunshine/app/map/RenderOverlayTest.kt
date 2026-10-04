@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test
 // Design D9 of add-sun-shade-overlay.
 class RenderOverlayTest {
     @Test
-    fun `shade is a translucent blue-grey everywhere at night`() {
+    fun `shade is the blue-grey tint everywhere at night`() {
         val image = renderOverlay(grid(flat, SunPosition(180.0, -10.0, false)))
 
         assertEquals(AREA.widthDp.toInt(), image.width)
@@ -106,8 +106,9 @@ class RenderOverlayTest {
         val AREA = MapArea(CENTER, zoom = 13.0, widthDp = 80.0, heightDp = 400.0)
         val METRES_PER_DEGREE = Math.toRadians(1.0) * 6_371_000.0
 
-        // #455A64 and #9E9E9E, both at alpha 0.6 (design D10 of add-sun-exposure-heatmap).
-        const val SHADE_ARGB = 0x99455A64.toInt()
-        const val UNKNOWN_ARGB = 0x999E9E9E.toInt()
+        // #455A64 and #9E9E9E, opaque: the overlay layer applies the chosen opacity (design D5 of
+        // add-settings; the colours are those of design D10 of add-sun-exposure-heatmap).
+        const val SHADE_ARGB = 0xFF455A64.toInt()
+        const val UNKNOWN_ARGB = 0xFF9E9E9E.toInt()
     }
 }
