@@ -78,7 +78,7 @@ non-blocking notice that it is offline and map tiles may be missing.
 
 #### Scenario: Launch without network
 - **WHEN** the app is launched without a network connection and no map tile of the visible area is stored
-- **THEN** the map area is blank, the crosshair, coordinates, ⓘ button and Offline button are shown, and the offline notice is visible
+- **THEN** the map area is blank, the crosshair, coordinates, ⓘ button, Offline button and location button are shown, and the offline notice is visible
 
 #### Scenario: Launch without network in a stored area
 - **WHEN** the app is launched without a network connection and the tiles of the visible area are stored
