@@ -42,7 +42,7 @@ import org.maplibre.android.style.sources.ImageSource
 
 /**
  * Full MapLibre map showing OpenTopoMap tiles. Starts at [initialCamera] and reports every camera
- * movement through [onCameraMoved]. [overlay] is drawn on the terrain, directly above the map tiles;
+ * movement through [onCameraMoved], and the start of each move by a gesture through [onCameraGesture]. [overlay] is drawn on the terrain, directly above the map tiles;
  * `null` removes it. The tiles are drawn with [saturation] (−1 greyscale, 0 their own colours).
  * Once [locationAllowed], the device's position is drawn as a dot and [onLocationStale] reports
  * whether it is old; each element of [centreRequests] moves the map centre to a fresh position.
@@ -57,11 +57,13 @@ fun MapLibreMap(
     locationAllowed: Boolean = false,
     onLocationStale: (Boolean) -> Unit = {},
     centreRequests: Flow<Unit> = emptyFlow(),
+    onCameraGesture: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val currentOnCameraMoved by rememberUpdatedState(onCameraMoved)
     val currentOnLocationStale by rememberUpdatedState(onLocationStale)
+    val currentOnCameraGesture by rememberUpdatedState(onCameraGesture)
 
     val mapView =
         remember {
@@ -69,6 +71,9 @@ fun MapLibreMap(
                 getMapAsync { map ->
                     map.setStyle(Style.Builder().fromJson(OPEN_TOPO_MAP_STYLE))
                     map.addOnCameraMoveListener { currentOnCameraMoved(map.cameraPosition.toCameraState()) }
+                    map.addOnCameraMoveStartedListener { reason ->
+                        if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) currentOnCameraGesture()
+                    }
                 }
             }
         }

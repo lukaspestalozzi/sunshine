@@ -29,6 +29,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -40,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
@@ -89,6 +91,17 @@ fun MapScreen(
     // Read again on every resume: the user may have changed it in the system settings meanwhile.
     var locationAllowed by remember { mutableStateOf(context.locationAccess() != LocationAccess.NONE) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { locationAllowed = context.locationAccess() != LocationAccess.NONE }
+    // Only while the map is in front: the Settings and Offline pages replace this composable, and
+    // Android drops the flag in the background (settings spec, "Keep screen on"; design D8 of add-settings).
+    val view = LocalView.current
+    DisposableEffect(view, settings.keepScreenOn) {
+        view.keepScreenOn = settings.keepScreenOn
+        onDispose { view.keepScreenOn = false }
+    }
+    // In the background, and when the Settings or Offline page replaces the map, which may then go
+    // to the background itself (map-view spec, "Default viewport").
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.storeLastView() }
+    DisposableEffect(viewModel) { onDispose { viewModel.storeLastView() } }
     val permissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
             val access = context.locationAccess()
@@ -128,6 +141,7 @@ fun MapScreen(
             locationAllowed = locationAllowed,
             onLocationStale = viewModel::onLocationStale,
             centreRequests = centreRequests,
+            onCameraGesture = viewModel::onCameraGesture,
         )
         sun?.let { SunLine(it.position, (sunshine as? SunshineUiState.Ready)?.atSelectedTime) }
         Crosshair(Modifier.align(Alignment.Center))
@@ -188,10 +202,10 @@ fun MapScreen(
     }
 }
 
-private val LOCATION_PERMISSIONS = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+internal val LOCATION_PERMISSIONS = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
 
 /** The location access the user allowed: precise (fine) wins over approximate (coarse). */
-private fun Context.locationAccess(): LocationAccess =
+internal fun Context.locationAccess(): LocationAccess =
     when {
         checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED -> LocationAccess.PRECISE
         checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED -> LocationAccess.APPROXIMATE
@@ -276,6 +290,7 @@ private val mapViewModelFactory =
                 log = ::debugLog,
                 checkOverlayAgreement = BuildConfig.DEBUG,
                 settings = application.settingsStore.settings,
+                saveLastView = application.settingsStore::setLastView,
             )
         }
     }

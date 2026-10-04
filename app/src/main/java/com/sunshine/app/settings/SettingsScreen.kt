@@ -1,5 +1,7 @@
 package com.sunshine.app.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -33,10 +35,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -44,6 +49,9 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.sunshine.app.R
 import com.sunshine.app.SunshineApp
 import com.sunshine.app.about.AboutSection
+import com.sunshine.app.map.LOCATION_PERMISSIONS
+import com.sunshine.app.map.LocationAccess
+import com.sunshine.app.map.locationAccess
 import kotlin.math.roundToInt
 
 /**
@@ -56,6 +64,19 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel(factory = settingsViewModelFactory),
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    // Read again on every resume: the user may have changed it in the system settings meanwhile.
+    var locationAllowed by remember { mutableStateOf(context.locationAccess() != LocationAccess.NONE) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { locationAllowed = context.locationAccess() != LocationAccess.NONE }
+    // `My location` stays selected whatever the answer (gps-location spec, "Location permission").
+    val askLocation =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            locationAllowed = context.locationAccess() != LocationAccess.NONE
+        }
+    val onStartAt = { startAt: StartAt ->
+        viewModel.onStartAt(startAt)
+        if (startAt == StartAt.MY_LOCATION && !locationAllowed) askLocation.launch(LOCATION_PERMISSIONS)
+    }
     Surface(modifier.fillMaxSize()) {
         Column(
             Modifier
@@ -71,7 +92,10 @@ fun SettingsScreen(
             SwitchEntry(R.string.settings_keep_screen_on, settings.keepScreenOn, viewModel::onKeepScreenOn)
 
             Section(R.string.settings_map)
-            ChoiceEntry(R.string.settings_start_at, START_AT_LABELS, settings.startAt, viewModel::onStartAt)
+            ChoiceEntry(R.string.settings_start_at, START_AT_LABELS, settings.startAt, onStartAt)
+            if (settings.startAt == StartAt.MY_LOCATION && !locationAllowed) {
+                Text(stringResource(R.string.settings_location_off), style = MaterialTheme.typography.bodySmall)
+            }
             OpacityEntry(settings.overlayOpacityPercent, viewModel::onOverlayOpacity)
 
             Section(R.string.settings_calculation)

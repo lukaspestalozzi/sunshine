@@ -5,7 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sunshine.app.elevation.Elevation
 import com.sunshine.app.elevation.ElevationRepository
+import com.sunshine.app.settings.LastView
 import com.sunshine.app.settings.Settings
+import com.sunshine.app.settings.StartAt
 import com.sunshine.core.DEFAULT_LOCATION
 import com.sunshine.core.GeoPoint
 import com.sunshine.core.HorizonProfile
@@ -192,6 +194,8 @@ class MapViewModel(
     checkOverlayAgreement: Boolean = false,
     /** The stored settings (settings spec, "Stored settings"). */
     val settings: StateFlow<Settings> = MutableStateFlow(Settings()),
+    /** Stores the map's view when the app goes to the background (map-view spec, "Default viewport"). */
+    private val saveLastView: suspend (LastView) -> Unit = {},
 ) : ViewModel() {
     private val zone: ZoneId = clock.zone
 
@@ -592,6 +596,12 @@ class MapViewModel(
 
     private val locationActionChannel = Channel<LocationAction>(Channel.BUFFERED)
 
+    // After a launch with `Start at` `My location`, the first fresh position centres the map once,
+    // unless the user moved it first; not after a rotation (map-view spec, "Default viewport";
+    // design D7 of add-settings).
+    private var pendingStartCentre =
+        settings.value.startAt == StartAt.MY_LOCATION && savedState.get<Double>(KEY_LATITUDE) == null
+
     /** One-off actions of the location button, each delivered once to the screen. */
     val locationActions: Flow<LocationAction> = locationActionChannel.receiveAsFlow()
 
@@ -613,6 +623,15 @@ class MapViewModel(
         // Logged in debug builds for the device checks of the stale state (task 1.1 of add-gps-location).
         log("Location stale=$stale")
         mutableLocationButton.value = mutableLocationButton.value.onStale(stale)
+        if (!stale && pendingStartCentre) {
+            pendingStartCentre = false
+            locationActionChannel.trySend(LocationAction.Centre)
+        }
+    }
+
+    /** The user started moving the map with a gesture. */
+    fun onCameraGesture() {
+        pendingStartCentre = false
     }
 
     private fun applyLocationStep(step: LocationStep) {
@@ -626,6 +645,15 @@ class MapViewModel(
         savedState[KEY_LATITUDE] = camera.center.latitude
         savedState[KEY_LONGITUDE] = camera.center.longitude
         savedState[KEY_ZOOM] = camera.zoom
+    }
+
+    /**
+     * Stores the map's view, the one `Last view` opens at: when the app goes to the background and
+     * when the map is left for another page (design D7 of add-settings).
+     */
+    fun storeLastView() {
+        val camera = mutableCamera.value
+        viewModelScope.launch { saveLastView(LastView(camera.center.latitude, camera.center.longitude, camera.zoom)) }
     }
 
     /** The map's size in dp, which with the camera gives the visible area. */
@@ -679,14 +707,18 @@ class MapViewModel(
     private fun restoreSelectedTime(): ZonedDateTime =
         savedState.get<Long>(KEY_SELECTED_TIME)?.let { Instant.ofEpochMilli(it).atZone(zone) } ?: now()
 
+    // Saved state first (rotation, process restore), then `Start at` (design D7 of add-settings).
     private fun restoreCamera(): CameraState {
         val latitude = savedState.get<Double>(KEY_LATITUDE)
         val longitude = savedState.get<Double>(KEY_LONGITUDE)
         val zoom = savedState.get<Double>(KEY_ZOOM)
-        if (latitude == null || longitude == null || zoom == null) {
-            return CameraState(center = DEFAULT_LOCATION, zoom = DEFAULT_ZOOM)
+        if (latitude != null && longitude != null && zoom != null) {
+            return CameraState(center = GeoPoint(latitude, longitude), zoom = zoom)
         }
-        return CameraState(center = GeoPoint(latitude, longitude), zoom = zoom)
+        val start = settings.value
+        val lastView = start.lastView.takeIf { start.startAt != StartAt.ALPS_OVERVIEW }
+        return lastView?.let { CameraState(GeoPoint(it.latitude, it.longitude), it.zoom) }
+            ?: CameraState(center = DEFAULT_LOCATION, zoom = DEFAULT_ZOOM)
     }
 
     private fun sunshineState(
