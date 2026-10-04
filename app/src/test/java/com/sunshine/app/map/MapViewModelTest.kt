@@ -5,6 +5,7 @@ import com.sunshine.app.elevation.DemTile
 import com.sunshine.app.elevation.ElevationRepository
 import com.sunshine.app.elevation.TileCache
 import com.sunshine.app.settings.LastView
+import com.sunshine.app.settings.Preset
 import com.sunshine.app.settings.Settings
 import com.sunshine.app.settings.StartAt
 import com.sunshine.core.AZIMUTH_COUNT
@@ -1039,7 +1040,8 @@ class MapViewModelTest {
             val area = MapArea(INTERLAKEN, 12.0, MAP_WIDTH, MAP_HEIGHT)
             val december21 = LocalDate.of(2025, 12, 21)
             assertEquals(2.0, dayCache.get(area, december21, 2.0)?.cellDp)
-            assertEquals(8.0, dayCache.get(area, december21, 8.0)?.cellDp)
+            // The heatmap's day is kept with its own step, 10 minutes (design D3 of add-settings).
+            assertEquals(8.0, dayCache.get(area, december21, 8.0, stepMinutes = 10)?.cellDp)
         }
 
     @Test
@@ -1350,6 +1352,183 @@ class MapViewModelTest {
         }
 
     @Test
+    fun `with Fast the sun and shade day computes 144 steps in 4 dp cells`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val cells = mutableListOf<Double>()
+            val viewModel = dayViewModel(suns, cells = cells, settings = MutableStateFlow(Settings(preset = Preset.FAST)))
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+
+            viewModel.onOverlayToggled()
+            advanceUntilIdle()
+
+            assertEquals(144, suns.size)
+            assertEquals(setOf(4.0), cells.toSet())
+        }
+
+    @Test
+    fun `with Fast the heatmap day computes 96 steps in 16 dp cells`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val cells = mutableListOf<Double>()
+            val viewModel = dayViewModel(suns, cells = cells, settings = MutableStateFlow(Settings(preset = Preset.FAST)))
+            viewModel.onOverlayModeSelected(OverlayMode.SUN_HOURS)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+
+            viewModel.onOverlayToggled()
+            advanceUntilIdle()
+
+            assertEquals(96, suns.size)
+            assertEquals(setOf(16.0), cells.toSet())
+            assertEquals(15, (viewModel.heatmap.value as HeatmapUiState.Ready).hours.stepMinutes)
+        }
+
+    @Test
+    fun `the slider moves in the sun and shade step only while that mode is shown`() {
+        val viewModel = newViewModel(settings = Settings(preset = Preset.FAST))
+        assertEquals(5, viewModel.sliderStep.value)
+
+        viewModel.onOverlaySelected(OverlayOption.SUN_AND_SHADE)
+        assertEquals(10, viewModel.sliderStep.value)
+        viewModel.onSliderMoved(14 * 60f + 33)
+        assertEquals(ZonedDateTime.of(2025, 12, 21, 14, 30, 0, 0, ZURICH), viewModel.selectedTime.value)
+
+        viewModel.onOverlaySelected(OverlayOption.SUN_HOURS)
+        assertEquals(5, viewModel.sliderStep.value)
+    }
+
+    @Test
+    fun `selecting sun and shade rounds the selected time to its step`() {
+        val viewModel = newViewModel(settings = Settings(preset = Preset.FAST))
+        viewModel.onSliderMoved(14 * 60f + 35)
+        assertEquals(ZonedDateTime.of(2025, 12, 21, 14, 35, 0, 0, ZURICH), viewModel.selectedTime.value)
+
+        viewModel.onOverlaySelected(OverlayOption.SUN_AND_SHADE)
+
+        assertEquals(ZonedDateTime.of(2025, 12, 21, 14, 40, 0, 0, ZURICH), viewModel.selectedTime.value)
+    }
+
+    @Test
+    fun `Now rounds while sun and shade is shown, and leaving it keeps the time`() {
+        // The clock reads 2025-12-21 09:47:31 in Zurich.
+        val viewModel = newViewModel()
+        viewModel.onOverlaySelected(OverlayOption.SUN_AND_SHADE)
+
+        viewModel.onNowClicked()
+        assertEquals(ZonedDateTime.of(2025, 12, 21, 9, 45, 0, 0, ZURICH), viewModel.selectedTime.value)
+
+        viewModel.onOverlaySelected(OverlayOption.OFF)
+        assertEquals(ZonedDateTime.of(2025, 12, 21, 9, 45, 0, 0, ZURICH), viewModel.selectedTime.value)
+
+        viewModel.onNowClicked()
+        assertEquals(ZonedDateTime.of(2025, 12, 21, 9, 47, 0, 0, ZURICH), viewModel.selectedTime.value)
+    }
+
+    @Test
+    fun `a date change while sun and shade is shown keeps the time on a step`() {
+        val viewModel = newViewModel(settings = Settings(preset = Preset.FAST))
+        viewModel.onOverlaySelected(OverlayOption.SUN_AND_SHADE)
+        viewModel.onSliderMoved(14 * 60f + 40)
+
+        viewModel.onDateSelected(LocalDate.of(2025, 6, 21))
+
+        assertEquals(ZonedDateTime.of(2025, 6, 21, 14, 40, 0, 0, ZURICH), viewModel.selectedTime.value)
+    }
+
+    @Test
+    fun `a preset change while sun and shade is shown rounds the selected time to the new step`() {
+        val settings = MutableStateFlow(Settings())
+        val viewModel = newViewModel(settingsFlow = settings)
+        viewModel.onOverlaySelected(OverlayOption.SUN_AND_SHADE)
+        viewModel.onSliderMoved(12 * 60f + 5)
+
+        settings.value = Settings(preset = Preset.FAST)
+
+        assertEquals(ZonedDateTime.of(2025, 12, 21, 12, 10, 0, 0, ZURICH), viewModel.selectedTime.value)
+        assertEquals(10, viewModel.sliderStep.value)
+    }
+
+    @Test
+    fun `a preset change while the overlay is on computes the shown day anew, with the notice`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val cells = mutableListOf<Double>()
+            val settings = MutableStateFlow(Settings())
+            val viewModel = dayViewModel(suns, cells = cells, settings = settings)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceUntilIdle()
+            val states = mutableListOf<OverlayUiState>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.overlay.collect { states += it } }
+            suns.clear()
+            cells.clear()
+
+            settings.value = Settings(preset = Preset.FAST)
+            advanceUntilIdle()
+
+            val computing = states.filterIsInstance<OverlayUiState.Computing>()
+            assertTrue(computing.isNotEmpty() && computing.all { it.resolutionChanged }, "$states")
+            assertEquals(144, suns.size)
+            assertEquals(setOf(4.0), cells.toSet())
+            assertTrue(viewModel.overlay.value is OverlayUiState.Ready, "${viewModel.overlay.value}")
+        }
+
+    @Test
+    fun `back to a computed preset shows its day at once, without computing it again`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val settings = MutableStateFlow(Settings())
+            val viewModel = dayViewModel(suns, settings = settings)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceUntilIdle()
+            settings.value = Settings(preset = Preset.FAST)
+            advanceUntilIdle()
+            suns.clear()
+
+            settings.value = Settings(preset = Preset.NORMAL)
+
+            assertTrue(viewModel.overlay.value is OverlayUiState.Ready, "${viewModel.overlay.value}")
+            advanceUntilIdle()
+            assertEquals(emptyList<SunPosition>(), suns)
+        }
+
+    @Test
+    fun `a preset change in sun hours computes the heatmap's day anew`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val cells = mutableListOf<Double>()
+            val settings = MutableStateFlow(Settings())
+            val viewModel = dayViewModel(suns, cells = cells, settings = settings)
+            viewModel.onOverlayModeSelected(OverlayMode.SUN_HOURS)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceUntilIdle()
+            suns.clear()
+            cells.clear()
+
+            settings.value = Settings(preset = Preset.DETAILED)
+            advanceUntilIdle()
+
+            assertEquals(144, suns.size)
+            assertEquals(setOf(4.0), cells.toSet())
+            assertTrue(viewModel.heatmap.value is HeatmapUiState.Ready, "${viewModel.heatmap.value}")
+        }
+
+    @Test
+    fun `a preset change while the overlay is off starts no computation`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val settings = MutableStateFlow(Settings())
+            dayViewModel(suns, settings = settings).onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+
+            settings.value = Settings(preset = Preset.DETAILED)
+            advanceUntilIdle()
+
+            assertEquals(emptyList<SunPosition>(), suns)
+        }
+
+    @Test
     fun `only the missing steps of a partly computed day are computed`() =
         runTest {
             val suns = mutableListOf<SunPosition>()
@@ -1556,6 +1735,7 @@ class MapViewModelTest {
         computeDispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(),
         settings: Settings = Settings(),
         saveLastView: suspend (LastView) -> Unit = {},
+        settingsFlow: StateFlow<Settings> = MutableStateFlow(settings),
     ) = MapViewModel(
         savedState,
         isOnline,
@@ -1564,7 +1744,7 @@ class MapViewModelTest {
         horizon,
         overlayGrid,
         computeDispatcher,
-        settings = MutableStateFlow(settings),
+        settings = settingsFlow,
         saveLastView = saveLastView,
     )
 

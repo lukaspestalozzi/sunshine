@@ -83,6 +83,7 @@ fun MapScreen(
     val heatmap by viewModel.heatmap.collectAsStateWithLifecycle()
     val locationButton by viewModel.locationButton.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val sliderStep by viewModel.sliderStep.collectAsStateWithLifecycle()
     val sunshine = computedSunshine.at(camera.center)
 
     val context = LocalContext.current
@@ -181,6 +182,7 @@ fun MapScreen(
                     },
                 onDateSelected = viewModel::onDateSelected,
                 onSliderMoved = viewModel::onSliderMoved,
+                sliderStep = sliderStep,
                 onNowClicked = viewModel::onNowClicked,
                 modifier = Modifier.widthIn(max = panelMaxWidth),
             )

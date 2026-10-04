@@ -59,6 +59,54 @@ class TimeSelectionTest {
         assertEquals(OffsetDateTime.parse("2025-10-26T02:55+01:00"), sliderTime(date, ZURICH, 235f).toOffsetDateTime())
     }
 
+    @ParameterizedTest(name = "{0}")
+    @CsvSource("2025-12-21, 144", "2025-03-30, 138", "2025-10-26, 150")
+    fun `with a 10-minute step the slider has one position per 10 minutes of the real day`(
+        date: LocalDate,
+        positions: Int,
+    ) {
+        assertEquals(positions, sliderPositions(date, ZURICH, step = 10))
+    }
+
+    @Test
+    fun `with a 10-minute step the slider covers 00_00 to 23_50 and skips the spring-forward gap`() {
+        val day = LocalDate.of(2025, 12, 21)
+        val short = LocalDate.of(2025, 3, 30)
+
+        assertEquals(LocalDateTime.of(2025, 12, 21, 23, 50), sliderTime(day, ZURICH, 143 * 10f, step = 10).toLocalDateTime())
+        assertEquals(LocalDateTime.of(2025, 12, 21, 14, 40), sliderTime(day, ZURICH, 876f, step = 10).toLocalDateTime())
+        assertEquals(OffsetDateTime.parse("2025-03-30T01:50+01:00"), sliderTime(short, ZURICH, 110f, step = 10).toOffsetDateTime())
+        assertEquals(OffsetDateTime.parse("2025-03-30T03:00+02:00"), sliderTime(short, ZURICH, 120f, step = 10).toOffsetDateTime())
+    }
+
+    @ParameterizedTest(name = "{0} every {1} min -> {2}")
+    @CsvSource(
+        "2025-12-21T14:35, 10, 2025-12-21T14:40",
+        "2025-12-21T14:34, 10, 2025-12-21T14:30",
+        "2025-12-21T14:30, 10, 2025-12-21T14:30",
+        "2025-12-21T23:57, 10, 2025-12-21T23:50",
+        "2025-12-21T09:47, 5, 2025-12-21T09:45",
+        "2025-12-21T09:48, 5, 2025-12-21T09:50",
+        "2025-12-21T00:08, 15, 2025-12-21T00:15",
+        "2025-12-21T23:59, 30, 2025-12-21T23:30",
+    )
+    fun `rounds to the nearest step of the day, half up, at most the last step`(
+        time: LocalDateTime,
+        step: Int,
+        rounded: LocalDateTime,
+    ) {
+        assertEquals(rounded.atZone(ZURICH), roundToStep(time.atZone(ZURICH), step))
+    }
+
+    @Test
+    fun `rounding counts steps from the start of the day on the real timeline`() {
+        // 2025-03-30 03:04 UTC+2 is 124 minutes after the start of the day; with 10-minute steps
+        // that is nearest to 120 minutes, i.e. 03:00 UTC+2.
+        val time = ZonedDateTime.of(2025, 3, 30, 3, 4, 0, 0, ZURICH)
+
+        assertEquals(OffsetDateTime.parse("2025-03-30T03:00+02:00"), roundToStep(time, 10).toOffsetDateTime())
+    }
+
     @Test
     fun `slider value is the minutes since the start of the selected day`() {
         assertEquals(180f, sliderMinutes(ZonedDateTime.parse("2025-10-26T02:00+01:00[Europe/Zurich]")))

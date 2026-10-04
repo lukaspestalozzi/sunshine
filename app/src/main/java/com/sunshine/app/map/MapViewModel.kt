@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.sunshine.app.elevation.Elevation
 import com.sunshine.app.elevation.ElevationRepository
 import com.sunshine.app.settings.LastView
+import com.sunshine.app.settings.Resolution
 import com.sunshine.app.settings.Settings
 import com.sunshine.app.settings.StartAt
 import com.sunshine.core.DEFAULT_LOCATION
@@ -16,6 +17,7 @@ import com.sunshine.core.ShadeGrid
 import com.sunshine.core.SunDay
 import com.sunshine.core.SunPeriods
 import com.sunshine.core.SunPosition
+import com.sunshine.core.SunShadeSweep
 import com.sunshine.core.Sunshine
 import com.sunshine.core.sunDay
 import com.sunshine.core.sunPeriods
@@ -48,6 +50,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -111,13 +114,16 @@ sealed interface OverlayUiState {
      */
     data class Computing(
         val kept: Ready?,
+        /** The kept overlay has another cell size than the one being computed (a new shade resolution). */
+        val resolutionChanged: Boolean = false,
     ) : OverlayUiState
 
-    /** The grid of the visible area at [time], and its [image] (rendered off the main thread). */
+    /** The grid of the visible area at [time] in cells of [cellDp], and its [image] (rendered off the main thread). */
     data class Ready(
         val grid: ShadeGrid,
         val time: ZonedDateTime,
         val image: OverlayImage,
+        val cellDp: Double = SunShadeSweep.CELL_DP,
     ) : OverlayUiState
 }
 
@@ -299,6 +305,18 @@ class MapViewModel(
     private val sunHoursShown =
         combine(mutableOverlayOn, mutableOverlayMode) { on, mode -> on to (on && mode == OverlayMode.SUN_HOURS) }
 
+    // The cell sizes and steps of both modes (settings spec, "Shade resolution"); other settings,
+    // such as the opacity, do not restart the overlay.
+    private val resolution: Flow<Resolution> = settings.map { it.resolution }.distinctUntilChanged()
+
+    /**
+     * The time slider's step: the `Sun & shade` step while that mode is shown, else 5 minutes
+     * (time-selection spec, "Choose the time of day"; design D4 of add-settings).
+     */
+    val sliderStep: StateFlow<Int> =
+        combine(sunAndShadeShown, resolution) { shown, _ -> stepFor(shown) }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = stepFor(isSunAndShadeShown()))
+
     // The overlay of the visible area at the selected time (design D8 of add-sun-shade-overlay).
     // Latest wins, as for the horizon. A camera move waits [SETTLE_MILLIS]; a time change starts at
     // once. Both keep the previous grid meanwhile. A reconnect recomputes only a grid with unknown
@@ -314,8 +332,14 @@ class MapViewModel(
             // Written by the lookups, read by the collector, as for the horizon's `done`.
             val shown = AtomicReference<OverlayUiState.Ready?>(null)
             var requestedTime: ZonedDateTime? = null
-            combine(camera, selectedTime, sunAndShadeShown, mapSize, isOnline) { camera, time, on, size, online ->
-                OverlayInput(camera, time, on, size, online)
+            combine(camera, selectedTime, sunAndShadeShown, mapSize, combine(isOnline, resolution, ::Pair)) {
+                camera,
+                time,
+                on,
+                size,
+                (online, resolution),
+                ->
+                OverlayInput(camera, time, on, size, online, resolution.sunShadeCellDp.toDouble(), resolution.sunShadeStepMinutes)
             }
                 // While a sweep that cannot stop mid-chunk is being cancelled, keep only the latest input.
                 .conflate()
@@ -331,23 +355,43 @@ class MapViewModel(
                         return@collect
                     }
                     val current = shown.get()
+                    val resolutionChanged = current != null && current.cellDp != input.cellDp
                     val unchanged =
-                        current != null && current.grid.area == area && current.time == input.time && requestedTime == input.time
+                        current != null &&
+                            current.grid.area == area &&
+                            current.time == input.time &&
+                            requestedTime == input.time &&
+                            day?.let { it.cellDp == input.cellDp && it.stepMinutes == input.stepMinutes } == true
                     if (unchanged && (!input.online || !current.grid.hasUnknown)) return@collect
-                    val timeChanged = requestedTime != null && requestedTime != input.time
+                    // A new time or shade resolution is computed at once; only a camera move waits to rest.
+                    val dayResolutionChanged = day?.let { it.cellDp != input.cellDp || it.stepMinutes != input.stepMinutes } == true
+                    val immediate = requestedTime != null && requestedTime != input.time || dayResolutionChanged
                     requestedTime = input.time
                     lookup?.cancelAndJoin()
                     val date = input.time.toLocalDate()
-                    val sameDay = day?.let { it.area == area && it.date == date } == true && !unchanged
+                    val sameDay =
+                        day?.let {
+                            it.area == area && it.date == date && it.cellDp == input.cellDp && it.stepMinutes == input.stepMinutes
+                        } == true &&
+                            !unchanged
                     if (!sameDay) {
                         dayJob?.cancelAndJoin()
-                        var cached = dayCache.get(area, date)
+                        var cached = dayCache.get(area, date, input.cellDp, input.stepMinutes)
                         // A day with unknown cells is computed anew while online, as after a reconnect (D14).
                         if (cached != null && input.online && cached.hasUnknown) {
                             dayCache.remove(cached)
                             cached = null
                         }
-                        val newDay = cached ?: DayOverlay(area, date, zone, overlayGrid, dayDispatcher ?: computeDispatcher)
+                        val newDay =
+                            cached ?: DayOverlay(
+                                area,
+                                date,
+                                zone,
+                                overlayGrid,
+                                dayDispatcher ?: computeDispatcher,
+                                input.stepMinutes,
+                                input.cellDp,
+                            )
                         day = newDay
                         dayJob =
                             dayDispatcher?.takeIf { newDay.computed.value < newDay.steps.size }?.let {
@@ -381,22 +425,22 @@ class MapViewModel(
                     val selectedDay = checkNotNull(day)
                     val known = selectedDay.gridAt(input.time)
                     if (known != null) {
-                        val ready = OverlayUiState.Ready(known, input.time, renderOverlay(known))
+                        val ready = OverlayUiState.Ready(known, input.time, renderOverlay(known), input.cellDp)
                         shown.set(ready)
                         send(ready)
                         return@collect
                     }
-                    send(OverlayUiState.Computing(kept = current))
+                    send(OverlayUiState.Computing(kept = current, resolutionChanged = resolutionChanged))
                     lookup =
                         launch {
-                            if (!timeChanged) delay(SETTLE_MILLIS)
+                            if (!immediate) delay(SETTLE_MILLIS)
                             val (grid, computing) = measureTimedValue { selectedDay.compute(input.time) }
                             val (image, rendering) = measureTimedValue { renderOverlay(grid) }
                             log(
                                 "Overlay ${area.widthDp.toInt()}×${area.heightDp.toInt()} dp at zoom ${area.zoom}: " +
                                     "grid ${computing.inWholeMilliseconds} ms, image ${rendering.inWholeMilliseconds} ms",
                             )
-                            val ready = OverlayUiState.Ready(grid, input.time, image)
+                            val ready = OverlayUiState.Ready(grid, input.time, image, input.cellDp)
                             shown.set(ready)
                             send(ready)
                         }
@@ -415,14 +459,20 @@ class MapViewModel(
             var day: DayOverlay? = null
             // Written by the jobs, read by the collector, as for the overlay's `shown`.
             val kept = AtomicReference<HeatmapUiState.Ready?>(null)
-            combine(camera, selectedTime.map { it.toLocalDate() }.distinctUntilChanged(), sunHoursShown, mapSize, isOnline) {
+            combine(
+                camera,
+                selectedTime.map { it.toLocalDate() }.distinctUntilChanged(),
+                sunHoursShown,
+                mapSize,
+                combine(isOnline, resolution, ::Pair),
+            ) {
                 camera,
                 date,
                 (on, shown),
                 size,
-                online,
+                (online, resolution),
                 ->
-                HeatmapInput(camera, date, on, shown, size, online)
+                HeatmapInput(camera, date, on, shown, size, online, resolution.sunHoursCellDp.toDouble(), resolution.sunHoursStepMinutes)
             }.conflate()
                 .collect { input ->
                     val area = input.area()
@@ -435,12 +485,17 @@ class MapViewModel(
                         return@collect
                     }
                     val current = day
-                    // Same area and date: only a reconnect matters, and only for a day with unknown cells.
-                    if (current != null && current.area == area && current.date == input.date) {
+                    // Same area, date and resolution: only a reconnect matters, and only for a day with unknown cells.
+                    if (current != null &&
+                        current.area == area &&
+                        current.date == input.date &&
+                        current.cellDp == input.cellDp &&
+                        current.stepMinutes == input.stepMinutes
+                    ) {
                         if (!input.online || !current.hasUnknown) return@collect
                     }
                     job?.cancelAndJoin()
-                    var cached = dayCache.get(area, input.date, HEATMAP_CELL_DP)
+                    var cached = dayCache.get(area, input.date, input.cellDp, input.stepMinutes)
                     // A day with unknown cells is computed anew while online, as for the overlay (D14 of #5).
                     if (cached != null && input.online && cached.hasUnknown) {
                         dayCache.remove(cached)
@@ -453,8 +508,8 @@ class MapViewModel(
                             zone,
                             overlayGrid,
                             dayDispatcher ?: computeDispatcher,
-                            HEATMAP_STEP_MINUTES,
-                            HEATMAP_CELL_DP,
+                            input.stepMinutes,
+                            input.cellDp,
                         )
                     day = newDay
                     val previous = kept.get()
@@ -533,6 +588,8 @@ class MapViewModel(
         val shown: Boolean,
         val size: Pair<Double, Double>?,
         val online: Boolean,
+        val cellDp: Double,
+        val stepMinutes: Int,
     ) {
         // The area to compute, or null when the heatmap is not shown, zoomed out or the size unknown.
         fun area(): MapArea? {
@@ -542,6 +599,9 @@ class MapViewModel(
     }
 
     init {
+        // A new shade resolution while `Sun & shade` is shown moves the selected time to a step of
+        // the new day (time-selection spec, "Choose the time of day").
+        viewModelScope.launch { resolution.drop(1).collect { select(mutableSelectedTime.value) } }
         // Debug builds: once an overlay has stayed for a while, log how many cells agree with the
         // point tracer (spec: ≥ 99.5 % at zoom ≥ 12). Cancelled by the next overlay state.
         if (checkOverlayAgreement) {
@@ -574,6 +634,8 @@ class MapViewModel(
         val on: Boolean,
         val size: Pair<Double, Double>?,
         val online: Boolean,
+        val cellDp: Double,
+        val stepMinutes: Int,
     ) {
         // The area to compute, or null when the overlay is off, zoomed out or the size unknown.
         fun area(): MapArea? {
@@ -668,12 +730,14 @@ class MapViewModel(
     fun onOverlayToggled() {
         mutableOverlayOn.value = !mutableOverlayOn.value
         savedState[KEY_OVERLAY_ON] = mutableOverlayOn.value
+        select(mutableSelectedTime.value)
     }
 
     /** Selects what the overlay shows; saved like the switch, so it survives rotation. */
     fun onOverlayModeSelected(mode: OverlayMode) {
         mutableOverlayMode.value = mode
         savedState[KEY_OVERLAY_MODE] = mode.name
+        select(mutableSelectedTime.value)
     }
 
     /** Selects an [option] of the toggle: off, or a mode with the overlay on (design D7 of add-sun-exposure-heatmap). */
@@ -690,17 +754,23 @@ class MapViewModel(
     /** Keeps the wall-clock time of day (design D3). */
     fun onDateSelected(date: LocalDate) = select(selectedTime.value.withDate(date))
 
-    /** [minutes] since the start of the selected day, snapped to the 5-minute grid. */
-    fun onSliderMoved(minutes: Float) = select(sliderTime(selectedTime.value.toLocalDate(), zone, minutes))
+    /** [minutes] since the start of the selected day, snapped to the slider's grid. */
+    fun onSliderMoved(minutes: Float) = select(sliderTime(selectedTime.value.toLocalDate(), zone, minutes, stepFor(isSunAndShadeShown())))
 
     /** Sets the current time once; the selected time does not follow the clock. */
     fun onNowClicked() = select(now())
 
     // Saved so the selected time survives rotation and process death; a new launch starts at now.
+    // While `Sun & shade` is shown, the time is a step of its day (design D4 of add-settings).
     private fun select(time: ZonedDateTime) {
-        mutableSelectedTime.value = time
-        savedState[KEY_SELECTED_TIME] = time.toInstant().toEpochMilli()
+        val selected = if (isSunAndShadeShown()) roundToStep(time, stepFor(shown = true)) else time
+        mutableSelectedTime.value = selected
+        savedState[KEY_SELECTED_TIME] = selected.toInstant().toEpochMilli()
     }
+
+    private fun isSunAndShadeShown(): Boolean = mutableOverlayOn.value && mutableOverlayMode.value == OverlayMode.SUN_AND_SHADE
+
+    private fun stepFor(shown: Boolean): Int = if (shown) settings.value.resolution.sunShadeStepMinutes else SLIDER_STEP_MINUTES
 
     private fun now(): ZonedDateTime = Instant.now(clock).truncatedTo(ChronoUnit.MINUTES).atZone(zone)
 
@@ -771,9 +841,6 @@ class MapViewModel(
         const val KEY_OVERLAY_ON = "overlay_on"
         const val KEY_OVERLAY_MODE = "overlay_mode"
 
-        // The heatmap's own day (user decisions, design D9 of add-sun-exposure-heatmap).
-        const val HEATMAP_CELL_DP = 8.0
-        const val HEATMAP_STEP_MINUTES = 10
         const val AGREEMENT_DELAY_MILLIS = 3_000L
         const val AGREEMENT_CELLS = 200
     }

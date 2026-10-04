@@ -87,7 +87,7 @@ fun overlayNotice(
 ): Int? =
     when (state) {
         OverlayUiState.ZoomedOut -> R.string.overlay_zoom_in
-        is OverlayUiState.Computing -> if (state.kept?.time != selectedTime) R.string.overlay_computing else null
+        is OverlayUiState.Computing -> if (state.kept?.time != selectedTime || state.resolutionChanged) R.string.overlay_computing else null
         OverlayUiState.Off, is OverlayUiState.Ready -> null
     }
 
