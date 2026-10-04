@@ -64,7 +64,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun MapScreen(
-    onAboutClicked: () -> Unit,
+    onSettingsClicked: () -> Unit,
     onOfflineClicked: (MapArea) -> Unit,
     viewModel: MapViewModel = viewModel(factory = mapViewModelFactory),
 ) {
@@ -133,7 +133,7 @@ fun MapScreen(
         MapLabels(
             camera = camera,
             isOffline = isOffline,
-            onAboutClicked = onAboutClicked,
+            onSettingsClicked = onSettingsClicked,
             // The area visible now: the Offline page downloads this one (design D9 of add-offline-regions).
             onOfflineClicked = {
                 onOfflineClicked(

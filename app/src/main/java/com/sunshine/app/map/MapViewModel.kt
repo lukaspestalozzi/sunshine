@@ -582,7 +582,7 @@ class MapViewModel(
             .map { online -> !online }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), initialValue = false)
 
-    // Held here, not in Compose, so that waiting survives rotation and the About and Offline pages
+    // Held here, not in Compose, so that waiting survives rotation and the Settings and Offline pages
     // (gps-location spec, "Wait for a position"; design D3 of add-gps-location).
     private val mutableLocationButton = MutableStateFlow(LocationButtonState.IDLE)
     val locationButton: StateFlow<LocationButtonState> = mutableLocationButton.asStateFlow()

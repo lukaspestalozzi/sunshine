@@ -74,7 +74,7 @@ fun MapLibreMap(
         }
 
     DisposableEffect(lifecycle, mapView) {
-        // The state the map view was brought to. Leaving the composition (the About or Offline page
+        // The state the map view was brought to. Leaving the composition (the Settings or Offline page
         // replaces the map while the activity stays resumed) brings it down from there; otherwise it
         // keeps running, its location engine included (gps-location spec, "Location updates only
         // while visible").
