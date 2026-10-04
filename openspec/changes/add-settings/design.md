@@ -93,8 +93,11 @@ to the inputs of its overlay and heatmap flows, so a change restarts them as a d
 `DayCache`'s key becomes `(area, date, cellDp, stepMinutes)`: days of another resolution stay
 until dropped as least recently used, as sun-shade-overlay "Overlay resolution" requires.
 
-The `Custom resolution` page edits a local copy and writes it when the page is left
-(`DisposableEffect`), so dragging a value does not restart the day at every step.
+The `Custom resolution` page edits a draft held in `SettingsViewModel` (`customDraft`), which
+survives a rotation, and the page's own `BackHandler` stores it when the user leaves for the
+Settings page, so dragging a value does not restart the day at every step. A `DisposableEffect`
+was the first approach; the review of PR #33 found that it also ran on a rotation, storing a
+partial draft and losing the edits.
 
 Alternatives considered: one preset per mode, and all three presets editable (12 fields, preset
 names no longer meaning a speed): rejected by the user for one shared preset plus `Custom`.
@@ -148,8 +151,10 @@ display does not show); the national border instead of the area of use (border d
 
 `MapViewModel.restoreCamera()` uses, in order: the `SavedStateHandle` (rotation, process
 restore), then `Settings.startAt` with `Settings.lastView`, then the Alps overview. The last view
-is written by `MapScreen` on `Lifecycle.Event.ON_STOP` through the view model (one write per
-background, not per camera move).
+is written by `MapScreen` through the view model (`storeLastView`) on `Lifecycle.Event.ON_STOP`
+and when the map leaves the composition for the Settings or Offline page, as the app may go to
+the background from there, where `MapScreen` sees no `ON_STOP`. One write per background or page
+change, not per camera move.
 
 For `My location`, the view model holds `pendingStartCentre = true` after a cold start. A camera
 move by a gesture (MapLibre's `OnCameraMoveStartedListener` with `REASON_API_GESTURE`, forwarded
