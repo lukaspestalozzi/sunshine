@@ -99,6 +99,6 @@ the coordinate format, the start view, the overlay opacity and keeping the scree
   `offline/AmbientLimit.kt`, `offline/DemTileStore.kt` (configurable limit, clearing);
   `offline/OfflineViewModel.kt` (the limit's text); `SunshineApp.kt` (wiring); strings and one
   Material Symbols icon (settings gear).
-- `core`: new `SwissGrid.kt` (WGS84 → LV95); `OfflineArea.kt` unchanged.
+- `core`: new `Lv95.kt` (WGS84 → LV95); `OfflineArea.kt` unchanged.
 - Dependency: `androidx.datastore:datastore-preferences` (new).
 - `docs/roadmap.md`: entry #8's scope and status; `CLAUDE.md`: the new files.

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sunshine.app.elevation.Elevation
 import com.sunshine.app.elevation.ElevationRepository
+import com.sunshine.app.settings.Settings
 import com.sunshine.core.DEFAULT_LOCATION
 import com.sunshine.core.GeoPoint
 import com.sunshine.core.HorizonProfile
@@ -189,6 +190,8 @@ class MapViewModel(
     private val dayCache: DayCache = DayCache(DEFAULT_DAY_CACHE_BYTES),
     private val log: (String) -> Unit = {},
     checkOverlayAgreement: Boolean = false,
+    /** The stored settings (settings spec, "Stored settings"). */
+    val settings: StateFlow<Settings> = MutableStateFlow(Settings()),
 ) : ViewModel() {
     private val zone: ZoneId = clock.zone
 

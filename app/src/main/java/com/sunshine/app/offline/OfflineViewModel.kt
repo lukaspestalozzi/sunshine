@@ -3,6 +3,8 @@ package com.sunshine.app.offline
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sunshine.app.map.formatCoordinates
+import com.sunshine.app.settings.CoordinateFormat
+import com.sunshine.app.settings.Settings
 import com.sunshine.core.DownloadEstimate
 import com.sunshine.core.GeoBounds
 import com.sunshine.core.GeoPoint
@@ -17,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -54,7 +57,7 @@ data class OfflineUiState(
 /**
  * The Offline page for the map [area] visible when it was opened (design D9 of
  * add-offline-regions). [regions] come newest first; [download] queues a region, [delete] deletes
- * one.
+ * one. Region names follow the coordinate format of [settings].
  */
 class OfflineViewModel(
     private val area: MapArea,
@@ -64,6 +67,7 @@ class OfflineViewModel(
     private val download: suspend (MapArea) -> Unit,
     private val delete: suspend (Long) -> Unit,
     private val zone: ZoneId,
+    settings: Flow<Settings> = flowOf(Settings()),
 ) : ViewModel() {
     // Deleted regions leave the list at once, before the database says so.
     private val deleted = MutableStateFlow(emptySet<Long>())
@@ -77,12 +81,12 @@ class OfflineViewModel(
     private val estimate = if (blocked == null) formatEstimate(downloadEstimate(GeoBounds.of(area))) else null
 
     val uiState: StateFlow<OfflineUiState> =
-        combine(regions, work, deleted, confirmDelete) { summaries, work, deleted, confirm ->
+        combine(regions, work, deleted, confirmDelete, settings) { summaries, work, deleted, confirm, settings ->
             val use = storage()
             OfflineUiState(
                 estimate = estimate,
                 blocked = blocked,
-                regions = items(summaries.filter { it.region.id !in deleted }, work),
+                regions = items(summaries.filter { it.region.id !in deleted }, work, settings.coordinates),
                 mapStorage = formatMebibytes(use.mapBytes),
                 demStorage = formatMebibytes(use.demBytes),
                 confirmDelete = confirm,
@@ -111,6 +115,7 @@ class OfflineViewModel(
     private fun items(
         summaries: List<RegionSummary>,
         work: DownloadWork,
+        coordinates: CoordinateFormat,
     ): List<RegionItem> {
         // The oldest queued region is the one being downloaded (design D7).
         val first =
@@ -121,7 +126,7 @@ class OfflineViewModel(
             val region = summary.region
             RegionItem(
                 region.id,
-                formatCoordinates(GeoPoint(region.centreLat, region.centreLon)),
+                formatCoordinates(GeoPoint(region.centreLat, region.centreLon), coordinates),
                 formatRegionStatus(
                     status(
                         summary,

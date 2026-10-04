@@ -80,6 +80,7 @@ fun MapScreen(
     val overlayMode by viewModel.overlayMode.collectAsStateWithLifecycle()
     val heatmap by viewModel.heatmap.collectAsStateWithLifecycle()
     val locationButton by viewModel.locationButton.collectAsStateWithLifecycle()
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
     val sunshine = computedSunshine.at(camera.center)
 
     val context = LocalContext.current
@@ -132,6 +133,7 @@ fun MapScreen(
         Crosshair(Modifier.align(Alignment.Center))
         MapLabels(
             camera = camera,
+            coordinates = settings.coordinates,
             isOffline = isOffline,
             onSettingsClicked = onSettingsClicked,
             // The area visible now: the Offline page downloads this one (design D9 of add-offline-regions).
@@ -273,6 +275,7 @@ private val mapViewModelFactory =
                 dayCache = DayCache(maxBytes = activityManager.memoryClass * MEBIBYTE / 4),
                 log = ::debugLog,
                 checkOverlayAgreement = BuildConfig.DEBUG,
+                settings = application.settingsStore.settings,
             )
         }
     }

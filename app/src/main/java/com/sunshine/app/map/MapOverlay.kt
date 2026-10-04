@@ -33,6 +33,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.sunshine.app.R
+import com.sunshine.app.settings.CoordinateFormat
 
 /** Crosshair marking the selected location; must share the map's bounds so it sits on the map centre. */
 @Composable
@@ -57,6 +58,7 @@ fun Crosshair(modifier: Modifier = Modifier) {
 @Composable
 fun MapLabels(
     camera: CameraState,
+    coordinates: CoordinateFormat,
     isOffline: Boolean,
     onSettingsClicked: () -> Unit,
     onOfflineClicked: () -> Unit,
@@ -94,7 +96,7 @@ fun MapLabels(
                     IconButton(onClick = onLocationClicked) { LocationIcon(locationButton) }
                 }
             }
-            Label(text = formatCoordinates(camera.center))
+            Label(text = formatCoordinates(camera.center, coordinates))
             if (isOffline) {
                 Label(
                     text = stringResource(R.string.map_offline_notice),
