@@ -220,6 +220,9 @@ today's behaviour apart from `Start at`. Rollback is a revert; an older app igno
 
 ## Performance budget
 
+Not measured: the device session of 2026-10-04 reported every check as working but no log lines,
+so the values below remain estimates, accepted by the user as unverified (tasks 9.2, 9.3).
+
 | Interaction | Budget | How it is checked |
 |---|---|---|
 | Reading the settings at start | ≤ 50 ms on the phone | log line `Settings read in N ms`, device check |
