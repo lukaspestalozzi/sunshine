@@ -33,6 +33,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -49,6 +50,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -1308,6 +1310,46 @@ class MapViewModelTest {
         }
 
     @Test
+    fun `an opacity change neither recomputes nor redraws the overlay`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val settings = MutableStateFlow(Settings())
+            val viewModel = dayViewModel(suns, settings = settings)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceUntilIdle()
+            val overlay = viewModel.overlay.value
+            suns.clear()
+
+            settings.value = settings.value.copy(overlayOpacityPercent = 30)
+            advanceUntilIdle()
+
+            assertEquals(emptyList<SunPosition>(), suns)
+            assertSame(overlay, viewModel.overlay.value)
+        }
+
+    @Test
+    fun `an opacity change neither recomputes nor rebuilds the heatmap`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val settings = MutableStateFlow(Settings())
+            val viewModel = dayViewModel(suns, settings = settings)
+            viewModel.onOverlayModeSelected(OverlayMode.SUN_HOURS)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceUntilIdle()
+            val heatmap = viewModel.heatmap.value
+            assertTrue(heatmap is HeatmapUiState.Ready, "$heatmap")
+            suns.clear()
+
+            settings.value = settings.value.copy(overlayOpacityPercent = 90)
+            advanceUntilIdle()
+
+            assertEquals(emptyList<SunPosition>(), suns)
+            assertSame(heatmap, viewModel.heatmap.value)
+        }
+
+    @Test
     fun `only the missing steps of a partly computed day are computed`() =
         runTest {
             val suns = mutableListOf<SunPosition>()
@@ -1429,6 +1471,7 @@ class MapViewModelTest {
         dayCache: DayCache = DayCache(maxBytes = Long.MAX_VALUE),
         cells: MutableList<Double> = mutableListOf(),
         beforeCell: suspend (Double) -> Unit = {},
+        settings: StateFlow<Settings> = MutableStateFlow(Settings()),
     ): MapViewModel {
         val viewModel =
             MapViewModel(
@@ -1449,6 +1492,7 @@ class MapViewModelTest {
                 dayDispatcher = StandardTestDispatcher(testScheduler),
                 log = log,
                 dayCache = dayCache,
+                settings = settings,
             )
         viewModel.onMapSizeChanged(MAP_WIDTH, MAP_HEIGHT)
         viewModel.onSliderMoved(12 * 60f)

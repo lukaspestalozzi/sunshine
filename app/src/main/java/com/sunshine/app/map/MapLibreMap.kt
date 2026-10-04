@@ -42,10 +42,12 @@ import org.maplibre.android.style.sources.ImageSource
 
 /**
  * Full MapLibre map showing OpenTopoMap tiles. Starts at [initialCamera] and reports every camera
- * movement through [onCameraMoved], and the start of each move by a gesture through [onCameraGesture]. [overlay] is drawn on the terrain, directly above the map tiles;
- * `null` removes it. The tiles are drawn with [saturation] (−1 greyscale, 0 their own colours).
- * Once [locationAllowed], the device's position is drawn as a dot and [onLocationStale] reports
- * whether it is old; each element of [centreRequests] moves the map centre to a fresh position.
+ * movement through [onCameraMoved], and the start of each move by a gesture through
+ * [onCameraGesture]. [overlay] is drawn on the terrain, directly above the map tiles, at
+ * [overlayOpacity]; `null` removes it. The tiles are drawn with [saturation] (−1 greyscale, 0 their
+ * own colours). Once [locationAllowed], the device's position is drawn as a dot and
+ * [onLocationStale] reports whether it is old; each element of [centreRequests] moves the map
+ * centre to a fresh position.
  */
 @Composable
 fun MapLibreMap(
@@ -58,12 +60,14 @@ fun MapLibreMap(
     onLocationStale: (Boolean) -> Unit = {},
     centreRequests: Flow<Unit> = emptyFlow(),
     onCameraGesture: () -> Unit = {},
+    overlayOpacity: Float = DEFAULT_OVERLAY_OPACITY,
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val currentOnCameraMoved by rememberUpdatedState(onCameraMoved)
     val currentOnLocationStale by rememberUpdatedState(onLocationStale)
     val currentOnCameraGesture by rememberUpdatedState(onCameraGesture)
+    val currentOverlayOpacity by rememberUpdatedState(overlayOpacity)
 
     val mapView =
         remember {
@@ -105,7 +109,14 @@ fun MapLibreMap(
     }
 
     LaunchedEffect(mapView, overlay) {
-        mapView.getMapAsync { map -> map.getStyle { style -> style.showOverlay(overlay) } }
+        mapView.getMapAsync { map -> map.getStyle { style -> style.showOverlay(overlay, currentOverlayOpacity) } }
+    }
+
+    // A layer property: no overlay is drawn again (design D5 of add-settings).
+    LaunchedEffect(mapView, overlayOpacity) {
+        mapView.getMapAsync { map ->
+            map.getStyle { style -> style.getLayer(OVERLAY_ID)?.setProperties(PropertyFactory.rasterOpacity(overlayOpacity)) }
+        }
     }
 
     LaunchedEffect(mapView, saturation) {
@@ -192,7 +203,10 @@ fun mapSaturation(option: OverlayOption): Float = if (option == OverlayOption.SU
  * Shows [image] as a georeferenced raster right above the map tiles (design D9 of
  * add-sun-shade-overlay), or removes the overlay when [image] is `null`.
  */
-private fun Style.showOverlay(image: OverlayImage?) {
+private fun Style.showOverlay(
+    image: OverlayImage?,
+    opacity: Float,
+) {
     if (image == null) {
         getLayer(OVERLAY_ID)?.let { removeLayer(it) }
         getSource(OVERLAY_ID)?.let { removeSource(it) }
@@ -209,6 +223,7 @@ private fun Style.showOverlay(image: OverlayImage?) {
                 // Nearest keeps cell edges and the hatching crisp; no fade between overlays.
                 PropertyFactory.rasterResampling(Property.RASTER_RESAMPLING_NEAREST),
                 PropertyFactory.rasterFadeDuration(0f),
+                PropertyFactory.rasterOpacity(opacity),
             ),
             TOPO_LAYER_ID,
         )
@@ -271,6 +286,9 @@ private const val OVERLAY_ID = "sun-shade-overlay"
 private const val TOPO_LAYER_ID = "opentopomap"
 private const val GREYSCALE = -1f
 private const val MAX_ZOOM = 17.0
+
+// The settings' default, 60 % (settings spec, "Settings page").
+private const val DEFAULT_OVERLAY_OPACITY = 0.6f
 
 // At most one position per second (gps-location spec, "Location updates only while visible").
 private const val UPDATE_MILLIS = 1_000L

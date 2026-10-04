@@ -80,11 +80,11 @@ private const val TRANSPARENT = 0
 // An area 850.0000001 dp high still has 850 rows.
 private const val EDGE_TOLERANCE = 1e-6
 
-// #455A64 at alpha 0.6: dark blue-grey that keeps the topographic map readable (0.45 before design
-// D10 of add-sun-exposure-heatmap).
-internal const val SHADE_ARGB = 0x99455A64.toInt()
+// #455A64: dark blue-grey. Opaque here; the overlay layer draws it at the chosen opacity, 60 % by
+// default, which keeps the topographic map readable (design D5 of add-settings).
+internal const val SHADE_ARGB = 0xFF455A64.toInt()
 
-// #9E9E9E at alpha 0.6, in diagonal stripes 2 dp wide every 8 dp.
-internal const val UNKNOWN_ARGB = 0x999E9E9E.toInt()
+// #9E9E9E in diagonal stripes 2 dp wide every 8 dp, opaque like the shade tint.
+internal const val UNKNOWN_ARGB = 0xFF9E9E9E.toInt()
 internal const val HATCH_PERIOD = 8
 internal const val HATCH_WIDTH = 2
