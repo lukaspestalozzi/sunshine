@@ -25,6 +25,7 @@ import com.sunshine.app.offline.RegionDownloader
 import com.sunshine.app.offline.RegionRow
 import com.sunshine.app.offline.StorageUse
 import com.sunshine.app.offline.downloadWork
+import com.sunshine.app.settings.SettingsStore
 import com.sunshine.app.sunshine.OverlayRepository
 import com.sunshine.app.sunshine.SunshineRepository
 import com.sunshine.app.sunshine.debugLog
@@ -54,6 +55,10 @@ class SunshineApp : Application() {
     private val rateLimiters = RateLimiters()
 
     val offlineDatabase: OfflineDatabase by lazy { OfflineDatabase.create(this) }
+
+    /** The settings, read before any screen is shown (design D2 of add-settings). */
+    lateinit var settingsStore: SettingsStore
+        private set
 
     /** The persistent DEM tiles, browsed and of regions (design D5 of add-offline-regions). */
     private val demTileStore: DemTileStore by lazy { DemTileStore(offlineDatabase.dao(), File(filesDir, "dem")) }
@@ -154,6 +159,9 @@ class SunshineApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        val readStart = System.nanoTime()
+        settingsStore = SettingsStore.open(File(filesDir, SETTINGS_FILE), appScope)
+        debugLog("Settings read in ${(System.nanoTime() - readStart) / NANOS_PER_MILLI} ms")
         // Before MapLibre starts, so that every map request goes through it (design D3 of add-offline-regions).
         MapLibre.setModuleProvider(SunshineModuleProvider(rateLimiters, appScope))
         MapLibre.getInstance(this)
@@ -185,5 +193,7 @@ class SunshineApp : Application() {
         const val MAX_TILE_REQUESTS_PER_HOST = 20
         const val MEBIBYTE = 1024L * 1024
         const val MAP_DATABASE = "mbgl-offline"
+        const val SETTINGS_FILE = "datastore/settings.preferences_pb"
+        const val NANOS_PER_MILLI = 1_000_000
     }
 }
