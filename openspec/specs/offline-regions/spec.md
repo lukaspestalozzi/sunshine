@@ -49,7 +49,7 @@ map, with the camera, the selected time and the overlay as they were.
 
 #### Scenario: Narrow screen
 - **WHEN** the screen is 360 dp wide
-- **THEN** the ⓘ button, the Offline button and the overlay toggle are fully on screen and do not overlap
+- **THEN** the ⓘ button, the Offline button, the location button (gps-location "Location button") and the overlay toggle are fully on screen and do not overlap
 
 ### Requirement: Download the visible area
 The Offline page SHALL offer the button `Download visible area`. The area is the map area that
