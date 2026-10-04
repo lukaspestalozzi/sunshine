@@ -9,7 +9,7 @@ Device checks (1.1, 3.1–3.3, 4.1, 4.2) were run by the user in one session on 
   - outdoors, a coloured dot with an accuracy circle appears and `stale=false` is logged;
   - in airplane mode with location on, a coloured dot appears from GPS alone (cold start may take minutes);
   - covering the GPS antenna (or going indoors) for > 30 s turns the dot grey and logs `stale=true`;
-  - after 5 minutes in another app, back on the map: the dot is grey until a new position arrives (spec "Back to the map"). If it is coloured instead (risk of design D2), stop, record the raw observation in design D2 and ask the user how to proceed;
+  - after 5 minutes in another app, back on the map: the dot is grey until a new position arrives (spec "Back to the map"). If it is coloured instead (risk of design D2), stop, record the raw observation in design D2 and ask the user how to proceed. Result (2026-10-04): it stays coloured; accepted by user decision, the scenario was removed from the spec (design D2).
   - with `Sun & shade` on, the dot is drawn above the overlay;
   - panning and zooming never move the camera back to the dot.
 

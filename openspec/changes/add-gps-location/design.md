@@ -71,10 +71,11 @@ Alternatives considered:
   without showing it, against the project's "unknown is shown as unknown" constraint.
 - *Our own timer on the position's age*: duplicates what the component already does.
 
-Whether the component goes stale after the app returns from the background (onStop/onStart without
-a new `MapView`) is not visible in the bytecode alone: `onStop` cancels the pending stale timeout,
-and `onStart` posts it again, so a fresh dot could stay coloured for up to 30 s after a long pause.
-Task 1 checks this on the device first (see Risks).
+After a return from the background (onStop/onStart without a new `MapView`), `onStop` cancels the
+pending stale timeout and `onStart` posts it again, so a dot that was fresh when the app left
+stays coloured after the return until a new position arrives or 30 s pass. Checked on the device
+(2026-10-04): the dot does not turn grey on the return. Accepted by user decision: the 30 s do
+not count time in the background, and the spec says so ("Position dot").
 
 ### D3. The button's states are a pure state machine in `map/LocationButton.kt`
 
@@ -163,9 +164,8 @@ manifest say what it uses. No background location permission.
 
 ## Risks / Trade-offs
 
-- [The dot stays coloured for up to 30 s after a return from the background (D2)] → Task 1 checks
-  it first. If it happens, implementation stops and the user decides (for example restarting the
-  component on `ON_START`, or accepting it as a known limitation).
+- [The dot stays coloured after a return from the background (D2)] → Confirmed on the device
+  and accepted by user decision (2026-10-04): the spec no longer asks for grey on the return.
 - [The engine starts the network provider as well] → Online it gives a quick first position with a
   large accuracy circle, which is honest. Offline it gives nothing and GPS alone answers.
 - [GPS at 1 Hz drains the battery while the map is open] → Updates run only while the map screen

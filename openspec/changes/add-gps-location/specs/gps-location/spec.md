@@ -83,9 +83,11 @@ While location is switched off, no fresh position arrives; a dot already shown t
 While location access is allowed and the map screen is visible, the map SHALL show the device's
 latest position as a dot above the map tiles and the sun-shade overlay, with a translucent circle
 around it whose radius is the position's reported horizontal accuracy (±10 %). A position is
-**fresh** when it was received while the map screen is visible, at most 30 s (±1 s) ago. A
+**fresh** when it was received while the map screen is visible, at most 30 s (±1 s) ago; time
+the app spends in the background does not count towards the 30 s (user decision, 2026-10-04). A
 position that is not fresh is **old**: the device's last known position from before the map
-screen became visible, or a position received more than 30 s ago. An old position SHALL be drawn in
+screen was opened (app launch, or return from the About or Offline page), or a position received
+more than 30 s ago. An old position SHALL be drawn in
 grey, a fresh one in colour; the next fresh position SHALL turn the dot back to colour. Before any
 position is known, no dot SHALL be drawn. A position whose accuracy is not reported SHALL be drawn
 without a circle.
@@ -155,13 +157,8 @@ rotation and a visit to the About or Offline page.
 ### Requirement: Location updates only while visible
 The app SHALL receive position updates only while the map screen is visible, at most one per
 second, and SHALL stop them when the app goes to the background, the screen turns off, or the
-About or Offline page is opened. When the map screen becomes visible again, updates SHALL resume;
-until the first fresh position arrives the dot is old.
+About or Offline page is opened. When the map screen becomes visible again, updates SHALL resume.
 
 #### Scenario: App to the background
 - **WHEN** the dot is shown and the user switches to another app
 - **THEN** the app receives no position updates until the map screen is visible again
-
-#### Scenario: Back to the map
-- **WHEN** the user returns to the map after 5 minutes in another app
-- **THEN** the dot is grey at the last position until a fresh position arrives
