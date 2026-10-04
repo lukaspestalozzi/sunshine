@@ -35,6 +35,21 @@ class DayCacheTest {
         }
 
     @Test
+    fun `days of the same area, date and cell size with other steps are kept apart`() =
+        runTest {
+            val cache = DayCache(maxBytes = Long.MAX_VALUE)
+            val every5 = day(AREA, DECEMBER_21, grids = 1)
+            val every10 = day(AREA, DECEMBER_21, grids = 1, stepMinutes = 10)
+
+            cache.put(every5)
+            cache.put(every10)
+
+            assertSame(every5, cache.get(AREA, DECEMBER_21, SunShadeSweep.CELL_DP, stepMinutes = 5))
+            assertSame(every10, cache.get(AREA, DECEMBER_21, SunShadeSweep.CELL_DP, stepMinutes = 10))
+            assertNull(cache.get(AREA, DECEMBER_21, SunShadeSweep.CELL_DP, stepMinutes = 15))
+        }
+
+    @Test
     fun `a day put again for the same area and date replaces the first`() =
         runTest {
             val cache = DayCache(maxBytes = Long.MAX_VALUE)
@@ -115,8 +130,9 @@ class DayCacheTest {
         area: MapArea,
         date: LocalDate,
         grids: Int,
+        stepMinutes: Int = 5,
     ): DayOverlay {
-        val day = DayOverlay(area, date, ZURICH, { _, _, _ -> GRID }, StandardTestDispatcher(testScheduler))
+        val day = DayOverlay(area, date, ZURICH, { _, _, _ -> GRID }, StandardTestDispatcher(testScheduler), stepMinutes)
         for (step in day.steps.take(grids)) day.compute(step)
         assertEquals(grids.toLong() * GRID.stateBytes, day.bytes)
         return day

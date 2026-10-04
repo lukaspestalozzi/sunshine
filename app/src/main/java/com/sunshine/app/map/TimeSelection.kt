@@ -11,23 +11,45 @@ import kotlin.math.roundToInt
 // The time slider covers the selected day from its start up to, but not including, the start of
 // the next day, on the instant timeline: 23 or 25 hours on most daylight-saving transition days.
 
-/** Number of slider positions on [date]: one per 5 minutes of the day's real length. */
+/**
+ * Number of slider positions on [date]: one per [step] minutes of the day's real length. The step
+ * is 5 minutes, or the `Sun & shade` step while that mode is shown (time-selection spec, "Choose
+ * the time of day"); every allowed step divides 23, 24 and 25 hours.
+ */
 fun sliderPositions(
     date: LocalDate,
     zone: ZoneId,
+    step: Int = SLIDER_STEP_MINUTES,
 ): Int {
     val length = Duration.between(date.atStartOfDay(zone), date.plusDays(1).atStartOfDay(zone))
-    return (length.toMinutes() / SLIDER_STEP_MINUTES).toInt()
+    return (length.toMinutes() / step).toInt()
 }
 
-/** The time at slider value [minutes] (minutes since the start of [date]), snapped to the 5-minute grid. */
+/** The time at slider value [minutes] (minutes since the start of [date]), snapped to the grid of [step] minutes. */
 fun sliderTime(
     date: LocalDate,
     zone: ZoneId,
     minutes: Float,
+    step: Int = SLIDER_STEP_MINUTES,
 ): ZonedDateTime {
-    val step = (minutes / SLIDER_STEP_MINUTES).roundToInt().coerceIn(0, sliderPositions(date, zone) - 1)
-    return date.atStartOfDay(zone).plusMinutes(step.toLong() * SLIDER_STEP_MINUTES)
+    val position = (minutes / step).roundToInt().coerceIn(0, sliderPositions(date, zone, step) - 1)
+    return date.atStartOfDay(zone).plusMinutes(position.toLong() * step)
+}
+
+/**
+ * [time] rounded to the nearest step of [step] minutes of its day, counted on the real timeline
+ * from the start of the day: half up, and at most the day's last step (design D4 of add-settings).
+ */
+fun roundToStep(
+    time: ZonedDateTime,
+    step: Int,
+): ZonedDateTime {
+    val date = time.toLocalDate()
+    val start = date.atStartOfDay(time.zone)
+    val elapsedMillis = Duration.between(start, time).toMillis()
+    val stepMillis = step * MILLIS_PER_MINUTE.toLong()
+    val position = ((elapsedMillis + stepMillis / 2) / stepMillis).coerceAtMost(sliderPositions(date, time.zone, step) - 1L)
+    return start.plusMinutes(position * step)
 }
 
 /** Slider value for [time]: minutes since the start of its day; off the grid for "Now". */

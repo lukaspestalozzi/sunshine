@@ -40,6 +40,7 @@ fun SunPanel(
     onSliderMoved: (Float) -> Unit,
     onNowClicked: () -> Unit,
     modifier: Modifier = Modifier,
+    sliderStep: Int = SLIDER_STEP_MINUTES,
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
 
@@ -62,7 +63,8 @@ fun SunPanel(
             Slider(
                 value = sliderMinutes(selectedTime),
                 onValueChange = onSliderMoved,
-                valueRange = 0f..(sliderPositions(selectedTime.toLocalDate(), selectedTime.zone) - 1) * SLIDER_STEP_MINUTES.toFloat(),
+                // Up to the day's last step: 23:55 with 5 minutes, 23:50 with 10 (design D4 of add-settings).
+                valueRange = 0f..(sliderPositions(selectedTime.toLocalDate(), selectedTime.zone, sliderStep) - 1) * sliderStep.toFloat(),
                 modifier = Modifier.semantics { contentDescription = timeOfDay },
             )
             // Altitude and sunshine belong to the location and day, so they do not wait for the sun values.
