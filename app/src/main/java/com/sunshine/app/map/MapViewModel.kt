@@ -355,7 +355,10 @@ class MapViewModel(
                         return@collect
                     }
                     val current = shown.get()
-                    val resolutionChanged = current != null && current.cellDp != input.cellDp
+                    // A new cell size or step: the kept overlay belongs to another shade resolution (sun-shade-overlay
+                    // spec, "Overlay resolution"), even when its time lies on both grids.
+                    val dayResolutionChanged = day?.let { it.cellDp != input.cellDp || it.stepMinutes != input.stepMinutes } == true
+                    val resolutionChanged = current != null && (current.cellDp != input.cellDp || dayResolutionChanged)
                     val unchanged =
                         current != null &&
                             current.grid.area == area &&
@@ -364,7 +367,6 @@ class MapViewModel(
                             day?.let { it.cellDp == input.cellDp && it.stepMinutes == input.stepMinutes } == true
                     if (unchanged && (!input.online || !current.grid.hasUnknown)) return@collect
                     // A new time or shade resolution is computed at once; only a camera move waits to rest.
-                    val dayResolutionChanged = day?.let { it.cellDp != input.cellDp || it.stepMinutes != input.stepMinutes } == true
                     val immediate = requestedTime != null && requestedTime != input.time || dayResolutionChanged
                     requestedTime = input.time
                     lookup?.cancelAndJoin()

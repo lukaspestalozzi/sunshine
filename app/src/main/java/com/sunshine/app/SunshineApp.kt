@@ -35,6 +35,7 @@ import com.sunshine.core.MapArea
 import java.io.File
 import kotlin.coroutines.resume
 import kotlin.time.measureTime
+import kotlin.time.measureTimedValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -99,26 +100,30 @@ class SunshineApp : Application() {
 
     /**
      * Removes every browsed map and DEM tile; region tiles stay (offline-regions spec, "Clear browsed
-     * tiles"; design D9 of add-settings). Only while every region is complete.
+     * tiles"; design D9 of add-settings). Only while every region is complete. `false` when MapLibre
+     * could not clear its browsed tiles; the DEM tiles are cleared all the same.
      */
-    suspend fun clearBrowsedTiles() {
-        val took =
-            measureTime {
-                suspendCancellableCoroutine { done ->
-                    OfflineManager.getInstance(this).clearAmbientCache(
-                        object : OfflineManager.FileSourceCallback {
-                            override fun onSuccess() = done.resume(Unit)
+    suspend fun clearBrowsedTiles(): Boolean {
+        val (mapCleared, took) =
+            measureTimedValue {
+                val mapCleared =
+                    suspendCancellableCoroutine { done ->
+                        OfflineManager.getInstance(this).clearAmbientCache(
+                            object : OfflineManager.FileSourceCallback {
+                                override fun onSuccess() = done.resume(true)
 
-                            override fun onError(message: String) {
-                                debugLog("Browsed map tiles not cleared: $message")
-                                done.resume(Unit)
-                            }
-                        },
-                    )
-                }
+                                override fun onError(message: String) {
+                                    debugLog("Browsed map tiles not cleared: $message")
+                                    done.resume(false)
+                                }
+                            },
+                        )
+                    }
                 demTileStore.clearBrowsed()
+                mapCleared
             }
-        debugLog("Browsed tiles cleared in ${took.inWholeMilliseconds} ms")
+        debugLog("Browsed tiles cleared in ${took.inWholeMilliseconds} ms, map tiles ${if (mapCleared) "cleared" else "not cleared"}")
+        return mapCleared
     }
 
     /** Shared by all screens and features, so decoded and stored tiles are shared too (design D6). */

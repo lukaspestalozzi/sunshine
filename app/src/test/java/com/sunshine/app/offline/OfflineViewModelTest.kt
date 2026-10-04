@@ -60,6 +60,16 @@ class OfflineViewModelTest {
     }
 
     @Test
+    fun `showing the page again reads the storage again`() {
+        val viewModel = viewModel()
+        storage = StorageUse(mapBytes = 300L * 1024 * 1024, demBytes = 0)
+
+        viewModel.onShown()
+
+        assertEquals("300 MiB", viewModel.uiState.value.mapStorage)
+    }
+
+    @Test
     fun `region names follow the coordinate format`() {
         regions.value = listOf(summary(id = 1, createdAt = 1))
 

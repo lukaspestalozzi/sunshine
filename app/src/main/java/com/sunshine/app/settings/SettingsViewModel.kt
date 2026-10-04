@@ -3,8 +3,10 @@ package com.sunshine.app.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -14,7 +16,8 @@ import kotlinx.coroutines.launch
 class SettingsViewModel(
     private val store: SettingsStore,
     regionNotComplete: Flow<Boolean> = flowOf(false),
-    private val clearBrowsed: suspend () -> Unit = {},
+    /** Clears the browsed tiles; `false` when some could not be removed. */
+    private val clearBrowsed: suspend () -> Boolean = { true },
 ) : ViewModel() {
     val settings: StateFlow<Settings> = store.settings
 
@@ -37,17 +40,32 @@ class SettingsViewModel(
 
     fun onBrowsedLimit(mib: Int) = write { store.setBrowsedLimit(mib) }
 
-    /** The values of `Custom resolution`, stored when its page is left. */
-    fun onCustom(custom: Resolution) {
-        if (custom != store.settings.value.custom) write { store.setCustom(custom) }
+    private val mutableCustomDraft = MutableStateFlow<Resolution?>(null)
+
+    /**
+     * The values being edited on the `Custom resolution` page, held here so that they survive a
+     * rotation; `null` while the page is not open (design D3 of add-settings).
+     */
+    val customDraft: StateFlow<Resolution?> = mutableCustomDraft.asStateFlow()
+
+    /** The page was shown; a draft already open, e.g. before a rotation, is kept. */
+    fun onCustomOpened() {
+        if (mutableCustomDraft.value == null) mutableCustomDraft.value = store.settings.value.custom
     }
 
-    /** Clears the browsed tiles, then calls [done]. */
-    fun onClearBrowsed(done: () -> Unit) =
-        write {
-            clearBrowsed()
-            done()
-        }
+    fun onCustomEdited(custom: Resolution) {
+        mutableCustomDraft.value = custom
+    }
+
+    /** The user left the page: the draft takes effect now, not at every step of the adjustment. */
+    fun onCustomClosed() {
+        val draft = mutableCustomDraft.value ?: return
+        mutableCustomDraft.value = null
+        if (draft != store.settings.value.custom) write { store.setCustom(draft) }
+    }
+
+    /** Clears the browsed tiles, then calls [done] with whether all of them were removed. */
+    fun onClearBrowsed(done: (Boolean) -> Unit) = write { done(clearBrowsed()) }
 
     private fun write(change: suspend () -> Unit) {
         viewModelScope.launch { change() }

@@ -74,6 +74,10 @@ class OfflineViewModel(
     // Deleted regions leave the list at once, before the database says so.
     private val deleted = MutableStateFlow(emptySet<Long>())
     private val confirmDelete = MutableStateFlow<RegionItem?>(null)
+
+    // Counts the page's appearances: the storage is read again each time, as browsing or clearing
+    // the browsed tiles meanwhile changes it without a change of the regions.
+    private val shown = MutableStateFlow(0)
     private val blocked =
         when {
             area.zoom < MIN_DOWNLOAD_ZOOM -> DownloadBlock.ZOOMED_OUT
@@ -83,7 +87,13 @@ class OfflineViewModel(
     private val estimate = if (blocked == null) formatEstimate(downloadEstimate(GeoBounds.of(area))) else null
 
     val uiState: StateFlow<OfflineUiState> =
-        combine(regions, work, deleted, confirmDelete, settings) { summaries, work, deleted, confirm, settings ->
+        combine(regions, work, deleted, confirmDelete, combine(settings, shown) { settings, _ -> settings }) {
+            summaries,
+            work,
+            deleted,
+            confirm,
+            settings,
+            ->
             val use = storage()
             OfflineUiState(
                 estimate = estimate,
@@ -95,6 +105,11 @@ class OfflineViewModel(
                 browsedLimit = formatMebibytes(settings.browsedLimitMib * MEBIBYTE),
             )
         }.stateIn(viewModelScope, SharingStarted.Eagerly, OfflineUiState(estimate, blocked))
+
+    /** The page became visible: its storage is read again. */
+    fun onShown() {
+        shown.update { it + 1 }
+    }
 
     fun onDownload() {
         viewModelScope.launch { download(area) }

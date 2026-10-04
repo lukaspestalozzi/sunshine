@@ -1,5 +1,6 @@
 package com.sunshine.app.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,34 +18,38 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sunshine.app.R
 import kotlin.math.roundToInt
 
 /**
  * The `Custom resolution` page (settings spec, "Custom resolution"; design D3 of add-settings): the
- * four values within their ranges. They are edited as a copy and stored when the page is left, so
- * that adjusting a value does not start a computation at every step. The system back returns to
- * the Settings page.
+ * four values within their ranges. They are edited as a draft in [viewModel], which survives a
+ * rotation, and stored when the system back leaves the page for the Settings page ([onBack]), so
+ * that adjusting a value does not start a computation at every step.
  */
 @Composable
 fun CustomResolutionScreen(
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = viewModel(factory = settingsViewModelFactory),
 ) {
-    var values by remember { mutableStateOf(viewModel.settings.value.custom) }
-    val current by rememberUpdatedState(values)
-    DisposableEffect(viewModel) { onDispose { viewModel.onCustom(current) } }
+    LaunchedEffect(viewModel) { viewModel.onCustomOpened() }
+    BackHandler {
+        viewModel.onCustomClosed()
+        onBack()
+    }
+    val draft by viewModel.customDraft.collectAsStateWithLifecycle()
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val values = draft ?: settings.custom
+    val edit = viewModel::onCustomEdited
     Surface(modifier.fillMaxSize()) {
         Column(
             Modifier
@@ -55,16 +60,16 @@ fun CustomResolutionScreen(
         ) {
             Text(stringResource(R.string.settings_custom_resolution), style = MaterialTheme.typography.headlineSmall)
             CellEntry(R.string.settings_custom_sun_shade_cell, values.sunShadeCellDp, Resolution.SUN_SHADE_CELLS) {
-                values = values.copy(sunShadeCellDp = it)
+                edit(values.copy(sunShadeCellDp = it))
             }
             StepEntry(R.string.settings_custom_sun_shade_step, values.sunShadeStepMinutes) {
-                values = values.copy(sunShadeStepMinutes = it)
+                edit(values.copy(sunShadeStepMinutes = it))
             }
             CellEntry(R.string.settings_custom_sun_hours_cell, values.sunHoursCellDp, Resolution.SUN_HOURS_CELLS) {
-                values = values.copy(sunHoursCellDp = it)
+                edit(values.copy(sunHoursCellDp = it))
             }
             StepEntry(R.string.settings_custom_sun_hours_step, values.sunHoursStepMinutes) {
-                values = values.copy(sunHoursStepMinutes = it)
+                edit(values.copy(sunHoursStepMinutes = it))
             }
         }
     }
