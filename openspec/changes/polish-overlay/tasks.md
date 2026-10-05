@@ -1,5 +1,7 @@
 # Tasks
 
+Device checks (3.2, 4.4, 5.1–5.3) are done by the user at the end, on the debug APK of the last commit (user decision, 2026-10-05).
+
 ## 1. One sunshine rule with an upper bound (core)
 
 - [x] 1.1 Set `docs/roadmap.md` row #10 to "in progress" and add the debug mode to its scope (proposal, "Why"). Verify: `openspec validate --all --strict` passes and the row reads "in progress".
@@ -33,4 +35,5 @@
 - [ ] 5.1 On the user's phone with the debug APK, follow design D7 (Lauterbrunnen, zoom 12, `Normal`, 2025-12-21 and 2025-06-21, `Timings` and `Day state` on, one `Agreement` result) and fill in "Measured values" in design.md. Verify: the table holds the measured numbers; if the counting pass exceeds 2 s or the heatmap image 100 ms, stop and ask the user before any further task (proposal, "What Changes").
 - [ ] 5.2 On the device with `Day state` on: compute a day, pan by half a screen, and right after the camera rests move the slider to a time not yet computed for the new area. Verify: the earlier overlay of that time appears at once on its terrain without `Computing sun and shade …`, the box shows `Shown earlier day`, then `Shown own day` once the new grid arrives (sun-shade-overlay "Scrubbing after a pan").
 - [ ] 5.3 On the device offline in an area with partly loaded tiles, `Agreement check` on: overlay on at zoom 12. Verify: the overlay's cell at the crosshair and the panel's state at the selected time agree, unless the crosshair lies on a shadow edge, and `Agreement` reports ≥ 99.5 % (point-sunshine "Panel and overlay agree with missing data").
-- [ ] 5.4 Run the full local CI. Verify: `./scripts/verify-local.sh` passes (ktlint, Android lint, unit tests, debug APK) and `openspec validate --all --strict` passes.
+- [x] 5.4 Run the full local CI. Verify: `./scripts/verify-local.sh` passes (ktlint, Android lint, unit tests, debug APK) and `openspec validate --all --strict` passes.
+  Result (2026-10-05): `./scripts/verify-local.sh` passed (4 of 4 steps) and `openspec validate --all --strict` passed. One earlier full-suite run timed out in `SettingsViewModelTest > a debug switch is stored()` after 10 s (it took 0.31 s alone); it did not reproduce in two further full runs nor in this one. It matches the intermittent DataStore hang noted in `SettingsStoreTest`; its root cause is unknown.
