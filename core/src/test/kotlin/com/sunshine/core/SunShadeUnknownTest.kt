@@ -32,6 +32,27 @@ class SunShadeUnknownTest {
         assertEquals(Sunshine.SHADE, terrain.grid(AREA, sun(1.5)).stateAt(CENTER))
     }
 
+    // The cell's eye at 2500 m on a plateau, with low ground at 500 m in the north of the area, so
+    // that the upwind cut (computed from the lowest ground) still reaches the gap at 20 km. From
+    // 2500 m, terrain 20 km away could rise to at most 6.51° (sun-shade-overlay spec, "Higher eye,
+    // same gap").
+    @Test
+    fun `a higher eye is sunny above what missing terrain could reach`() {
+        val plateau =
+            SyntheticTerrain { lat, _ ->
+                val south = (CENTER.latitude - lat) * METRES_PER_DEGREE
+                when {
+                    south < -300.0 -> GROUND
+                    south in 20_000.0..21_000.0 -> Double.NaN
+                    south in 5_000.0..5_100.0 -> PLATEAU + RIDGE - GROUND
+                    else -> PLATEAU
+                }
+            }
+
+        assertEquals(Sunshine.SUN, plateau.grid(AREA, sun(8.0)).stateAt(CENTER))
+        assertEquals(Sunshine.UNKNOWN, plateau.grid(AREA, sun(6.4)).stateAt(CENTER))
+    }
+
     @Test
     fun `a whole missing tile 20 km towards the sun makes the cell unknown`() {
         val plain = SyntheticTerrain { lat, _ -> if ((CENTER.latitude - lat) * METRES_PER_DEGREE in 5_000.0..5_100.0) RIDGE else GROUND }
@@ -74,6 +95,7 @@ class SunShadeUnknownTest {
         val AREA = MapArea(CENTER, 12.0, 60.0, 60.0)
         val METRES_PER_DEGREE = Math.toRadians(1.0) * SyntheticTerrain.EARTH_RADIUS
         const val GROUND = 498.3
+        const val PLATEAU = 2498.3
 
         // 2° seen from the eye at 500 m, 5 km away: 500 + 5000 · tan 2° + c · 5000².
         const val RIDGE = 676.3

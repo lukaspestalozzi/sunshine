@@ -7,21 +7,32 @@ import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.ln
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 /**
  * Horizon angle (degrees) for every [AZIMUTH_STEP] of azimuth, seen from an eye at [eyeHeight]
- * metres. Where [complete] is false, the angle is a lower bound: the ray ended at missing data
- * (terrain-horizon spec, "Incomplete horizon").
+ * metres, with its [upper] bound. Where the upper bound lies above the angle, the bin is
+ * incomplete: the ray met missing data, the angle is a lower bound, and terrain beyond the gap
+ * could appear at most at the upper bound (terrain-horizon spec, "Incomplete horizon").
  */
 class HorizonProfile(
     val eyeHeight: Double,
     val angles: DoubleArray,
-    val complete: BooleanArray,
+    val upper: DoubleArray,
 ) {
+    /** Whether each bin is complete, i.e. its upper bound equals its angle. */
+    val complete: BooleanArray = BooleanArray(angles.size) { upper[it] <= angles[it] }
+
     /** Angle at [azimuth], interpolated linearly between the two neighbouring bins. */
     fun angleAt(azimuth: Double): Double {
         val (i, j, f) = bins(azimuth)
         return angles[i] + (angles[j] - angles[i]) * f
+    }
+
+    /** Upper bound at [azimuth]: the larger of the bins that [angleAt] uses (design D3 of polish-overlay). */
+    fun upperAt(azimuth: Double): Double {
+        val (i, j, f) = bins(azimuth)
+        return if (f == 0.0) upper[i] else maxOf(upper[i], upper[j])
     }
 
     /** Whether the bins that [angleAt] uses at [azimuth] are complete. */
@@ -54,7 +65,9 @@ class HorizonTracer(
 
     // Largest slope (tan of the elevation angle) seen along each ray.
     private val maxSlope = DoubleArray(AZIMUTH_COUNT) { Double.NEGATIVE_INFINITY }
-    private val complete = BooleanArray(AZIMUTH_COUNT) { true }
+
+    // Distance of each ray's first missing sample, or infinity.
+    private val gap = DoubleArray(AZIMUTH_COUNT) { Double.POSITIVE_INFINITY }
     private val active = BooleanArray(AZIMUTH_COUNT) { true }
     private var eyeHeight = Double.NaN
     private var groundUnknown = false
@@ -113,9 +126,9 @@ class HorizonTracer(
             }
             val h = grid.bilinear(x, y)
             if (h.isNaN()) {
-                complete[ray] = false
-                active[ray] = false
-                false
+                // The ray goes on: terrain beyond the gap still counts (design D3 of polish-overlay).
+                if (distance < gap[ray]) gap[ray] = distance
+                true
             } else {
                 val slope = (h - drop(distance) - eyeHeight) / distance
                 if (slope > maxSlope[ray]) maxSlope[ray] = slope
@@ -129,7 +142,14 @@ class HorizonTracer(
     fun profile(): HorizonProfile? {
         check(isDone) { "not done" }
         if (groundUnknown) return null
-        return HorizonProfile(eyeHeight, DoubleArray(AZIMUTH_COUNT) { Math.toDegrees(atan(maxSlope[it])) }, complete.copyOf())
+        val angles = DoubleArray(AZIMUTH_COUNT) { Math.toDegrees(atan(maxSlope[it])) }
+        val upper =
+            DoubleArray(AZIMUTH_COUNT) { ray ->
+                val reach = if (gap[ray].isInfinite()) Double.NEGATIVE_INFINITY else boundBeyond(gap[ray])
+                // Complete when nothing beyond the gap could rise above the slope found.
+                if (reach <= maxSlope[ray]) angles[ray] else Math.toDegrees(atan(reach))
+            }
+        return HorizonProfile(eyeHeight, angles, upper)
     }
 
     /**
@@ -144,6 +164,17 @@ class HorizonTracer(
         ray: Int,
         distance: Double,
     ): Boolean = (heightBound - eyeHeight - drop(distance)) / distance < maxSlope[ray]
+
+    /**
+     * The largest slope terrain up to heightBound could have at [distance] or beyond: bound(d)
+     * falls with d when the eye is below heightBound; otherwise it peaks where d² = (eye - heightBound) / c
+     * (see [cannotRise]).
+     */
+    private fun boundBeyond(distance: Double): Double {
+        val peak = if (eyeHeight > heightBound) sqrt((eyeHeight - heightBound) / CURVATURE) else 0.0
+        val d = maxOf(distance, peak)
+        return (heightBound - eyeHeight - drop(d)) / d
+    }
 
     private fun drop(distance: Double): Double = distance * distance * (1 - REFRACTION) / (2 * EARTH_RADIUS)
 

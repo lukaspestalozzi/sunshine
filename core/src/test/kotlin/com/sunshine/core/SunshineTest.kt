@@ -28,13 +28,35 @@ class SunshineTest {
         }
     }
 
+    // Bounds 2° and 12.09°: eye at 500 m, a tile 20 km away unavailable (point-sunshine spec).
+    @Test
+    fun `an incomplete horizon decides sun above its upper bound`() {
+        val profile = HorizonProfile(568.0, DoubleArray(AZIMUTH_COUNT) { 2.0 }, DoubleArray(AZIMUTH_COUNT) { 12.09 })
+
+        assertEquals(Sunshine.SUN, sunshine(profile, 180.0, 20.0))
+        assertEquals(Sunshine.UNKNOWN, sunshine(profile, 180.0, 5.0))
+        assertEquals(Sunshine.SHADE, sunshine(profile, 180.0, 1.5))
+    }
+
+    @Test
+    fun `between a complete and an incomplete bin the larger upper bound applies`() {
+        // Bin 720 (180°) complete at 2°, bin 721 (180.25°) incomplete up to 12.09°.
+        val upper = DoubleArray(AZIMUTH_COUNT) { if (it == 721) 12.09 else 2.0 }
+        val profile = HorizonProfile(568.0, DoubleArray(AZIMUTH_COUNT) { 2.0 }, upper)
+
+        assertEquals(Sunshine.SUN, sunshine(profile, 180.0, 8.0))
+        assertEquals(Sunshine.UNKNOWN, sunshine(profile, 180.05, 8.0))
+        assertEquals(Sunshine.SUN, sunshine(profile, 180.05, 12.1))
+    }
+
+    // An incomplete horizon without a known upper bound: anything above its angle may be blocked.
     private fun constantHorizon(
         angle: Double,
         complete: Boolean,
     ) = HorizonProfile(
         eyeHeight = 568.0,
         angles = DoubleArray(AZIMUTH_COUNT) { angle },
-        complete = BooleanArray(AZIMUTH_COUNT) { complete },
+        upper = DoubleArray(AZIMUTH_COUNT) { if (complete) angle else 90.0 },
     )
 
     private companion object {
