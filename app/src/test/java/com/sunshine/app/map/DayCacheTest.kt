@@ -15,6 +15,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertSame
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 // The cache of overlay days (sun-shade-overlay spec, "Overlay of the whole day"; design D14 of
@@ -125,14 +126,76 @@ class DayCacheTest {
             assertEquals(0L, cache.bytes)
         }
 
+    // An earlier day fills in after a pan (sun-shade-overlay spec, "Overlay updates"; design D2 of polish-overlay).
+    @Test
+    fun `an overlapping day of the same date, cell size and step with the time is found`() =
+        runTest {
+            val cache = DayCache(maxBytes = Long.MAX_VALUE)
+            val earlier = day(AREA, DECEMBER_21, grids = 2)
+            val current = day(PANNED, DECEMBER_21, grids = 1)
+            cache.put(earlier)
+            cache.put(current)
+
+            assertSame(earlier, cache.overlapping(PANNED, earlier.steps[1], SunShadeSweep.CELL_DP, 5, except = current))
+        }
+
+    @Test
+    fun `days that do not fit are not found`() =
+        runTest {
+            val cache = DayCache(maxBytes = Long.MAX_VALUE)
+            val time = day(AREA, DECEMBER_21, grids = 1).steps[1]
+            val current = day(PANNED, DECEMBER_21, grids = 2)
+            cache.put(day(AREA.copy(center = GeoPoint(46.6863, 8.8632)), DECEMBER_21, grids = 2))
+            cache.put(day(AREA, DECEMBER_21.plusDays(1), grids = 2))
+            cache.put(day(AREA, DECEMBER_21, grids = 2, cellDp = 4.0))
+            cache.put(day(AREA, DECEMBER_21, grids = 2, stepMinutes = 10))
+            cache.put(current)
+
+            assertNull(cache.overlapping(PANNED, time, SunShadeSweep.CELL_DP, 5, except = current))
+            // A day without that time.
+            cache.put(day(AREA, DECEMBER_21, grids = 1))
+            assertNull(cache.overlapping(PANNED, time, SunShadeSweep.CELL_DP, 5, except = current))
+        }
+
+    @Test
+    fun `of two overlapping days the most recently used is found`() =
+        runTest {
+            val cache = DayCache(maxBytes = Long.MAX_VALUE)
+            val first = day(AREA, DECEMBER_21, grids = 2)
+            val second = day(AREA.copy(center = GeoPoint(46.6863, 7.8622)), DECEMBER_21, grids = 2)
+            cache.put(first)
+            cache.put(second)
+            val time = first.steps[1]
+
+            assertSame(second, cache.overlapping(PANNED, time, SunShadeSweep.CELL_DP, 5, except = null))
+            cache.get(first.area, first.date)
+            assertSame(first, cache.overlapping(PANNED, time, SunShadeSweep.CELL_DP, 5, except = null))
+        }
+
+    @Test
+    fun `50 cached days are searched within 1 ms`() =
+        runTest {
+            val cache = DayCache(maxBytes = Long.MAX_VALUE)
+            repeat(50) { cache.put(day(AREA.copy(center = GeoPoint(46.0 + it * 0.01, 7.0)), DECEMBER_21.plusDays(it % 2L), grids = 1)) }
+            val time = day(AREA, DECEMBER_21, grids = 1).steps[1]
+            repeat(WARM_UP) { cache.overlapping(PANNED, time, SunShadeSweep.CELL_DP, 5, except = null) }
+
+            val start = System.nanoTime()
+            repeat(RUNS) { cache.overlapping(PANNED, time, SunShadeSweep.CELL_DP, 5, except = null) }
+            val millis = (System.nanoTime() - start) / 1e6 / RUNS
+
+            assertTrue(millis <= 1.0, "$millis ms per lookup")
+        }
+
     // A day of [area] and [date] with the first [grids] slider steps computed.
     private suspend fun TestScope.day(
         area: MapArea,
         date: LocalDate,
         grids: Int,
         stepMinutes: Int = 5,
+        cellDp: Double = SunShadeSweep.CELL_DP,
     ): DayOverlay {
-        val day = DayOverlay(area, date, ZURICH, { _, _, _ -> GRID }, StandardTestDispatcher(testScheduler), stepMinutes)
+        val day = DayOverlay(area, date, ZURICH, { _, _, _ -> GRID }, StandardTestDispatcher(testScheduler), stepMinutes, cellDp)
         for (step in day.steps.take(grids)) day.compute(step)
         assertEquals(grids.toLong() * GRID.stateBytes, day.bytes)
         return day
@@ -142,6 +205,11 @@ class DayCacheTest {
         val ZURICH: ZoneId = ZoneId.of("Europe/Zurich")
         val DECEMBER_21: LocalDate = LocalDate.of(2025, 12, 21)
         val AREA = MapArea(GeoPoint(46.6863, 7.8632), zoom = 12.0, widthDp = 20.0, heightDp = 30.0)
+
+        // AREA moved 10 dp east: they overlap by half their width.
+        val PANNED = AREA.copy(center = GeoPoint(46.6863, 7.8632 + 10 * 360.0 / (512 * 4096)))
+        const val WARM_UP = 1000
+        const val RUNS = 1000
 
         // Count pixels: one per 2 dp cell of the 20 × 30 dp area (design D9 of add-sun-exposure-heatmap).
         const val PIXELS = 10 * 15

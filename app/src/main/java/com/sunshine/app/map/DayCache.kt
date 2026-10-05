@@ -1,8 +1,10 @@
 package com.sunshine.app.map
 
+import com.sunshine.core.GeoBounds
 import com.sunshine.core.MapArea
 import com.sunshine.core.SunShadeSweep
 import java.time.LocalDate
+import java.time.ZonedDateTime
 
 /**
  * Computed overlay days by visible area, date, cell size and step (design D14 of
@@ -45,6 +47,36 @@ class DayCache(
     fun remove(day: DayOverlay) {
         days.remove(day.key(), day)
     }
+
+    /**
+     * The most recently used day other than [except] whose area overlaps [area], of [time]'s date,
+     * [cellDp] and [stepMinutes], that has a grid at [time]; it becomes the most recently used
+     * (design D2 of polish-overlay).
+     */
+    @Synchronized
+    fun overlapping(
+        area: MapArea,
+        time: ZonedDateTime,
+        cellDp: Double,
+        stepMinutes: Int,
+        except: DayOverlay?,
+    ): DayOverlay? {
+        val visible = GeoBounds.of(area)
+        val date = time.toLocalDate()
+        val found =
+            days.values.reversed().firstOrNull { day ->
+                day !== except &&
+                    day.date == date &&
+                    day.cellDp == cellDp &&
+                    day.stepMinutes == stepMinutes &&
+                    day.gridAt(time) != null &&
+                    GeoBounds.of(day.area).intersects(visible)
+            }
+        return found?.also { days[it.key()] }
+    }
+
+    private fun GeoBounds.intersects(other: GeoBounds) =
+        south < other.north && other.south < north && west < other.east && other.west < east
 
     private fun DayOverlay.key() = Key(area, date, cellDp, stepMinutes)
 

@@ -1,6 +1,7 @@
 package com.sunshine.app.map
 
 import androidx.lifecycle.SavedStateHandle
+import com.sunshine.app.R
 import com.sunshine.app.elevation.DemTile
 import com.sunshine.app.elevation.ElevationRepository
 import com.sunshine.app.elevation.TileCache
@@ -1140,6 +1141,62 @@ class MapViewModelTest {
             assertEquals(setOf(MapArea(GeoPoint(46.69, 7.87), 12.0, MAP_WIDTH, MAP_HEIGHT)), areas.toSet())
         }
 
+    // sun-shade-overlay spec, "Overlay updates", "Scrubbing after a pan" (design D1, D2 of polish-overlay).
+    @Test
+    fun `after a pan a time the new day lacks is shown from the earlier day, then from the own day`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val gate = MutableStateFlow(true)
+            // The first day's 288 grids and the new area's selected time pass; the rest waits.
+            val viewModel = dayViewModel(suns, before = { if (suns.size > DAY_STEPS) gate.first { it } })
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            advanceUntilIdle()
+            assertEquals(DAY_STEPS, suns.size)
+            gate.value = false
+
+            viewModel.onCameraMoved(CameraState(center = HALF_A_SCREEN_EAST, zoom = 12.0))
+            advanceTimeBy(SETTLE_MILLIS)
+            assertEquals(HALF_A_SCREEN_EAST, (viewModel.overlay.value as OverlayUiState.Ready).grid.area.center)
+            assertEquals(DAY_STEPS + 1, suns.size)
+            viewModel.onSliderMoved(14 * 60f + 35)
+
+            val earlier = viewModel.overlay.value as OverlayUiState.Ready
+            assertEquals(OverlaySource.EARLIER_DAY, earlier.source)
+            assertEquals(INTERLAKEN, earlier.grid.area.center)
+            assertEquals(ZonedDateTime.of(2025, 12, 21, 14, 35, 0, 0, ZURICH), earlier.time)
+            assertEquals(DAY_STEPS + 1, suns.size)
+
+            gate.value = true
+            advanceUntilIdle()
+            val own = viewModel.overlay.value as OverlayUiState.Ready
+            assertEquals(OverlaySource.OWN_DAY, own.source)
+            assertEquals(HALF_A_SCREEN_EAST, own.grid.area.center)
+            assertEquals(earlier.time, own.time)
+        }
+
+    @Test
+    fun `after a pan to an area no earlier day overlaps, a time not yet computed waits with the notice`() =
+        runTest {
+            val suns = mutableListOf<SunPosition>()
+            val gate = MutableStateFlow(true)
+            val viewModel = dayViewModel(suns, before = { if (suns.size > DAY_STEPS) gate.first { it } })
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            advanceUntilIdle()
+            gate.value = false
+            viewModel.onCameraMoved(CameraState(center = GeoPoint(46.69, 7.95), zoom = 12.0))
+            advanceTimeBy(SETTLE_MILLIS)
+            val previous = viewModel.overlay.value as OverlayUiState.Ready
+
+            viewModel.onSliderMoved(14 * 60f + 35)
+
+            assertEquals(OverlayUiState.Computing(kept = previous), viewModel.overlay.value)
+            assertEquals(R.string.overlay_computing, overlayNotice(viewModel.overlay.value, viewModel.selectedTime.value))
+        }
+
     @Test
     fun `a date change starts the day over for the new date`() =
         runTest {
@@ -1812,6 +1869,10 @@ class MapViewModelTest {
         const val SETTLE_MILLIS = 301L
 
         const val MAP_WIDTH = 60.0
+        const val DAY_STEPS = 288
+
+        // INTERLAKEN moved 30 dp east at zoom 12: the earlier area covers half of the new one.
+        val HALF_A_SCREEN_EAST = GeoPoint(46.6863, 7.8632 + 30 * 360.0 / (512 * 4096))
         const val MAP_HEIGHT = 80.0
         val FLAT: HeightTile = HeightTile.fromMetres(512, FloatArray(512 * 512) { 568f })
     }
