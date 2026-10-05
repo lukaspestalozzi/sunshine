@@ -118,14 +118,22 @@ sealed interface OverlayUiState {
         val resolutionChanged: Boolean = false,
     ) : OverlayUiState
 
-    /** The grid of the visible area at [time] in cells of [cellDp], and its [image] (rendered off the main thread). */
+    /**
+     * The grid at [time] in cells of [cellDp], and its [image] (rendered off the main thread): of
+     * the visible area, or of an earlier day's area while the visible area's day lacks [time]
+     * ([source]; design D2 of polish-overlay).
+     */
     data class Ready(
         val grid: ShadeGrid,
         val time: ZonedDateTime,
         val image: OverlayImage,
         val cellDp: Double = SunShadeSweep.CELL_DP,
+        val source: OverlaySource = OverlaySource.OWN_DAY,
     ) : OverlayUiState
 }
+
+/** Where a shown `Sun & shade` overlay comes from (design D2 of polish-overlay). */
+enum class OverlaySource { OWN_DAY, EARLIER_DAY }
 
 /** The heatmap of the selected day as shown on screen (sun-exposure-heatmap spec). */
 sealed interface HeatmapUiState {
@@ -367,7 +375,8 @@ class MapViewModel(
                             day?.let { it.cellDp == input.cellDp && it.stepMinutes == input.stepMinutes } == true
                     if (unchanged && (!input.online || !current.grid.hasUnknown)) return@collect
                     // A new time or shade resolution is computed at once; only a camera move waits to rest.
-                    val immediate = requestedTime != null && requestedTime != input.time || dayResolutionChanged
+                    val timeChanged = requestedTime != null && requestedTime != input.time
+                    val immediate = timeChanged || dayResolutionChanged
                     requestedTime = input.time
                     lookup?.cancelAndJoin()
                     val date = input.time.toLocalDate()
@@ -432,7 +441,27 @@ class MapViewModel(
                         send(ready)
                         return@collect
                     }
-                    send(OverlayUiState.Computing(kept = current, resolutionChanged = resolutionChanged))
+                    // After a time or date change, an earlier day's grid of that time fills in meanwhile
+                    // (sun-shade-overlay spec, "Overlay updates"; design D2 of polish-overlay).
+                    val earlier =
+                        dayCache
+                            .takeIf { timeChanged }
+                            ?.overlapping(area, input.time, input.cellDp, input.stepMinutes, except = selectedDay)
+                            ?.gridAt(input.time)
+                    if (earlier != null) {
+                        val ready =
+                            OverlayUiState.Ready(
+                                earlier,
+                                input.time,
+                                renderOverlay(earlier),
+                                input.cellDp,
+                                OverlaySource.EARLIER_DAY,
+                            )
+                        shown.set(ready)
+                        send(ready)
+                    } else {
+                        send(OverlayUiState.Computing(kept = current, resolutionChanged = resolutionChanged))
+                    }
                     lookup =
                         launch {
                             if (!immediate) delay(SETTLE_MILLIS)
