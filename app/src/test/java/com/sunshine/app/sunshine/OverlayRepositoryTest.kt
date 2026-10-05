@@ -1,5 +1,6 @@
 package com.sunshine.app.sunshine
 
+import com.sunshine.app.elevation.TileLoads
 import com.sunshine.core.GeoPoint
 import com.sunshine.core.HeightTile
 import com.sunshine.core.MapArea
@@ -29,6 +30,7 @@ class OverlayRepositoryTest {
     private var inFlight = 0
     private var maxInFlight = 0
     private var gate: CompletableDeferred<Unit>? = null
+    private var stored = 0
 
     @Test
     fun `every planned tile is requested once, concurrently`() =
@@ -90,6 +92,27 @@ class OverlayRepositoryTest {
             assertTrue(overlap.isNotEmpty() && requested.containsAll(overlap), "a far pan reuses tiles")
         }
 
+    // settings spec, "Debug info": the grid's tiles by where they came from (design D4 of polish-overlay).
+    @Test
+    fun `the tiles of a grid are counted by source, an unavailable one included`() =
+        runTest {
+            val debug = DebugInfo()
+            val missingKey = SunShadeSweep(AREA, SUN).groundTiles().first()
+            val repository = repository(missing = { it == missingKey }, debug = debug)
+
+            repository.grid(AREA, SUN)
+
+            val first = requested.toSet().size
+            assertEquals(TileSources(kept = 0, memory = 0, disk = first - 1, network = 0, unavailable = 1), debug.values.value.gridTiles)
+
+            requested.clear()
+            repository.grid(AREA, SunPosition(230.0, 15.0, true))
+
+            val sources = checkNotNull(debug.values.value.gridTiles)
+            assertEquals(requested.toSet().size, sources.disk + sources.unavailable)
+            assertTrue(sources.kept > 0, "nothing kept: $sources")
+        }
+
     @Test
     fun `at night only the ground tiles are requested and every cell is shade`() =
         runTest {
@@ -121,6 +144,8 @@ class OverlayRepositoryTest {
     private fun repository(
         chunks: Int = 3,
         latency: Boolean = false,
+        missing: (TileKey) -> Boolean = { false },
+        debug: DebugInfo = DebugInfo(),
     ) = OverlayRepository(
         tile = { key ->
             gate?.await()
@@ -129,9 +154,16 @@ class OverlayRepositoryTest {
             maxInFlight = maxOf(maxInFlight, inFlight)
             if (latency) delay(10)
             inFlight--
-            heightTile(key)
+            if (missing(key)) {
+                null
+            } else {
+                stored++
+                heightTile(key)
+            }
         },
         chunks = chunks,
+        loads = { TileLoads(network = 0, store = stored) },
+        debug = debug,
     )
 
     private fun assertSameStates(

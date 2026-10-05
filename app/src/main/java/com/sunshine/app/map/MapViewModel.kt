@@ -9,6 +9,14 @@ import com.sunshine.app.settings.LastView
 import com.sunshine.app.settings.Resolution
 import com.sunshine.app.settings.Settings
 import com.sunshine.app.settings.StartAt
+import com.sunshine.app.sunshine.Agreement
+import com.sunshine.app.sunshine.CacheState
+import com.sunshine.app.sunshine.DayState
+import com.sunshine.app.sunshine.DayTiming
+import com.sunshine.app.sunshine.DebugInfo
+import com.sunshine.app.sunshine.DebugValues
+import com.sunshine.app.sunshine.GridTiming
+import com.sunshine.app.sunshine.ShownSource
 import com.sunshine.core.DEFAULT_LOCATION
 import com.sunshine.core.GeoPoint
 import com.sunshine.core.HorizonProfile
@@ -205,13 +213,17 @@ class MapViewModel(
     private val dayDispatcher: CoroutineDispatcher? = null,
     private val dayCache: DayCache = DayCache(DEFAULT_DAY_CACHE_BYTES),
     private val log: (String) -> Unit = {},
-    checkOverlayAgreement: Boolean = false,
+    /** Collects the values of the debug box (settings spec, "Debug info"; design D4 of polish-overlay). */
+    private val debug: DebugInfo = DebugInfo(),
     /** The stored settings (settings spec, "Stored settings"). */
     val settings: StateFlow<Settings> = MutableStateFlow(Settings()),
     /** Stores the map's view when the app goes to the background (map-view spec, "Default viewport"). */
     private val saveLastView: suspend (LastView) -> Unit = {},
 ) : ViewModel() {
     private val zone: ZoneId = clock.zone
+
+    /** The values of the debug box (settings spec, "Debug info"). */
+    val debugValues: StateFlow<DebugValues> = debug.values
 
     private val mutableCamera = MutableStateFlow(restoreCamera())
     val camera: StateFlow<CameraState> = mutableCamera.asStateFlow()
@@ -404,6 +416,7 @@ class MapViewModel(
                                 input.cellDp,
                             )
                         day = newDay
+                        recordDay(newDay)
                         dayJob =
                             dayDispatcher?.takeIf { newDay.computed.value < newDay.steps.size }?.let {
                                 launch {
@@ -417,10 +430,12 @@ class MapViewModel(
                                                 }
                                                 overlayDayProgress.value =
                                                     it.toFloat() / newDay.steps.size
+                                                recordDay(newDay)
                                             }
                                         }
                                     try {
                                         val took = measureTime { newDay.computeRest { mutableSelectedTime.value } }
+                                        debug.update { it.copy(day = DayTiming(newDay.steps.size, newDay.nightSteps, took)) }
                                         log(
                                             "Overlay day ${newDay.date}: ${newDay.computed.value} of ${newDay.steps.size} steps, " +
                                                 "${newDay.nightSteps} at night, in ${took.inWholeMilliseconds} ms",
@@ -438,6 +453,7 @@ class MapViewModel(
                     if (known != null) {
                         val ready = OverlayUiState.Ready(known, input.time, renderOverlay(known), input.cellDp)
                         shown.set(ready)
+                        debug.update { it.copy(shown = ShownSource.OWN_DAY) }
                         send(ready)
                         return@collect
                     }
@@ -458,8 +474,10 @@ class MapViewModel(
                                 OverlaySource.EARLIER_DAY,
                             )
                         shown.set(ready)
+                        debug.update { it.copy(shown = ShownSource.EARLIER_DAY) }
                         send(ready)
                     } else {
+                        if (current != null) debug.update { it.copy(shown = ShownSource.PREVIOUS_OVERLAY) }
                         send(OverlayUiState.Computing(kept = current, resolutionChanged = resolutionChanged))
                     }
                     lookup =
@@ -473,6 +491,7 @@ class MapViewModel(
                             )
                             val ready = OverlayUiState.Ready(grid, input.time, image, input.cellDp)
                             shown.set(ready)
+                            debug.update { it.copy(grid = GridTiming(computing, rendering), shown = ShownSource.OWN_DAY) }
                             send(ready)
                         }
                 }
@@ -543,6 +562,7 @@ class MapViewModel(
                             input.cellDp,
                         )
                     day = newDay
+                    recordDay(newDay)
                     val previous = kept.get()
                     val counted = newDay.counted
                     if (counted != null && previous?.hours === counted) {
@@ -575,11 +595,13 @@ class MapViewModel(
                                 dayCache.trim(keep = day)
                             }
                             heatmapDayProgress.value = it.toFloat() / day.steps.size
+                            recordDay(day)
                         }
                     }
                 try {
                     // The grids run on the background dispatcher, as for the overlay's day.
                     val took = measureTime { day.computeAll { mutableSelectedTime.value } }
+                    debug.update { it.copy(day = DayTiming(day.steps.size, day.nightSteps, took)) }
                     log(
                         "Overlay day ${day.date} at ${day.cellDp.toInt()} dp every ${day.stepMinutes} min: " +
                             "${day.computed.value} of ${day.steps.size} steps, ${day.nightSteps} at night, in ${took.inWholeMilliseconds} ms",
@@ -596,6 +618,7 @@ class MapViewModel(
             dayCache.trim(keep = day)
             val (ready, rendering) = measureTimedValue { heatmapOf(day, hours) }
             if (counted == null) {
+                debug.update { it.copy(sunHours = GridTiming(counting, rendering), cache = cacheState()) }
                 log(
                     "Sun hours ${hours.width}×${hours.height} px, ${hours.steps} steps: " +
                         "counts ${counting.inWholeMilliseconds} ms, image ${rendering.inWholeMilliseconds} ms",
@@ -633,22 +656,47 @@ class MapViewModel(
         // A new shade resolution while `Sun & shade` is shown moves the selected time to a step of
         // the new day (time-selection spec, "Choose the time of day").
         viewModelScope.launch { resolution.drop(1).collect { select(mutableSelectedTime.value) } }
-        // Debug builds: once an overlay has stayed for a while, log how many cells agree with the
-        // point tracer (spec: ≥ 99.5 % at zoom ≥ 12). Cancelled by the next overlay state.
-        if (checkOverlayAgreement) {
-            viewModelScope.launch(computeDispatcher) {
-                overlay.collectLatest { state ->
-                    if (state is OverlayUiState.Ready) {
-                        delay(AGREEMENT_DELAY_MILLIS)
-                        log(overlayAgreement(state))
-                    }
+        // While `Agreement check` is on, in any build: once an overlay has stayed for a while, check
+        // how many cells agree with the point tracer (spec: ≥ 99.5 % at zoom ≥ 12). Cancelled by the
+        // next overlay state or by switching it off (settings spec, "Debug info"; design D5 of polish-overlay).
+        viewModelScope.launch(computeDispatcher) {
+            combine(overlay, settings.map { it.debug.agreementCheck }.distinctUntilChanged(), ::Pair).collectLatest { (state, on) ->
+                if (on && state is OverlayUiState.Ready) {
+                    delay(AGREEMENT_DELAY_MILLIS)
+                    debug.update { it.copy(agreement = Agreement.Checking) }
+                    val result = overlayAgreement(state)
+                    debug.update { it.copy(agreement = result) }
+                    log(
+                        "Overlay agreement with the point tracer: ${result.agree} of ${result.checked} cells " +
+                            "(${if (result.checked > 0) result.agree * PERCENT / result.checked else 0} %)",
+                    )
                 }
             }
         }
     }
 
+    // The day of the shown overlay mode and the cache of days, for the debug box (design D4 of polish-overlay).
+    private fun recordDay(day: DayOverlay) =
+        debug.update {
+            it.copy(
+                dayState =
+                    DayState(
+                        day.computed.value,
+                        day.steps.size,
+                        day.cellDp,
+                        day.stepMinutes,
+                        day.area.widthDp,
+                        day.area.heightDp,
+                        day.area.zoom,
+                    ),
+                cache = cacheState(),
+            )
+        }
+
+    private fun cacheState() = CacheState(dayCache.count, dayCache.bytes, dayCache.maxBytes)
+
     // The cells' states against the point tracer at their sample points, with the map centre's sun.
-    private suspend fun overlayAgreement(state: OverlayUiState.Ready): String {
+    private suspend fun overlayAgreement(state: OverlayUiState.Ready): Agreement.Result {
         var agree = 0
         var checked = 0
         for ((point, shown) in state.grid.sampleCells(AGREEMENT_CELLS, Random(0))) {
@@ -656,7 +704,7 @@ class MapViewModel(
             checked++
             if (sunshineAt(profile, state.grid.area.center, state.time.toInstant()) == shown) agree++
         }
-        return "Overlay agreement with the point tracer: $agree of $checked cells (${if (checked > 0) agree * 100 / checked else 0} %)"
+        return Agreement.Result(agree, checked)
     }
 
     private class OverlayInput(
@@ -835,6 +883,7 @@ class MapViewModel(
             } else {
                 val (periods, duration) = measureTimedValue { sunPeriods(profile, horizon.point, date, zone) }
                 log("Sun periods of $date: ${duration.inWholeMilliseconds} ms")
+                debug.update { it.copy(sunPeriods = duration) }
                 periods.also { periodsOfDay = Triple(horizon, date, it) }
             }
         return SunshineUiState.Ready(horizon.point, periods, sunshineAt(profile, horizon.point, time.toInstant()))
@@ -874,5 +923,6 @@ class MapViewModel(
 
         const val AGREEMENT_DELAY_MILLIS = 3_000L
         const val AGREEMENT_CELLS = 200
+        const val PERCENT = 100
     }
 }

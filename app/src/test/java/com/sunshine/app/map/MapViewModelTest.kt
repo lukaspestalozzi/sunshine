@@ -5,11 +5,14 @@ import com.sunshine.app.R
 import com.sunshine.app.elevation.DemTile
 import com.sunshine.app.elevation.ElevationRepository
 import com.sunshine.app.elevation.TileCache
+import com.sunshine.app.settings.DebugSwitches
 import com.sunshine.app.settings.LastView
 import com.sunshine.app.settings.Preset
 import com.sunshine.app.settings.Resolution
 import com.sunshine.app.settings.Settings
 import com.sunshine.app.settings.StartAt
+import com.sunshine.app.sunshine.Agreement
+import com.sunshine.app.sunshine.DebugInfo
 import com.sunshine.core.AZIMUTH_COUNT
 import com.sunshine.core.DEFAULT_LOCATION
 import com.sunshine.core.GeoPoint
@@ -53,6 +56,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -1059,31 +1063,64 @@ class MapViewModelTest {
             assertEquals(setOf<Short>(0), (viewModel.heatmap.value as HeatmapUiState.Ready).hours.unknown.toSet())
         }
 
+    // settings spec, "Debug info", "Agreement check result" (design D5 of polish-overlay).
     @Test
-    fun `debug builds log the overlay's agreement with the point tracer once it has stayed`() =
+    fun `with Agreement check on, the overlay's agreement with the point tracer is recorded once it has stayed`() =
         runTest {
             val logged = mutableListOf<String>()
-            val viewModel =
-                MapViewModel(
-                    SavedStateHandle(),
-                    isOnline,
-                    clock,
-                    repository { heightBytes(568) },
-                    { horizonOf(-1.0) },
-                    { area, sun, _ -> flatGrid(area, sun, available = true) },
-                    UnconfinedTestDispatcher(testScheduler),
-                    log = { logged += it },
-                    checkOverlayAgreement = true,
-                )
-            viewModel.onMapSizeChanged(MAP_WIDTH, MAP_HEIGHT)
-            viewModel.onSliderMoved(12 * 60f)
+            val debug = DebugInfo()
+            val viewModel = agreementViewModel(DebugSwitches(agreementCheck = true), debug, log = { logged += it })
             viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
             viewModel.onOverlayToggled()
             advanceTimeBy(SETTLE_MILLIS + 3_000)
 
             // Flat terrain at noon is sun everywhere, as is a -1° horizon: all 200 agree.
+            assertEquals(Agreement.Result(agree = 200, checked = 200), debug.values.value.agreement)
             assertTrue(logged.any { it.startsWith("Overlay agreement with the point tracer: 200 of 200") }, "$logged")
         }
+
+    // settings spec, "Agreement check only while on".
+    @Test
+    fun `with Agreement check off, no cell is checked against the point tracer`() =
+        runTest {
+            val checked = mutableListOf<GeoPoint>()
+            val debug = DebugInfo()
+            val viewModel = agreementViewModel(DebugSwitches(timings = true), debug, profiles = checked)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS + 10_000)
+
+            assertTrue(viewModel.overlay.value is OverlayUiState.Ready)
+            assertEquals(emptyList<GeoPoint>(), checked.filter { it != INTERLAKEN })
+            assertNull(debug.values.value.agreement)
+        }
+
+    private fun TestScope.agreementViewModel(
+        switches: DebugSwitches,
+        debug: DebugInfo,
+        log: (String) -> Unit = {},
+        profiles: MutableList<GeoPoint> = mutableListOf(),
+    ): MapViewModel {
+        val viewModel =
+            MapViewModel(
+                SavedStateHandle(),
+                isOnline,
+                clock,
+                repository { heightBytes(568) },
+                { point ->
+                    profiles += point
+                    horizonOf(-1.0)
+                },
+                { area, sun, _ -> flatGrid(area, sun, available = true) },
+                UnconfinedTestDispatcher(testScheduler),
+                log = log,
+                settings = MutableStateFlow(Settings(debug = switches)),
+                debug = debug,
+            )
+        viewModel.onMapSizeChanged(MAP_WIDTH, MAP_HEIGHT)
+        viewModel.onSliderMoved(12 * 60f)
+        return viewModel
+    }
 
     @Test
     fun `after the selected time is ready, the day continues in the background`() =

@@ -29,6 +29,9 @@ class TileCache(
         var users = 0
     }
 
+    /** Number of tiles held in memory, at most [MEMORY_TILES]. */
+    val size: Int get() = synchronized(tiles) { tiles.size }
+
     /** The tile if it is in memory, else `null`. */
     fun cached(key: TileKey): HeightTile? = synchronized(tiles) { tiles[key] }
 
@@ -87,12 +90,12 @@ class TileCache(
         return HeightTile.fromMetres(SIZE, metres)
     }
 
-    private companion object {
-        const val SIZE = MapterhornTiles.TILE_SIZE
+    companion object {
+        private const val SIZE = MapterhornTiles.TILE_SIZE
         const val MEMORY_TILES = 64
-        const val LOAD_FACTOR = 0.75f
+        private const val LOAD_FACTOR = 0.75f
 
         // Mapterhorn publishes zooms 0–12 everywhere; finer zooms only where the sources allow.
-        const val MIN_FALLBACK_ZOOM = 12
+        private const val MIN_FALLBACK_ZOOM = 12
     }
 }

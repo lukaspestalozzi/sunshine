@@ -27,6 +27,8 @@ class OverlayRepository(
     private val chunks: Int = Runtime.getRuntime().availableProcessors(),
     private val loads: () -> TileLoads = { TileLoads(0, 0) },
     private val log: (String) -> Unit = {},
+    private val debug: DebugInfo = DebugInfo(),
+    private val memoryTiles: () -> MemoryTiles? = { null },
 ) {
     private var kept: Kept? = null
 
@@ -51,6 +53,7 @@ class OverlayRepository(
             // kept upwind tiles stay for the next daytime grid.
             if (sweep.isNight) {
                 kept = Kept(area, reusable + ground.mapNotNull { (key, tile) -> tile?.let { key to it } })
+                record(ground, reusable, before)
                 log("Overlay at night: ${ground.size} ground tiles in ${start.elapsedNow().inWholeMilliseconds} ms")
                 return@coroutineScope sweep.night(ground)
             }
@@ -65,19 +68,36 @@ class OverlayRepository(
                     }
                 }
             val grid = sweep.assemble(parts.awaitAll())
-            val reused = tiles.keys.count { it in reusable }
-            // Other features loading tiles at the same time can inflate the store and network counts.
-            val stored = loads().store - before.store
-            val network = loads().network - before.network
+            val sources = record(tiles, reusable, before)
             log(
-                "Overlay tiles: ${tiles.size} ($reused kept, $stored from store, $network from network, " +
-                    "${tiles.size - reused - stored - network} in memory or unavailable) in ${loaded.inWholeMilliseconds} ms; " +
+                "Overlay tiles: ${tiles.size} (${sources.kept} kept, ${sources.disk} from store, ${sources.network} from network, " +
+                    "${sources.memory} in memory, ${sources.unavailable} unavailable) in ${loaded.inWholeMilliseconds} ms; " +
                     "sweep ${(start.elapsedNow() - loaded).inWholeMilliseconds} ms on ${sweep.chunks(chunks).size} chunks",
             )
             // Unavailable tiles are not kept: the network may be back next time.
             kept = Kept(area, tiles.mapNotNull { (key, tile) -> tile?.let { key to it } }.toMap())
             grid
         }
+
+    /**
+     * Counts [tiles] by source for the debug box (settings spec, "Debug info"). Other features
+     * loading tiles at the same time can inflate the disk and network counts at memory's expense.
+     */
+    private fun record(
+        tiles: Map<TileKey, HeightTile?>,
+        reusable: Map<TileKey, HeightTile>,
+        before: TileLoads,
+    ): TileSources {
+        val kept = tiles.keys.count { it in reusable }
+        val unavailable = tiles.values.count { it == null }
+        val disk = loads().store - before.store
+        val network = loads().network - before.network
+        val memory = (tiles.size - kept - unavailable - disk - network).coerceAtLeast(0)
+        val sources = TileSources(kept, memory, disk, network, unavailable)
+        val held = memoryTiles()
+        debug.update { it.copy(gridTiles = sources, memoryTiles = held ?: it.memoryTiles) }
+        return sources
+    }
 
     /** The [keys] from [reusable] or, concurrently, from [tile]. */
     private suspend fun load(

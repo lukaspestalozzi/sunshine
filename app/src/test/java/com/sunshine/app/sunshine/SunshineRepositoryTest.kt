@@ -1,5 +1,6 @@
 package com.sunshine.app.sunshine
 
+import com.sunshine.app.elevation.TileLoads
 import com.sunshine.core.GeoPoint
 import com.sunshine.core.HeightTile
 import com.sunshine.core.TileKey
@@ -22,6 +23,7 @@ class SunshineRepositoryTest {
     private val built = mutableMapOf<TileKey, HeightTile>()
     private var inFlight = 0
     private var maxInFlight = 0
+    private var fetched = 0
 
     @Test
     fun `computes the horizon profile of a location`() =
@@ -49,6 +51,23 @@ class SunshineRepositoryTest {
             val profile = repository(missing = { it.zoom == 12 }).profile(OBSERVER)!!
 
             assertTrue(profile.complete.any { !it })
+        }
+
+    // settings spec, "Debug info": the horizon's timing and tiles by source (design D4 of polish-overlay).
+    @Test
+    fun `the tiles of a horizon are counted by source, unavailable ones included`() =
+        runTest {
+            val debug = DebugInfo()
+
+            repository(missing = { it.zoom == 12 }, debug = debug).profile(OBSERVER)
+
+            val unavailable = requested.count { it.zoom == 12 }
+            assertTrue(unavailable > 0)
+            assertEquals(
+                TileSources(kept = 0, memory = 0, disk = 0, network = requested.size - unavailable, unavailable = unavailable),
+                debug.values.value.horizonTiles,
+            )
+            assertNotNull(debug.values.value.horizon)
         }
 
     @Test
@@ -85,6 +104,7 @@ class SunshineRepositoryTest {
     private fun repository(
         latency: Boolean = false,
         missing: (TileKey) -> Boolean = { false },
+        debug: DebugInfo = DebugInfo(),
     ) = SunshineRepository(
         tile = { key ->
             requested += key
@@ -92,8 +112,15 @@ class SunshineRepositoryTest {
             maxInFlight = maxOf(maxInFlight, inFlight)
             if (latency) delay(10)
             inFlight--
-            if (missing(key)) null else built.getOrPut(key) { heightTile(key) }
+            if (missing(key)) {
+                null
+            } else {
+                fetched++
+                built.getOrPut(key) { heightTile(key) }
+            }
         },
+        loads = { TileLoads(network = fetched, store = 0) },
+        debug = debug,
     )
 
     /** Terrain heights at the pixel centres of [key]. */

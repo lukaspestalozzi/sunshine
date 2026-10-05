@@ -13,7 +13,7 @@ import java.time.ZonedDateTime
  * their states take more than [maxBytes].
  */
 class DayCache(
-    private val maxBytes: Long,
+    val maxBytes: Long,
 ) {
     // Access order: the eldest entry is the least recently used.
     private val days = LinkedHashMap<Key, DayOverlay>(16, 0.75f, true)
@@ -24,6 +24,10 @@ class DayCache(
         val cellDp: Double,
         val stepMinutes: Int,
     )
+
+    /** Number of cached days. */
+    val count: Int
+        @Synchronized get() = days.size
 
     /** Bytes of all cached days' states. */
     val bytes: Long
