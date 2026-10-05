@@ -53,6 +53,18 @@ class SettingsStoreTest {
         }
 
     @Test
+    fun `debug switches are read back by a new store on the same file`() =
+        runBlocking {
+            val store = open()
+            store.setDebug(DebugSwitches(timings = true, agreementCheck = true))
+            jobs.forEach { it.cancelAndJoin() }
+
+            val reopened = open()
+
+            assertEquals(DebugSwitches(timings = true, agreementCheck = true), reopened.settings.value.debug)
+        }
+
+    @Test
     fun `a change reaches the settings flow`() =
         runBlocking {
             val store = open()

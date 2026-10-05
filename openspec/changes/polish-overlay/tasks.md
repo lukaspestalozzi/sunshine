@@ -16,8 +16,9 @@
 
 ## 3. Debug settings (app)
 
-- [ ] 3.1 Extend `SettingsDecodeTest` first: the four debug switches default to off; a stored `true` round-trips; an unreadable value gives off and keeps the other settings (settings "Stored settings"). Then add `DebugSwitches` to `Settings`, `decode` and `SettingsStore` (design D6). Verify: `./gradlew :app:testDebugUnitTest --tests "*SettingsDecode*" --tests "*SettingsStore*"` passes.
+- [x] 3.1 Extend `SettingsDecodeTest` first: the four debug switches default to off; a stored `true` round-trips; an unreadable value gives off and keeps the other settings (settings "Stored settings"). Then add `DebugSwitches` to `Settings`, `decode` and `SettingsStore` (design D6). Verify: `./gradlew :app:testDebugUnitTest --tests "*SettingsDecode*" --tests "*SettingsStore*"` passes.
 - [ ] 3.2 Add the `Debug` section with the switches `Timings`, `Tiles`, `Day state` and `Agreement check` between Storage and About in `SettingsScreen`, wired through `SettingsViewModel`; extend `SettingsViewModelTest` for one switch. Verify: the test passes; on the device the sections read Display, Map, Calculation, Storage, Debug, About, all four switches are off after `adb shell pm clear com.sunshine.app`, and a switch turned on is still on after force-stopping and relaunching (settings "Defaults", "Order of the sections", "Debug switch kept").
+  Status (apply): code done, `SettingsViewModelTest` passes; the device check is open.
 
 ## 4. Debug info and box (app)
 

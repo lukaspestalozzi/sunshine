@@ -22,7 +22,30 @@ class SettingsDecodeTest {
         assertEquals(Resolution.NORMAL, settings.custom)
         assertEquals(512, settings.browsedLimitMib)
         assertNull(settings.lastView)
+        assertEquals(DebugSwitches(timings = false, tiles = false, dayState = false, agreementCheck = false), settings.debug)
         assertEquals(Settings(), settings)
+    }
+
+    @Test
+    fun `stored debug switches are read, each on its own`() {
+        val settings = decode(preferencesOf(SettingsKeys.DEBUG_TIMINGS to true, SettingsKeys.DEBUG_AGREEMENT to true))
+
+        assertEquals(DebugSwitches(timings = true, tiles = false, dayState = false, agreementCheck = true), settings.debug)
+    }
+
+    @Test
+    fun `an unreadable debug switch is off and the other settings keep their values`() {
+        val settings =
+            decode(
+                preferencesOf(
+                    stringPreferencesKey(SettingsKeys.DEBUG_TILES.name) to "yes",
+                    SettingsKeys.DEBUG_DAY_STATE to true,
+                    SettingsKeys.COORDINATES to "LV95",
+                ),
+            )
+
+        assertEquals(DebugSwitches(timings = false, tiles = false, dayState = true, agreementCheck = false), settings.debug)
+        assertEquals(CoordinateFormat.LV95, settings.coordinates)
     }
 
     @Test

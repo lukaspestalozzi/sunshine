@@ -57,7 +57,7 @@ import kotlin.math.roundToInt
 
 /**
  * The Settings page (settings spec, "Settings page"; design D10 of add-settings): the sections
- * Display, Map, Calculation, Storage and About. The system back returns to the map.
+ * Display, Map, Calculation, Storage, Debug and About. The system back returns to the map.
  */
 @Composable
 fun SettingsScreen(
@@ -127,6 +127,14 @@ fun SettingsScreen(
                 cleared == true -> Text(stringResource(R.string.settings_cleared), style = MaterialTheme.typography.bodySmall)
                 cleared == false -> Text(stringResource(R.string.settings_clear_failed), style = MaterialTheme.typography.bodySmall)
             }
+
+            // In every build, each switch off by default (settings spec, "Debug info"; design D6 of polish-overlay).
+            Section(R.string.settings_debug)
+            val debug = settings.debug
+            SwitchEntry(R.string.settings_debug_timings, debug.timings) { viewModel.onDebug(debug.copy(timings = it)) }
+            SwitchEntry(R.string.settings_debug_tiles, debug.tiles) { viewModel.onDebug(debug.copy(tiles = it)) }
+            SwitchEntry(R.string.settings_debug_day_state, debug.dayState) { viewModel.onDebug(debug.copy(dayState = it)) }
+            SwitchEntry(R.string.settings_debug_agreement, debug.agreementCheck) { viewModel.onDebug(debug.copy(agreementCheck = it)) }
 
             Section(R.string.about_title)
             AboutSection()

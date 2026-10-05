@@ -68,6 +68,11 @@
     <string name="settings_clear_unavailable">Not available while a region is downloading</string>
     <string name="settings_browsed_limit_note">Lowering the limit removes the least recently used browsed tiles now.</string>
     <string name="settings_cancel">Cancel</string>
+    <string name="settings_debug">Debug</string>
+    <string name="settings_debug_timings">Timings</string>
+    <string name="settings_debug_tiles">Tiles</string>
+    <string name="settings_debug_day_state">Day state</string>
+    <string name="settings_debug_agreement">Agreement check</string>
     <string name="offline_button">Offline maps</string>
     <string name="offline_title">Offline maps</string>
     <string name="offline_download">Download visible area</string>
