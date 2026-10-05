@@ -11,7 +11,7 @@ offline.
 ### Requirement: Location button
 The map screen SHALL show a location button directly to the right of the Offline button
 (offline-regions "Offline button"), in the same row, with the content description `My location`.
-It SHALL be at least 48 × 48 dp to touch and SHALL NOT cover the ⓘ button, the Offline button,
+It SHALL be at least 48 × 48 dp to touch and SHALL NOT cover the Settings button, the Offline button,
 the coordinates or the overlay toggle, on screens 360 dp wide or more, in portrait and landscape.
 The button SHALL show which of these states it is in:
 - **idle**: no fresh position is known and the user is not waiting for one;
@@ -28,9 +28,10 @@ The button SHALL show which of these states it is in:
 - **THEN** the button shows the ready state, and the map does not move
 
 ### Requirement: Location permission
-The app SHALL ask for location access only when the user taps the location button and access is
-not allowed yet; it SHALL NOT ask at launch. It SHALL ask for precise and approximate access
-while the app is in use; it SHALL NOT ask for background location access. After the user's answer:
+The app SHALL ask for location access only when access is not allowed yet and the user taps the
+location button or selects `My location` for `Start at` on the Settings page (map-view "Default
+viewport"); it SHALL NOT ask at launch. It SHALL ask for precise and approximate access
+while the app is in use; it SHALL NOT ask for background location access. After the user's answer to a tap of the location button:
 - precise or approximate access allowed: the tap is handled as described in "Centre on the
   position" (with a fresh position) or "Wait for a position" (without one);
 - access refused, and Android would show the dialog again: nothing else happens; the next tap asks
@@ -41,6 +42,12 @@ while the app is in use; it SHALL NOT ask for background location access. After 
 While access is refused, every tap that Android answers without a dialog SHALL show that notice
 again. The button SHALL stay idle. A notice SHALL NOT block the map and SHALL disappear when its
 button is tapped, when it is swiped away, or after 10 s.
+
+When `My location` is selected on the Settings page, it SHALL stay selected whatever the answer;
+the map does not move then. While `My location` is selected and location access is not allowed,
+the Settings page SHALL show below `Start at` the note `Location access is off: the map opens at
+the last view.`, and selecting `My location` again SHALL ask again when Android would show the
+dialog.
 
 #### Scenario: First tap
 - **WHEN** the user taps the location button for the first time after installing the app
@@ -57,6 +64,14 @@ button is tapped, when it is swiped away, or after 10 s.
 #### Scenario: Open the settings
 - **WHEN** the user taps `Settings` in that notice
 - **THEN** the system settings page of the app opens
+
+#### Scenario: Asked from the Settings page
+- **WHEN** location access has never been asked and the user selects `My location` for `Start at`
+- **THEN** Android's dialog asks for location access while the app is in use, and `My location` stays selected
+
+#### Scenario: Refused from the Settings page
+- **WHEN** the user selects `My location` for `Start at` and refuses location access
+- **THEN** `My location` stays selected, and the note `Location access is off: the map opens at the last view.` is shown below `Start at`
 
 ### Requirement: Approximate location
 When only approximate location access is allowed, the dot and its accuracy circle SHALL be shown
@@ -86,7 +101,7 @@ around it whose radius is the position's reported horizontal accuracy (±10 %). 
 **fresh** when it was received while the map screen is visible, at most 30 s (±1 s) ago; time
 the app spends in the background does not count towards the 30 s (user decision, 2026-10-04). A
 position that is not fresh is **old**: the device's last known position from before the map
-screen was opened (app launch, or return from the About or Offline page), or a position received
+screen was opened (app launch, or return from the Settings or Offline page), or a position received
 more than 30 s ago. An old position SHALL be drawn in
 grey, a fresh one in colour; the next fresh position SHALL turn the dot back to colour. Before any
 position is known, no dot SHALL be drawn. A position whose accuracy is not reported SHALL be drawn
@@ -115,8 +130,9 @@ without a circle.
 ### Requirement: Centre on the position
 When the user taps the location button in the ready state, the map SHALL move so that its centre,
 and with it the selected location (map-view "Selected location crosshair"), is the fresh position
-(±0.0001°), keeping the current zoom level (±0.01). The map SHALL move only on such a tap; a new
-position SHALL never move the map by itself. After the move the map can be panned as usual.
+(±0.0001°), keeping the current zoom level (±0.01). The map SHALL move only on such a tap, and once
+at launch when `Start at` is `My location` (map-view "Default viewport"); otherwise a new position
+SHALL never move the map by itself. After the move the map can be panned as usual.
 
 #### Scenario: Tap when ready
 - **WHEN** the map shows Bern at zoom 12, the fresh position is 46.6863° N, 7.8632° E, and the user taps the location button
@@ -132,7 +148,7 @@ location access is allowed and location is switched on, the button SHALL enter t
 It SHALL stay waiting, without a time limit, until a fresh position arrives; then it SHALL show the
 ready state and the map SHALL NOT move. A tap while waiting SHALL end the waiting state (idle);
 position updates continue and the dot is still drawn. The waiting state SHALL survive a screen
-rotation and a visit to the About or Offline page.
+rotation and a visit to the Settings or Offline page.
 
 #### Scenario: Tap without a position
 - **WHEN** location access is allowed, no fresh position is known, and the user taps the location button
@@ -157,7 +173,7 @@ rotation and a visit to the About or Offline page.
 ### Requirement: Location updates only while visible
 The app SHALL receive position updates only while the map screen is visible, at most one per
 second, and SHALL stop them when the app goes to the background, the screen turns off, or the
-About or Offline page is opened. When the map screen becomes visible again, updates SHALL resume.
+Settings or Offline page is opened. When the map screen becomes visible again, updates SHALL resume.
 
 #### Scenario: App to the background
 - **WHEN** the dot is shown and the user switches to another app
