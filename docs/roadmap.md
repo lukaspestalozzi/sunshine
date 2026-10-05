@@ -15,8 +15,12 @@ Ordered list of planned OpenSpec changes. Each row becomes one change under `ope
 | 7 | `add-sun-exposure-heatmap` | sun-exposure-heatmap | Hours of direct sun per cell for the selected day, as a second overlay mode counted from the day's sun-shade grids; done before #6 by user decision (2026-09-28), as #6 waits on the tile servers' bulk-download policies | resolved in its design.md (partial heatmap while computing deferred until measured on the device; the change also redesigned the overlay controls and moved the attributions to an About page) | archived 2026-09-30 |
 | 8 | `add-settings` | settings (new) | A Settings page behind a gear button that replaces ⓘ (About and attributions at its end): coordinate format (decimal, DMS, Swiss LV95), keep screen on, start view (last view, my location, Alps overview), overlay opacity, shade resolution (Fast / Normal / Detailed / Custom, for both overlay modes), browsed-tile limit and clearing. The download rate limit and the region map depth stay fixed, and dark mode is dropped (user decisions, 2026-10-04) | resolved in its design.md | archived 2026-10-05 |
 | 9 | `add-gps-location` | gps-location (new) | The device's position as a dot with its accuracy circle (MapLibre's location component and default engine, no Google Play Services), grey when older than 30 s; a location button that centres the map on a fresh position, or waits for one with an animation; permission asked on the first tap; online and offline alike. Done before #8 by user decision (2026-10-02) | resolved in its design.md (grey dot after a return from the background dropped by user decision, 2026-10-04) | archived 2026-10-04 |
+| 10 | `polish-v1` | sun-shade-overlay, sun-exposure-heatmap, point-sunshine | Polishing before v1: overlay on pans (see below); candidates: align the panel with the overlay offline (the panel says unknown where the overlay rightly says sun, from #5) and measure the heatmap's day and counting pass on the device (from #7) | scope and the pan option, in its proposal and design.md | planned |
 
-Polishing after the v1 features (#1–#8):
+v1 = the features (#1–#9) done and the app polished (#10). Releasing (signed release build,
+launcher icon, version 1.0.0) comes after v1 and is not planned yet.
+
+Polishing (#10):
 - **Overlay on pans (from #5, deferred by user decision 2026-09-28).** Today a pan computes the
   day again for the new area, because the overlay covers exactly the visible area. Options,
   measured on the desktop JVM against one screen-sized sweep (zoom 12, 400 × 850 dp):
