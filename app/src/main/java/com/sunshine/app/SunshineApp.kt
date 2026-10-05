@@ -27,6 +27,8 @@ import com.sunshine.app.offline.RegionState
 import com.sunshine.app.offline.StorageUse
 import com.sunshine.app.offline.downloadWork
 import com.sunshine.app.settings.SettingsStore
+import com.sunshine.app.sunshine.DebugInfo
+import com.sunshine.app.sunshine.MemoryTiles
 import com.sunshine.app.sunshine.OverlayRepository
 import com.sunshine.app.sunshine.SunshineRepository
 import com.sunshine.app.sunshine.debugLog
@@ -200,10 +202,17 @@ class SunshineApp : Application() {
 
     val elevationRepository: ElevationRepository by lazy { ElevationRepository(tileCache) }
 
-    val sunshineRepository: SunshineRepository by lazy { SunshineRepository(tile = tileCache::tile, log = ::debugLog) }
+    /** The values of the debug box, recorded in every build (settings spec, "Debug info"; design D4 of polish-overlay). */
+    val debugInfo = DebugInfo()
+
+    private val memoryTiles = { MemoryTiles(tileCache.size, TileCache.MEMORY_TILES) }
+
+    val sunshineRepository: SunshineRepository by lazy {
+        SunshineRepository(tile = tileCache::tile, log = ::debugLog, loads = demTiles::loads, debug = debugInfo, memoryTiles = memoryTiles)
+    }
 
     val overlayRepository: OverlayRepository by lazy {
-        OverlayRepository(tile = tileCache::tile, loads = demTiles::loads, log = ::debugLog)
+        OverlayRepository(tile = tileCache::tile, loads = demTiles::loads, log = ::debugLog, debug = debugInfo, memoryTiles = memoryTiles)
     }
 
     override fun onCreate() {

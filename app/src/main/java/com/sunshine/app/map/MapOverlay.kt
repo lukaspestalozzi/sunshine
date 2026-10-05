@@ -8,13 +8,16 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -23,14 +26,22 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sunshine.app.R
 import com.sunshine.app.settings.CoordinateFormat
@@ -53,7 +64,9 @@ fun Crosshair(modifier: Modifier = Modifier) {
  * settings spec, "Settings button") and to its right the Offline button ([onOfflineClicked]; offline-regions spec,
  * "Offline button") and the location button in its [locationButton] state ([onLocationClicked];
  * gps-location spec, "Location button"), below them the selected-location coordinates and the offline
- * notice, the [topEnd] controls and the [bottomPanel], kept clear of the system bars.
+ * notice, the [topEnd] controls and the [bottomPanel], kept clear of the system bars. While
+ * [debugLines] is not empty, the debug box shows them below the offline notice, at most [debugMaxWidth]
+ * wide and cut off above the bottom panel (settings spec, "Debug info").
  */
 @Composable
 fun MapLabels(
@@ -66,16 +79,24 @@ fun MapLabels(
     onLocationClicked: () -> Unit,
     modifier: Modifier = Modifier,
     topEnd: @Composable () -> Unit = {},
+    debugLines: List<String> = emptyList(),
+    debugMaxWidth: Dp = Dp.Infinity,
     bottomPanel: @Composable () -> Unit = {},
 ) {
-    Box(
+    // The bottom panel's height, so that the debug box ends above it.
+    var panelHeight by remember { mutableIntStateOf(0) }
+    BoxWithConstraints(
         modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.safeDrawing)
             .padding(8.dp),
     ) {
+        val aboveThePanel = (maxHeight - with(LocalDensity.current) { panelHeight.toDp() } - 8.dp).coerceAtLeast(0.dp)
         Column(
-            modifier = Modifier.align(Alignment.TopStart),
+            modifier =
+                Modifier
+                    .align(Alignment.TopStart)
+                    .then(if (debugLines.isEmpty()) Modifier else Modifier.heightIn(max = aboveThePanel)),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // Not in one row with the coordinates: they did not fit beside the overlay toggle on narrow
@@ -103,9 +124,27 @@ fun MapLabels(
                     containerColor = MaterialTheme.colorScheme.errorContainer,
                 )
             }
+            if (debugLines.isNotEmpty()) {
+                DebugBox(debugLines, Modifier.weight(1f, fill = false).widthIn(max = debugMaxWidth))
+            }
         }
         Box(Modifier.align(Alignment.TopEnd)) { topEnd() }
-        Box(Modifier.align(Alignment.BottomStart)) { bottomPanel() }
+        Box(Modifier.align(Alignment.BottomStart).onSizeChanged { panelHeight = it.height }) { bottomPanel() }
+    }
+}
+
+/** The debug box: [lines] in a monospace font, cut off where its space ends (settings spec, "Debug info"). */
+@Composable
+private fun DebugBox(
+    lines: List<String>,
+    modifier: Modifier = Modifier,
+) {
+    Surface(modifier.clipToBounds(), color = floatingSurfaceColor(), shape = MaterialTheme.shapes.medium) {
+        Text(
+            text = lines.joinToString("\n"),
+            style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+        )
     }
 }
 

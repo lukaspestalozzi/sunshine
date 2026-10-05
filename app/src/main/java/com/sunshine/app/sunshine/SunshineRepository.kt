@@ -1,5 +1,6 @@
 package com.sunshine.app.sunshine
 
+import com.sunshine.app.elevation.TileLoads
 import com.sunshine.core.GeoPoint
 import com.sunshine.core.HeightTile
 import com.sunshine.core.HorizonProfile
@@ -21,6 +22,9 @@ import kotlinx.coroutines.coroutineScope
 class SunshineRepository(
     private val tile: suspend (TileKey) -> HeightTile?,
     private val log: (String) -> Unit = {},
+    private val loads: () -> TileLoads = { TileLoads(0, 0) },
+    private val debug: DebugInfo = DebugInfo(),
+    private val memoryTiles: () -> MemoryTiles? = { null },
 ) {
     private val profiles =
         object : LinkedHashMap<Pair<Long, Long>, HorizonProfile>(CACHED_PROFILES, LOAD_FACTOR, true) {
@@ -34,9 +38,14 @@ class SunshineRepository(
         val start = TimeSource.Monotonic.markNow()
         var loading = Duration.ZERO
         var tiles = 0
+        var unavailable = 0
+        val before = loads()
         val timedLoad: suspend (Set<TileKey>) -> Map<TileKey, HeightTile?> = { keys ->
             tiles += keys.size
-            measureTimedValue { load(keys) }.also { loading += it.duration }.value
+            measureTimedValue { load(keys) }.also { loading += it.duration }.value.also { loaded ->
+                unavailable +=
+                    loaded.values.count { it == null }
+            }
         }
         val tracer = HorizonTracer(point)
         tracer.start(timedLoad(tracer.groundTiles()))
@@ -44,6 +53,12 @@ class SunshineRepository(
         val profile = tracer.profile()
         val total = start.elapsedNow()
         log("Horizon at $point: ${total.inWholeMilliseconds} ms, of which $tiles tiles ${loading.inWholeMilliseconds} ms")
+        // Other features loading tiles at the same time can inflate the disk and network counts.
+        val disk = loads().store - before.store
+        val network = loads().network - before.network
+        val sources = TileSources(0, (tiles - unavailable - disk - network).coerceAtLeast(0), disk, network, unavailable)
+        val held = memoryTiles()
+        debug.update { it.copy(horizon = HorizonTiming(total, loading), horizonTiles = sources, memoryTiles = held ?: it.memoryTiles) }
         if (profile != null && profile.complete.all { it }) synchronized(profiles) { profiles[key] = profile }
         return profile
     }

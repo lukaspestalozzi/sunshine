@@ -53,10 +53,10 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import com.sunshine.app.BuildConfig
 import com.sunshine.app.R
 import com.sunshine.app.SunshineApp
 import com.sunshine.app.network.NetworkMonitor
+import com.sunshine.app.sunshine.debugLines
 import com.sunshine.app.sunshine.debugLog
 import com.sunshine.core.MapArea
 import java.time.Clock
@@ -84,6 +84,7 @@ fun MapScreen(
     val locationButton by viewModel.locationButton.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val sliderStep by viewModel.sliderStep.collectAsStateWithLifecycle()
+    val debugValues by viewModel.debugValues.collectAsStateWithLifecycle()
     val sunshine = computedSunshine.at(camera.center)
 
     val context = LocalContext.current
@@ -160,6 +161,9 @@ fun MapScreen(
             },
             locationButton = locationButton,
             onLocationClicked = { viewModel.onLocationTapped(context.locationAccess(), context.isLocationOn()) },
+            debugLines = if (settings.debug.any) debugLines(debugValues, settings.debug) else emptyList(),
+            // Left of the crosshair, as the panel in landscape (settings spec, "Debug info").
+            debugMaxWidth = widthLeftOfCrosshair(maxWidth, startInset),
             topEnd = {
                 OverlayControl(
                     option = overlayOption(isOverlayOn, overlayMode),
@@ -258,9 +262,14 @@ fun sunPanelMaxWidth(
     startInset: Dp,
 ): Dp {
     if (screenWidth <= screenHeight) return SUN_PANEL_MAX_WIDTH
-    val leftOfCrosshair = screenWidth / 2 - startInset - CROSSHAIR_CLEARANCE
-    return leftOfCrosshair.coerceIn(0.dp, SUN_PANEL_MAX_WIDTH)
+    return widthLeftOfCrosshair(screenWidth, startInset).coerceAtMost(SUN_PANEL_MAX_WIDTH)
 }
+
+/** Widest an element at the map's left edge may be so that it ends left of the centre crosshair. */
+fun widthLeftOfCrosshair(
+    screenWidth: Dp,
+    startInset: Dp,
+): Dp = (screenWidth / 2 - startInset - CROSSHAIR_CLEARANCE).coerceAtLeast(0.dp)
 
 private val SUN_PANEL_MAX_WIDTH = 360.dp
 
@@ -292,9 +301,9 @@ private val mapViewModelFactory =
                 // A quarter of the app's heap limit (user decision, design D14).
                 dayCache = DayCache(maxBytes = activityManager.memoryClass * MEBIBYTE / 4),
                 log = ::debugLog,
-                checkOverlayAgreement = BuildConfig.DEBUG,
                 settings = application.settingsStore.settings,
                 saveLastView = application.settingsStore::setLastView,
+                debug = application.debugInfo,
             )
         }
     }
