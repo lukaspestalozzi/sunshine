@@ -88,6 +88,14 @@ class SettingsViewModelTest {
         }
 
     @Test
+    fun `a debug switch is stored`() =
+        runBlocking {
+            viewModel().onDebug(DebugSwitches(tiles = true))
+
+            assertEquals(DebugSwitches(tiles = true), store.settings.first { it.debug.tiles }.debug)
+        }
+
+    @Test
     fun `opening the page starts the draft from the stored values`() {
         val viewModel = viewModel()
 

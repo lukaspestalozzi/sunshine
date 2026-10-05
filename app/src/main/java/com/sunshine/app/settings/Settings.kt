@@ -19,6 +19,17 @@ data class LastView(
     val zoom: Double,
 )
 
+/** The switches of the `Debug` section, each showing one group of the debug box (settings spec, "Debug info"). */
+data class DebugSwitches(
+    val timings: Boolean = false,
+    val tiles: Boolean = false,
+    val dayState: Boolean = false,
+    val agreementCheck: Boolean = false,
+) {
+    /** Whether the debug box is shown. */
+    val any: Boolean get() = timings || tiles || dayState || agreementCheck
+}
+
 /** Every setting and the last view, with the defaults of the settings spec, "Stored settings". */
 data class Settings(
     val coordinates: CoordinateFormat = CoordinateFormat.DECIMAL,
@@ -29,6 +40,7 @@ data class Settings(
     val custom: Resolution = Resolution.NORMAL,
     val browsedLimitMib: Int = 512,
     val lastView: LastView? = null,
+    val debug: DebugSwitches = DebugSwitches(),
 ) {
     /** The cell sizes and steps in use. */
     val resolution: Resolution get() = preset.resolution(custom)
@@ -54,6 +66,10 @@ object SettingsKeys {
     val LAST_LATITUDE = doublePreferencesKey("last_view_latitude")
     val LAST_LONGITUDE = doublePreferencesKey("last_view_longitude")
     val LAST_ZOOM = doublePreferencesKey("last_view_zoom")
+    val DEBUG_TIMINGS = booleanPreferencesKey("debug_timings")
+    val DEBUG_TILES = booleanPreferencesKey("debug_tiles")
+    val DEBUG_DAY_STATE = booleanPreferencesKey("debug_day_state")
+    val DEBUG_AGREEMENT = booleanPreferencesKey("debug_agreement_check")
 
     fun lastView(view: LastView): Array<Preferences.Pair<*>> =
         arrayOf(LAST_LATITUDE to view.latitude, LAST_LONGITUDE to view.longitude, LAST_ZOOM to view.zoom)
@@ -93,6 +109,13 @@ fun decode(preferences: Preferences): Settings {
             preferences.read(SettingsKeys.BROWSED_LIMIT_MIB)?.takeIf { it in Settings.BROWSED_LIMITS_MIB }
                 ?: defaults.browsedLimitMib,
         lastView = preferences.lastView(),
+        debug =
+            DebugSwitches(
+                timings = preferences.read(SettingsKeys.DEBUG_TIMINGS) ?: false,
+                tiles = preferences.read(SettingsKeys.DEBUG_TILES) ?: false,
+                dayState = preferences.read(SettingsKeys.DEBUG_DAY_STATE) ?: false,
+                agreementCheck = preferences.read(SettingsKeys.DEBUG_AGREEMENT) ?: false,
+            ),
     )
 }
 

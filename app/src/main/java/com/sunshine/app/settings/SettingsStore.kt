@@ -59,6 +59,14 @@ class SettingsStore private constructor(
 
     suspend fun setLastView(view: LastView) = edit { it.putAll(*SettingsKeys.lastView(view)) }
 
+    suspend fun setDebug(switches: DebugSwitches) =
+        edit {
+            it[SettingsKeys.DEBUG_TIMINGS] = switches.timings
+            it[SettingsKeys.DEBUG_TILES] = switches.tiles
+            it[SettingsKeys.DEBUG_DAY_STATE] = switches.dayState
+            it[SettingsKeys.DEBUG_AGREEMENT] = switches.agreementCheck
+        }
+
     private suspend fun edit(change: (MutablePreferences) -> Unit) {
         dataStore.edit(change)
     }
