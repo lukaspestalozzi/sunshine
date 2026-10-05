@@ -72,7 +72,7 @@ class SunPeriodsTest {
     ) = HorizonProfile(
         eyeHeight = 568.0,
         angles = DoubleArray(AZIMUTH_COUNT) { angle(it * AZIMUTH_STEP) },
-        complete = BooleanArray(AZIMUTH_COUNT) { complete(it * AZIMUTH_STEP) },
+        upper = DoubleArray(AZIMUTH_COUNT) { if (complete(it * AZIMUTH_STEP)) angle(it * AZIMUTH_STEP) else 90.0 },
     )
 
     /** Upper-edge elevations at 1 s steps from [from] to [to], from commons-suncalc. */

@@ -9,24 +9,46 @@ import org.junit.jupiter.api.Test
 // The sweep against the point tracer (sun-shade-overlay spec, "Sunshine of a cell": ≥ 99.5 %).
 class SunShadeOracleTest {
     @Test
-    fun `parallel ridges agree with the point tracer`() = check(RIDGES)
+    fun `parallel ridges agree with the point tracer`() {
+        check(RIDGES)
+    }
 
     @Test
-    fun `a cirque agrees with the point tracer`() = check(CIRQUE)
+    fun `a cirque agrees with the point tracer`() {
+        check(CIRQUE)
+    }
 
-    private fun check(terrain: SyntheticTerrain) {
+    // point-sunshine spec, "Panel and overlay agree with missing data": one rule with an upper bound.
+    // The ridges' low horizons reach beyond 10 km, so some sampled horizons have gaps.
+    @Test
+    fun `parallel ridges agree with the point tracer without tiles beyond 10 km`() {
+        assertTrue(check(RIDGES, ::beyond10Km) > 0, "no incomplete horizon")
+    }
+
+    // The cirque's walls end every ray before 10 km: the missing tiles must not change anything.
+    @Test
+    fun `a cirque agrees with the point tracer without tiles beyond 10 km`() {
+        check(CIRQUE, ::beyond10Km)
+    }
+
+    /** Checks the agreement of sampled cells and returns how many of their horizons were incomplete towards the sun. */
+    private fun check(
+        terrain: SyntheticTerrain,
+        missing: (TileKey) -> Boolean = { false },
+    ): Int {
         val suns = listOf(SunPosition(150.0, 14.0, true), SunPosition(200.0, 24.0, true), SunPosition(250.0, 9.0, true))
         val sweeps = suns.map { sun -> SunShadeSweep(AREA, sun, heightBound = HEIGHT_BOUND) }
         val grids =
             sweeps.map { sweep ->
-                sweep.tiles(sweep.groundTiles().associateWith(terrain::tile))
-                sweep.assemble(listOf(sweep.compute(recording(terrain, mutableSetOf()))))
+                sweep.tiles(sweep.groundTiles().associateWith { if (missing(it)) null else terrain.tile(it) })
+                sweep.assemble(listOf(sweep.compute(recording(terrain, mutableSetOf(), missing))))
             }
         val random = Random(11)
         val point = DoubleArray(2)
         var agree = 0
         var total = 0
         val far = mutableListOf<String>()
+        var incomplete = 0
         for (index in suns.indices) {
             val sweep = sweeps[index]
             val sun = suns[index]
@@ -35,7 +57,8 @@ class SunShadeOracleTest {
                 if (sweep.lineCells[k] == 0) return@repeat
                 val j = random.nextInt(sweep.lineCells[k])
                 sweep.samplePoint(k, j, point)
-                val profile = terrain.run(HorizonTracer(GeoPoint(point[0], point[1]), heightBound = HEIGHT_BOUND))!!
+                val profile = terrain.run(HorizonTracer(GeoPoint(point[0], point[1]), heightBound = HEIGHT_BOUND), missing)!!
+                if (!profile.isCompleteAt(sun.azimuth)) incomplete++
                 val expected = sunshine(profile, sun.azimuth, sun.elevation + SUN_UPPER_LIMB)
                 total++
                 if (grids[index].cellState(k, j) == expected) {
@@ -47,6 +70,19 @@ class SunShadeOracleTest {
         }
         assertTrue(agree >= 0.995 * total, "$agree of $total cells agree")
         assertTrue(far.isEmpty(), "disagreements away from a shadow edge: $far")
+        return incomplete
+    }
+
+    // Whether [key]'s nearest point lies farther than 10 km from the area's centre.
+    private fun beyond10Km(key: TileKey): Boolean {
+        val n = (1L shl key.zoom).toDouble()
+
+        fun latitude(y: Int) = Math.toDegrees(kotlin.math.atan(kotlin.math.sinh(Math.PI * (1 - 2 * y / n))))
+        val west = key.x / n * 360.0 - 180.0
+        val east = (key.x + 1) / n * 360.0 - 180.0
+        val lat = CENTER.latitude.coerceIn(latitude(key.y + 1), latitude(key.y))
+        val lon = CENTER.longitude.coerceIn(west, east)
+        return SyntheticTerrain.distance(CENTER.latitude, CENTER.longitude, lat, lon) > 10_000.0
     }
 
     // Whether a neighbouring cell has the [expected] state, i.e. the cell lies at a shadow edge.

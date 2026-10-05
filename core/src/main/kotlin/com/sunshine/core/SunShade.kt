@@ -370,7 +370,9 @@ class SunShadeSweep(
             hull.lastGap == Double.NEGATIVE_INFINITY ||
                 run {
                     val d = s - hull.lastGap
-                    tan >= (heightBound - (h + EYE_HEIGHT) - CURVATURE * d * d) / d
+                    val reach = (heightBound - (h + EYE_HEIGHT) - CURVATURE * d * d) / d
+                    // Sunny above what missing terrain could reach (design D3 of polish-overlay).
+                    tan >= reach || upperEdge > Math.toDegrees(atan(reach))
                 }
         return when {
             upperEdge <= Math.toDegrees(atan(tan)) -> SHADE

@@ -47,6 +47,30 @@ class IncompleteHorizonTest {
         assertEquals(2.0, profile.angles[bin], 0.05)
     }
 
+    // Eye at 500 m: terrain at 4810 m, 20 km away, could appear at 12.09° (terrain-horizon spec).
+    @Test
+    fun `missing data at 20 km gives an upper bound of 12_09 degrees`() {
+        val profile = SyntheticTerrain(height = eastward(gapFrom = 20_000.0)).run(HorizonTracer(OBSERVER))!!
+
+        val bin = (90.0 / AZIMUTH_STEP).toInt()
+        assertFalse(profile.complete[bin])
+        assertEquals(2.0, profile.angles[bin], 0.05)
+        assertEquals(12.09, profile.upper[bin], 0.05)
+    }
+
+    @Test
+    fun `terrain beyond missing data raises the lower bound`() {
+        // A crest 30 km east that appears at 6°: 3214.6 m above the eye, curvature included.
+        val profile =
+            SyntheticTerrain(height = eastward(gapFrom = 20_000.0, crestAt = 30_000.0, crest = BASE + 1.7 + 3214.6))
+                .run(HorizonTracer(OBSERVER))!!
+
+        val bin = (90.0 / AZIMUTH_STEP).toInt()
+        assertFalse(profile.complete[bin])
+        assertEquals(6.0, profile.angles[bin], 0.05)
+        assertEquals(12.09, profile.upper[bin], 0.05)
+    }
+
     @Test
     fun `a missing ground tile gives no profile`() {
         val tracer = HorizonTracer(OBSERVER)
@@ -58,7 +82,29 @@ class IncompleteHorizonTest {
         assertNull(profile)
     }
 
+    // Ground at BASE (eye at 500 m); in a strip to the east a 2° ridge at 8 km, no data from
+    // [gapFrom] for 500 m, and optionally a 300 m wide crest at [crestAt].
+    private fun eastward(
+        gapFrom: Double,
+        crestAt: Double = Double.NaN,
+        crest: Double = BASE,
+    ): (Double, Double) -> Double =
+        { lat, lon ->
+            if (abs(lat - OBSERVER.latitude) > 0.01 || lon < OBSERVER.longitude) {
+                BASE
+            } else {
+                val d = SyntheticTerrain.distance(OBSERVER.latitude, OBSERVER.longitude, lat, lon)
+                when {
+                    d in 8000.0..8300.0 -> BASE + 285.4
+                    d in gapFrom..gapFrom + 500.0 -> Double.NaN
+                    d in crestAt..crestAt + 300.0 -> crest
+                    else -> BASE
+                }
+            }
+        }
+
     private companion object {
+        const val BASE = 498.3
         val OBSERVER = GeoPoint(46.6863, 7.8632)
         val METRES_PER_DEGREE = Math.toRadians(1.0) * SyntheticTerrain.EARTH_RADIUS
         val COS_LAT = kotlin.math.cos(Math.toRadians(OBSERVER.latitude))

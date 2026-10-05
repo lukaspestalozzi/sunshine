@@ -1775,7 +1775,7 @@ class MapViewModelTest {
     ) = HorizonProfile(
         eyeHeight = 568.0,
         angles = DoubleArray(AZIMUTH_COUNT) { angle },
-        complete = BooleanArray(AZIMUTH_COUNT) { complete },
+        upper = DoubleArray(AZIMUTH_COUNT) { if (complete) angle else 90.0 },
     )
 
     /** Tiles whose bytes are the height of every pixel, as decimal text. */

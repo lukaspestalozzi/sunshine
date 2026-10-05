@@ -78,13 +78,14 @@ class SunShadePlanTest {
 internal fun recording(
     terrain: SyntheticTerrain,
     read: MutableSet<TileKey>,
+    missing: (TileKey) -> Boolean = { false },
 ): Map<TileKey, HeightTile?> =
     object : AbstractMap<TileKey, HeightTile?>() {
         override val entries: Set<Map.Entry<TileKey, HeightTile?>> get() = throw UnsupportedOperationException()
 
-        override fun get(key: TileKey): HeightTile {
+        override fun get(key: TileKey): HeightTile? {
             read += key
-            return terrain.tile(key)
+            return if (missing(key)) null else terrain.tile(key)
         }
 
         override fun containsKey(key: TileKey) = true

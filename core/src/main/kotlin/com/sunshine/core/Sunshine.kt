@@ -14,7 +14,8 @@ const val SUN_UPPER_LIMB = 0.266
 
 /**
  * Sunshine at [point] at [instant]: the sun's upper edge against the horizon [profile] at the sun's
- * azimuth. An incomplete horizon decides shade only where the upper edge is at or below its bound.
+ * azimuth. An incomplete horizon decides shade only at or below its angle, its lower bound, and sun
+ * only above its upper bound.
  */
 fun sunshineAt(
     profile: HorizonProfile,
@@ -32,7 +33,7 @@ internal fun sunshine(
 ): Sunshine =
     when {
         upperEdge <= profile.angleAt(azimuth) -> Sunshine.SHADE
-        profile.isCompleteAt(azimuth) -> Sunshine.SUN
+        upperEdge > profile.upperAt(azimuth) || profile.isCompleteAt(azimuth) -> Sunshine.SUN
         else -> Sunshine.UNKNOWN
     }
 
