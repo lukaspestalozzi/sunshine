@@ -10,8 +10,8 @@ Device checks (6.1–6.3) are done by the user at the end, on the debug APK of t
 
 ## 2. Geometry and choice of the earlier day (app)
 
-- [ ] 2.1 Write `UncoveredTest` first (design D2): pans by half a screen in the four directions give one rectangle of half the area; a diagonal pan gives two; zooming out by 0.5 level around the same centre gives four strips around the old area; no overlap gives the whole area and share 0; a sliver narrower than one cell is widened to one cell; the covered share of a half-screen pan is 0.5 (±0.01). Then implement `uncovered(new, old, cellDp)` in `map/`. Verify: `./gradlew :app:testDebugUnitTest --tests "*Uncovered*"` passes.
-- [ ] 2.2 Extend `DayCacheTest` first with `reusable` (design D1): same date, cell size and step; zoom rule (12 → 12.5 refused, 12.5 → 12 accepted, 13.1 → 12 refused); share ≥ ¼ (0.8-screen pan refused); a day with unknown cells refused online and accepted offline; the largest share wins; 50 days searched in ≤ 1 ms. Then implement it. Verify: `./gradlew :app:testDebugUnitTest --tests "*DayCache*"` passes.
+- [x] 2.1 Write `UncoveredTest` first (design D2): pans by half a screen in the four directions give one rectangle of half the area; a diagonal pan gives two; zooming out by 0.5 level around the same centre gives four strips around the old area; no overlap gives the whole area and share 0; a sliver narrower than one cell is widened to one cell; the covered share of a half-screen pan is 0.5 (±0.01). Then implement `uncovered(new, old, cellDp)` in `map/`. Verify: `./gradlew :app:testDebugUnitTest --tests "*Uncovered*"` passes.
+- [x] 2.2 Extend `DayCacheTest` first with `reusable` (design D1): same date, cell size and step; zoom rule (12 → 12.5 refused, 12.5 → 12 accepted, 13.1 → 12 refused); share ≥ ¼ (0.8-screen pan refused); a day with unknown cells refused online and accepted offline; the largest share wins; 50 days searched in ≤ 1 ms. Then implement it. Verify: `./gradlew :app:testDebugUnitTest --tests "*DayCache*"` passes.
 
 ## 3. Days that reuse an earlier day (app)
 

@@ -79,6 +79,34 @@ class DayCache(
         return found?.also { days[it.key()] }
     }
 
+    /**
+     * The day to reuse for a new day of [area] (design D1 of overlay-pan-reuse): of [date], [cellDp]
+     * and [stepMinutes], computed at [area]'s zoom or up to one level higher, without unknown cells
+     * while [online], covering the largest share of [area] and at least [MIN_REUSED_SHARE]; or `null`.
+     */
+    @Synchronized
+    fun reusable(
+        area: MapArea,
+        date: LocalDate,
+        cellDp: Double,
+        stepMinutes: Int,
+        online: Boolean,
+    ): DayOverlay? {
+        var best: DayOverlay? = null
+        var bestShare = 0.0
+        for (day in days.values) {
+            if (day.area == area || day.date != date || day.cellDp != cellDp || day.stepMinutes != stepMinutes) continue
+            if (day.area.zoom < area.zoom || day.area.zoom > area.zoom + 1) continue
+            if (online && day.hasUnknown) continue
+            val share = uncovered(area, day.area, cellDp).coveredShare
+            if (share >= MIN_REUSED_SHARE && share > bestShare) {
+                best = day
+                bestShare = share
+            }
+        }
+        return best
+    }
+
     private fun GeoBounds.intersects(other: GeoBounds) =
         south < other.north && other.south < north && west < other.east && other.west < east
 
@@ -97,3 +125,6 @@ class DayCache(
         }
     }
 }
+
+/** The least share of a new area an earlier day must cover to be reused (design D1 of overlay-pan-reuse). */
+const val MIN_REUSED_SHARE = 0.25
