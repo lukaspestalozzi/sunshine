@@ -165,16 +165,8 @@ class HorizonTracer(
         distance: Double,
     ): Boolean = (heightBound - eyeHeight - drop(distance)) / distance < maxSlope[ray]
 
-    /**
-     * The largest slope terrain up to heightBound could have at [distance] or beyond: bound(d)
-     * falls with d when the eye is below heightBound; otherwise it peaks where d² = (eye - heightBound) / c
-     * (see [cannotRise]).
-     */
-    private fun boundBeyond(distance: Double): Double {
-        val peak = if (eyeHeight > heightBound) sqrt((eyeHeight - heightBound) / CURVATURE) else 0.0
-        val d = maxOf(distance, peak)
-        return (heightBound - eyeHeight - drop(d)) / d
-    }
+    // The largest slope terrain beyond a gap at [distance] could have (see [cannotRise]).
+    private fun boundBeyond(distance: Double): Double = slopeBound(distance, eyeHeight, heightBound)
 
     private fun drop(distance: Double): Double = distance * distance * (1 - REFRACTION) / (2 * EARTH_RADIUS)
 
@@ -336,6 +328,22 @@ internal fun tileKey(
 ): TileKey {
     val worldPixels = (1L shl zoom) * tileSize
     return TileKey(zoom, (Math.floorMod(gx, worldPixels) / tileSize).toInt(), (gy / tileSize).toInt())
+}
+
+/**
+ * The largest slope terrain up to [heightBound] could have at [distance] or beyond, seen from an eye
+ * at [eyeHeight]: bound(d) = (heightBound - eye - c·d²) / d falls with d when the eye is below
+ * heightBound; otherwise it peaks where d² = (eye - heightBound) / c. Shared by the point tracer and
+ * the sweep, so that panel and overlay agree where data is missing (design D3 of polish-overlay).
+ */
+internal fun slopeBound(
+    distance: Double,
+    eyeHeight: Double,
+    heightBound: Double,
+): Double {
+    val peak = if (eyeHeight > heightBound) sqrt((eyeHeight - heightBound) / CURVATURE) else 0.0
+    val d = maxOf(distance, peak)
+    return (heightBound - eyeHeight - CURVATURE * d * d) / d
 }
 
 /**
