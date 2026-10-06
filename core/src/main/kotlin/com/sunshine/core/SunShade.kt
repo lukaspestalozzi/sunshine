@@ -731,38 +731,27 @@ class ShadeGridPart internal constructor(
 )
 
 /**
- * Sun, shade or unknown for every cell of [sweep]'s area (sun-shade-overlay spec). The states are
- * packed at 2 bits per cell, 4 cells per byte, so that a whole day of grids fits in memory (design D13).
+ * Sun, shade or unknown at the points of [area] at one step: one computed grid ([ShadeGrid]) or an
+ * earlier day's grid combined with the grids of the parts a pan uncovered ([CombinedGrid]; design D3
+ * of overlay-pan-reuse).
  */
-class ShadeGrid internal constructor(
-    private val sweep: SunShadeSweep,
-    states: Array<ByteArray>,
-) {
-    val area: MapArea get() = sweep.area
-    val sun: SunPosition get() = sweep.sun
-
-    private val packed: Array<ByteArray> =
-        Array(states.size) { k ->
-            val line = states[k]
-            val bytes = ByteArray((line.size + 3) / 4)
-            for (j in line.indices) bytes[j shr 2] = (bytes[j shr 2].toInt() or (line[j].toInt() shl ((j and 3) * 2))).toByte()
-            bytes
-        }
+interface StepGrid {
+    val area: MapArea
 
     /** Whether some cell is unknown. */
-    val hasUnknown: Boolean = states.any { line -> line.any { it == SunShadeSweep.UNKNOWN } }
+    val hasUnknown: Boolean
 
     /** Bytes taken by the packed states, e.g. to budget a cache of grids. */
-    val stateBytes: Int = packed.sumOf { it.size }
+    val stateBytes: Int
+
+    /** How many combinations this grid is made of: 0 for a computed grid. */
+    val depth: Int
 
     /** The state of the cell containing the point, or `null` outside the grid. */
     fun stateAt(
         latitude: Double,
         longitude: Double,
-    ): Sunshine? {
-        val (k, j) = sweep.cellOf(latitude, longitude) ?: return null
-        return cellState(k, j)
-    }
+    ): Sunshine?
 
     fun stateAt(point: GeoPoint): Sunshine? = stateAt(point.latitude, point.longitude)
 
@@ -773,17 +762,71 @@ class ShadeGrid internal constructor(
     fun statesAt(
         latitudes: DoubleArray,
         longitudes: DoubleArray,
+    ): Array<Sunshine?>
+
+    /** The sample points and states of [count] random cells, e.g. to check them against the point tracer. */
+    fun sampleCells(
+        count: Int,
+        random: Random,
+    ): List<SampledCell>
+}
+
+/** A cell's sample [point] and [state], computed with the sun position of [center] (sun-shade-overlay, "Sunshine of a cell"). */
+data class SampledCell(
+    val point: GeoPoint,
+    val state: Sunshine,
+    val center: GeoPoint,
+)
+
+/**
+ * Sun, shade or unknown for every cell of [sweep]'s area (sun-shade-overlay spec). The states are
+ * packed at 2 bits per cell, 4 cells per byte, so that a whole day of grids fits in memory (design D13).
+ */
+class ShadeGrid internal constructor(
+    private val sweep: SunShadeSweep,
+    states: Array<ByteArray>,
+) : StepGrid {
+    override val area: MapArea get() = sweep.area
+    val sun: SunPosition get() = sweep.sun
+
+    /** Width of a cell in metres. */
+    internal val cellMetres: Double get() = sweep.spacing
+
+    private val packed: Array<ByteArray> =
+        Array(states.size) { k ->
+            val line = states[k]
+            val bytes = ByteArray((line.size + 3) / 4)
+            for (j in line.indices) bytes[j shr 2] = (bytes[j shr 2].toInt() or (line[j].toInt() shl ((j and 3) * 2))).toByte()
+            bytes
+        }
+
+    override val hasUnknown: Boolean = states.any { line -> line.any { it == SunShadeSweep.UNKNOWN } }
+
+    override val stateBytes: Int = packed.sumOf { it.size }
+
+    override val depth: Int get() = 0
+
+    override fun stateAt(
+        latitude: Double,
+        longitude: Double,
+    ): Sunshine? {
+        val (k, j) = sweep.cellOf(latitude, longitude) ?: return null
+        return cellState(k, j)
+    }
+
+    override fun statesAt(
+        latitudes: DoubleArray,
+        longitudes: DoubleArray,
     ): Array<Sunshine?> {
         val states = arrayOfNulls<Sunshine>(latitudes.size * longitudes.size)
         sweep.forEachCell(latitudes, longitudes) { index, line, cell -> states[index] = cellState(line, cell) }
         return states
     }
 
-    /** The sample points and states of [count] random cells, e.g. to check them against the point tracer. */
-    fun sampleCells(
+    override fun sampleCells(
         count: Int,
         random: Random,
-    ): List<Pair<GeoPoint, Sunshine>> {
+    ): List<SampledCell> {
         val lines = (0 until sweep.lineCount).filter { sweep.lineCells[it] > 0 }
         if (lines.isEmpty()) return emptyList()
         val point = DoubleArray(2)
@@ -791,7 +834,7 @@ class ShadeGrid internal constructor(
             val k = lines[random.nextInt(lines.size)]
             val j = random.nextInt(sweep.lineCells[k])
             sweep.samplePoint(k, j, point)
-            GeoPoint(point[0], point[1]) to cellState(k, j)
+            SampledCell(GeoPoint(point[0], point[1]), cellState(k, j), area.center)
         }
     }
 
@@ -804,6 +847,119 @@ class ShadeGrid internal constructor(
             SunShadeSweep.SHADE -> Sunshine.SHADE
             else -> Sunshine.UNKNOWN
         }
+}
+
+/**
+ * An earlier day's [base] grid combined with the grids of the [parts] of [area] it does not cover
+ * (design D3 of overlay-pan-reuse). A point takes the base's state inside the base's bounds,
+ * elsewhere the first part's that has one near its own bounds; each grid keeps the sun position of
+ * the area it was computed for (sun-shade-overlay, "Sunshine of a cell").
+ */
+class CombinedGrid(
+    override val area: MapArea,
+    val base: StepGrid,
+    val parts: List<ShadeGrid>,
+) : StepGrid {
+    private val bounds = GeoBounds.of(area)
+    private val baseBounds = GeoBounds.of(base.area)
+
+    // A part's grid reaches a few cells past its area; the margin keeps its cells at the new area's edges.
+    private val partBounds = parts.map { GeoBounds.of(it.area).extend(PART_MARGIN_CELLS * it.cellMetres) }
+
+    override val hasUnknown: Boolean = base.hasUnknown || parts.any { it.hasUnknown }
+
+    override val stateBytes: Int = base.stateBytes + parts.sumOf { it.stateBytes }
+
+    override val depth: Int = base.depth + 1
+
+    override fun stateAt(
+        latitude: Double,
+        longitude: Double,
+    ): Sunshine? {
+        if (baseBounds.contains(latitude, longitude)) base.stateAt(latitude, longitude)?.let { return it }
+        for (i in parts.indices) {
+            if (partBounds[i].contains(latitude, longitude)) parts[i].stateAt(latitude, longitude)?.let { return it }
+        }
+        return null
+    }
+
+    // Each grid is asked only for the rows and columns within its bounds, so the raster is passed about once.
+    override fun statesAt(
+        latitudes: DoubleArray,
+        longitudes: DoubleArray,
+    ): Array<Sunshine?> {
+        val states = arrayOfNulls<Sunshine>(latitudes.size * longitudes.size)
+        fill(states, latitudes, longitudes, base, baseBounds)
+        for (i in parts.indices) fill(states, latitudes, longitudes, parts[i], partBounds[i])
+        return states
+    }
+
+    // Draws a grid in proportion to its area, then keeps its cell if the cell lies in [area] and the
+    // combination takes its state from that grid: the cells kept are spread by each grid's share.
+    override fun sampleCells(
+        count: Int,
+        random: Random,
+    ): List<SampledCell> {
+        val grids = listOf(base) + parts
+        val allBounds = listOf(baseBounds) + partBounds
+        val weights = grids.map { GeoBounds.of(it.area).let { b -> (b.north - b.south) * (b.east - b.west) } }
+        val total = weights.sum()
+        val samples = ArrayList<SampledCell>(count)
+        var attempts = 0
+        while (samples.size < count && attempts < count * MAX_SAMPLE_ATTEMPTS) {
+            attempts++
+            var pick = random.nextDouble() * total
+            var i = 0
+            while (i < weights.lastIndex && pick >= weights[i]) pick -= weights[i++]
+            val sample = grids[i].sampleCells(1, random).firstOrNull() ?: continue
+            val (latitude, longitude) = sample.point
+            if (bounds.contains(latitude, longitude) && ownerAt(latitude, longitude, allBounds) == i) samples += sample
+        }
+        return samples
+    }
+
+    // The index in base and parts of the grid whose state [stateAt] takes, or -1.
+    private fun ownerAt(
+        latitude: Double,
+        longitude: Double,
+        allBounds: List<GeoBounds>,
+    ): Int {
+        if (allBounds[0].contains(latitude, longitude) && base.stateAt(latitude, longitude) != null) return 0
+        for (i in parts.indices) {
+            if (allBounds[i + 1].contains(latitude, longitude) && parts[i].stateAt(latitude, longitude) != null) return i + 1
+        }
+        return -1
+    }
+
+    private fun fill(
+        states: Array<Sunshine?>,
+        latitudes: DoubleArray,
+        longitudes: DoubleArray,
+        grid: StepGrid,
+        bounds: GeoBounds,
+    ) {
+        val rows = latitudes.indices.filter { latitudes[it] >= bounds.south && latitudes[it] <= bounds.north }
+        val columns = longitudes.indices.filter { longitudes[it] >= bounds.west && longitudes[it] <= bounds.east }
+        if (rows.isEmpty() || columns.isEmpty()) return
+        val sub = grid.statesAt(DoubleArray(rows.size) { latitudes[rows[it]] }, DoubleArray(columns.size) { longitudes[columns[it]] })
+        for (r in rows.indices) {
+            val row = rows[r] * longitudes.size
+            for (c in columns.indices) {
+                val i = row + columns[c]
+                if (states[i] == null) states[i] = sub[r * columns.size + c]
+            }
+        }
+    }
+
+    private fun GeoBounds.contains(
+        latitude: Double,
+        longitude: Double,
+    ) = latitude >= south && latitude <= north && longitude >= west && longitude <= east
+
+    private companion object {
+        const val PART_MARGIN_CELLS = 3.0
+        const val MAX_SAMPLE_ATTEMPTS = 50
+    }
 }
 
 /**

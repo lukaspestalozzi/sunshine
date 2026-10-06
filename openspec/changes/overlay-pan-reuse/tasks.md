@@ -4,9 +4,9 @@ Device checks (6.1–6.3) are done by the user at the end, on the debug APK of t
 
 ## 1. Combined grids (core)
 
-- [ ] 1.1 Set `docs/roadmap.md` row #11 to "in progress" with the decisions of design D1. Verify: `openspec validate --all --strict` passes and the row reads "in progress".
-- [ ] 1.2 Write `CombinedGridTest` first (design D3): on synthetic terrain, a base grid of an area and part grids of the rectangles a half-screen pan uncovers; `stateAt` equals the base's inside the base's bounds and the parts' elsewhere, `null` outside the new area's grids; `statesAt` over a raster reaching past the area equals `stateAt` at every point; `sampleCells` draws from base and parts in proportion to their share (±10 % over 1000 samples); `hasUnknown` is any part's; `stateBytes` the sum. See it fail to compile, then add the `StepGrid` interface (implemented by `ShadeGrid`) and `CombinedGrid` in `SunShade.kt`. Verify: `./gradlew :core:test` passes.
-- [ ] 1.3 Extend `SunShadeOracleTest` first: a combined grid of a half-screen pan, each cell against the point tracer with the sun of its computed area (sun-shade-overlay "Sunshine of a cell", "Sun position of a reused part"), ≥ 99.5 % agreement. Verify: `./gradlew :core:test --tests "*SunShadeOracle*"` passes.
+- [x] 1.1 Set `docs/roadmap.md` row #11 to "in progress" with the decisions of design D1. Verify: `openspec validate --all --strict` passes and the row reads "in progress".
+- [x] 1.2 Write `CombinedGridTest` first (design D3): on synthetic terrain, a base grid of an area and part grids of the rectangles a half-screen pan uncovers; `stateAt` equals the base's inside the base's bounds and the parts' elsewhere, `null` outside the new area's grids; `statesAt` over a raster reaching past the area equals `stateAt` at every point; `sampleCells` draws from base and parts in proportion to their share (±10 % over 1000 samples); `hasUnknown` is any part's; `stateBytes` the sum. See it fail to compile, then add the `StepGrid` interface (implemented by `ShadeGrid`) and `CombinedGrid` in `SunShade.kt`. Verify: `./gradlew :core:test` passes.
+- [x] 1.3 Extend `SunShadeOracleTest` first: a combined grid of a half-screen pan, each cell against the point tracer with the sun of its computed area (sun-shade-overlay "Sunshine of a cell", "Sun position of a reused part"), ≥ 99.5 % agreement. Verify: `./gradlew :core:test --tests "*SunShadeOracle*"` passes.
 
 ## 2. Geometry and choice of the earlier day (app)
 

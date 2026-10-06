@@ -1,5 +1,6 @@
 package com.sunshine.core
 
+import java.time.Instant
 import kotlin.math.abs
 import kotlin.math.sin
 import kotlin.random.Random
@@ -29,6 +30,40 @@ class SunShadeOracleTest {
     @Test
     fun `a cirque agrees with the point tracer without tiles beyond 10 km`() {
         check(CIRQUE, ::beyond10Km)
+    }
+
+    // sun-shade-overlay, "Sun position of a reused part": after a half-screen pan the earlier day's
+    // grid keeps the sun of its centre and the uncovered part has the sun of its own.
+    @Test
+    fun `a combined grid of a half-screen pan agrees with the point tracer`() {
+        val new = AREA.panned(dx = AREA.widthDp / 2)
+        val part = AREA.panned(dx = AREA.widthDp * 3 / 4).copy(widthDp = AREA.widthDp / 2)
+        val random = Random(12)
+        var agree = 0
+        var total = 0
+        var fromPart = 0
+        for (instant in PAN_TIMES) {
+            val combined = CombinedGrid(new, grid(RIDGES, AREA, instant), listOf(grid(RIDGES, part, instant)))
+            for (sample in combined.sampleCells(CELLS, random)) {
+                val profile = RIDGES.run(HorizonTracer(sample.point, heightBound = HEIGHT_BOUND))!!
+                total++
+                if (sample.center == part.center) fromPart++
+                if (sunshineAt(profile, sample.center, instant) == sample.state) agree++
+            }
+        }
+        assertTrue(total == PAN_TIMES.size * CELLS && fromPart in 1 until total, "$total cells, $fromPart from the part")
+        assertTrue(agree >= 0.995 * total, "$agree of $total cells agree")
+    }
+
+    // The grid of [area] with the sun of its centre at [instant].
+    private fun grid(
+        terrain: SyntheticTerrain,
+        area: MapArea,
+        instant: Instant,
+    ): ShadeGrid {
+        val sweep = SunShadeSweep(area, sunPosition(area.center, instant), heightBound = HEIGHT_BOUND)
+        sweep.tiles(sweep.groundTiles().associateWith(terrain::tile))
+        return sweep.assemble(listOf(sweep.compute(recording(terrain, mutableSetOf()))))
     }
 
     /** Checks the agreement of sampled cells and returns how many of their horizons were incomplete towards the sun. */
@@ -109,6 +144,9 @@ class SunShadeOracleTest {
         val CENTER = GeoPoint(46.6, 7.9)
         val AREA = MapArea(CENTER, 12.0, 120.0, 160.0)
         const val CELLS = 70
+
+        // Sun from the south-east, the south and the south-west.
+        val PAN_TIMES = listOf("2026-10-06T08:30:00Z", "2026-10-06T11:30:00Z", "2026-10-06T14:30:00Z").map(Instant::parse)
         const val HEIGHT_BOUND = 2300.0
         val METRES_PER_DEGREE = Math.toRadians(1.0) * SyntheticTerrain.EARTH_RADIUS
 
