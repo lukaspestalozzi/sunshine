@@ -8,11 +8,13 @@ import com.sunshine.core.SunPosition
 import com.sunshine.core.SunShadeSweep
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlin.math.pow
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -187,6 +189,100 @@ class DayCacheTest {
             assertTrue(millis <= 1.0, "$millis ms per lookup")
         }
 
+    // The earlier day reused after a camera move (sun-shade-overlay spec, "Overlay of the whole day";
+    // design D1 of overlay-pan-reuse).
+    @Test
+    fun `a day of the same date, cell size and step covering half the new area is reusable`() =
+        runTest {
+            val cache = DayCache(maxBytes = Long.MAX_VALUE)
+            val earlier = day(AREA, DECEMBER_21, grids = 2)
+            cache.put(earlier)
+            cache.put(day(AREA, DECEMBER_21.plusDays(1), grids = 2))
+            cache.put(day(AREA, DECEMBER_21, grids = 2, cellDp = 4.0))
+            cache.put(day(AREA, DECEMBER_21, grids = 2, stepMinutes = 10))
+
+            assertSame(earlier, cache.reusable(PANNED, DECEMBER_21, SunShadeSweep.CELL_DP, 5, online = true))
+            assertNull(cache.reusable(PANNED, DECEMBER_21.plusDays(2), SunShadeSweep.CELL_DP, 5, online = true))
+            assertNull(cache.reusable(PANNED, DECEMBER_21, 8.0, 5, online = true))
+            assertNull(cache.reusable(PANNED, DECEMBER_21, SunShadeSweep.CELL_DP, 15, online = true))
+        }
+
+    @Test
+    fun `a day of the same zoom or up to one level higher is reusable`() =
+        runTest {
+            // [old] zoom to [new] zoom around the same centre: whether the day at [old] is reused.
+            suspend fun reused(
+                old: Double,
+                new: Double,
+            ): Boolean {
+                val cache = DayCache(maxBytes = Long.MAX_VALUE)
+                cache.put(day(AREA.copy(zoom = old), DECEMBER_21, grids = 1))
+                return cache.reusable(AREA.copy(zoom = new), DECEMBER_21, SunShadeSweep.CELL_DP, 5, online = true) != null
+            }
+
+            assertFalse(reused(old = 12.0, new = 12.5), "zoomed in")
+            assertTrue(reused(old = 12.5, new = 12.0), "zoomed out by half a level")
+            assertFalse(reused(old = 13.1, new = 12.0), "zoomed out by more than a level")
+        }
+
+    @Test
+    fun `a day covering less than a quarter of the new area is not reusable`() =
+        runTest {
+            val cache = DayCache(maxBytes = Long.MAX_VALUE)
+            cache.put(day(AREA, DECEMBER_21, grids = 1))
+
+            // 0.8 of the width to the east: a fifth is covered.
+            assertNull(cache.reusable(AREA.panned(dx = 16.0), DECEMBER_21, SunShadeSweep.CELL_DP, 5, online = true))
+            assertSame(AREA, cache.reusable(AREA.panned(dx = 14.0), DECEMBER_21, SunShadeSweep.CELL_DP, 5, online = true)?.area)
+        }
+
+    @Test
+    fun `a day with unknown cells is reusable only offline`() =
+        runTest {
+            val cache = DayCache(maxBytes = Long.MAX_VALUE)
+            val unknown = day(AREA, DECEMBER_21, grids = 1, grid = UNKNOWN_GRID)
+            cache.put(unknown)
+
+            assertNull(cache.reusable(PANNED, DECEMBER_21, SunShadeSweep.CELL_DP, 5, online = true))
+            assertSame(unknown, cache.reusable(PANNED, DECEMBER_21, SunShadeSweep.CELL_DP, 5, online = false))
+        }
+
+    @Test
+    fun `of two reusable days the one covering the larger share is chosen`() =
+        runTest {
+            val cache = DayCache(maxBytes = Long.MAX_VALUE)
+            val half = day(AREA, DECEMBER_21, grids = 1)
+            val threeQuarters = day(PANNED.panned(dx = -5.0), DECEMBER_21, grids = 1)
+            cache.put(threeQuarters)
+            cache.put(half)
+
+            // The half-covering day was used more recently.
+            assertSame(threeQuarters, cache.reusable(PANNED, DECEMBER_21, SunShadeSweep.CELL_DP, 5, online = true))
+        }
+
+    @Test
+    fun `the day of the new area itself is not reused`() =
+        runTest {
+            val cache = DayCache(maxBytes = Long.MAX_VALUE)
+            cache.put(day(PANNED, DECEMBER_21, grids = 1))
+
+            assertNull(cache.reusable(PANNED, DECEMBER_21, SunShadeSweep.CELL_DP, 5, online = true))
+        }
+
+    @Test
+    fun `50 cached days are searched for a reusable one within 1 ms`() =
+        runTest {
+            val cache = DayCache(maxBytes = Long.MAX_VALUE)
+            repeat(50) { cache.put(day(AREA.panned(dx = it * 0.4), DECEMBER_21.plusDays(it % 2L), grids = 1)) }
+            repeat(WARM_UP) { cache.reusable(PANNED, DECEMBER_21, SunShadeSweep.CELL_DP, 5, online = true) }
+
+            val start = System.nanoTime()
+            repeat(RUNS) { cache.reusable(PANNED, DECEMBER_21, SunShadeSweep.CELL_DP, 5, online = true) }
+            val millis = (System.nanoTime() - start) / 1e6 / RUNS
+
+            assertTrue(millis <= 1.0, "$millis ms per lookup")
+        }
+
     // A day of [area] and [date] with the first [grids] slider steps computed.
     private suspend fun TestScope.day(
         area: MapArea,
@@ -194,12 +290,16 @@ class DayCacheTest {
         grids: Int,
         stepMinutes: Int = 5,
         cellDp: Double = SunShadeSweep.CELL_DP,
+        grid: ShadeGrid = GRID,
     ): DayOverlay {
-        val day = DayOverlay(area, date, ZURICH, { _, _, _ -> GRID }, StandardTestDispatcher(testScheduler), stepMinutes, cellDp)
+        val day = DayOverlay(area, date, ZURICH, { _, _, _ -> grid }, StandardTestDispatcher(testScheduler), stepMinutes, cellDp)
         for (step in day.steps.take(grids)) day.compute(step)
-        assertEquals(grids.toLong() * GRID.stateBytes, day.bytes)
+        assertEquals(grids.toLong() * grid.stateBytes, day.bytes)
         return day
     }
+
+    // This area moved [dx] dp east at its zoom.
+    private fun MapArea.panned(dx: Double) = copy(center = GeoPoint(center.latitude, center.longitude + dx * 360.0 / (512 * 2.0.pow(zoom))))
 
     private companion object {
         val ZURICH: ZoneId = ZoneId.of("Europe/Zurich")
@@ -216,6 +316,10 @@ class DayCacheTest {
         val GRID: ShadeGrid =
             SunShadeSweep(AREA, SunPosition(0.0, -30.0, false)).let { sweep ->
                 sweep.night(sweep.groundTiles().associateWith { HeightTile.fromMetres(512, FloatArray(512 * 512) { 568f }) })
+            }
+        val UNKNOWN_GRID: ShadeGrid =
+            SunShadeSweep(AREA, SunPosition(0.0, -30.0, false)).let { sweep ->
+                sweep.night(sweep.groundTiles().associateWith { null })
             }
     }
 }
