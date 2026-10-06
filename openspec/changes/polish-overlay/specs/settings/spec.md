@@ -89,7 +89,7 @@ durations in whole milliseconds as `ms`, or in seconds with one decimal as `s` f
     (sun-shade-overlay "Overlay updates") or `previous overlay`;
   - `Cache <n> days, <m> of <max> MiB`: the cache of days.
 - **Agreement check:** `Agreement <a> of <n> cells (<p> %)`: 3 s after a `Sun & shade` overlay is
-  shown and stays, 200 of its cells are checked against point-sunshine "Sunshine at an instant" at
+  shown and stays, 50 of its cells are checked against point-sunshine "Sunshine at an instant" at
   their sample points; `…` while checking. A newer overlay cancels the check.
 
 The box SHALL show a new value within 1 s. Collecting the values SHALL NOT slow the computations
@@ -117,7 +117,7 @@ they describe by more than 1 %.
 
 #### Scenario: Agreement check result
 - **WHEN** `Agreement check` is on and a `Sun & shade` overlay at map zoom 12 has been shown for 3 s
-- **THEN** the debug box shows `Agreement <a> of <n> cells (<p> %)` with n at most 200
+- **THEN** the debug box shows `Agreement <a> of <n> cells (<p> %)` with n at most 50
 
 #### Scenario: Release build
 - **WHEN** the app is a release build

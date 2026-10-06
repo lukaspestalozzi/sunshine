@@ -120,7 +120,8 @@ individual switches only); debug builds only (user decision: every build, off by
 ### D5. Agreement check by setting
 The `init` block's agreement collector becomes `combine(overlay, settings.agreementCheck)` with
 `collectLatest`: it runs only while the switch is on (any build), as before 3 s after a `Ready`
-overlay, on 200 cells, on `computeDispatcher`. Results go to `DebugInfo` (and to logcat in debug
+overlay, on 50 cells (200 before the device check; user decision, 2026-10-06: a check of 200 took
+about 6 minutes on the phone), on `computeDispatcher`. Results go to `DebugInfo` (and to logcat in debug
 builds). `checkOverlayAgreement` is removed from the constructor.
 
 ### D6. Settings
@@ -161,7 +162,7 @@ the heatmap, which is drawn once per day (user decision: optimize both).
 | Upper-bound rule in the sweep | no measurable change (one comparison per incomplete cell) | existing sweep timing test |
 | Recording debug values | ≤ 1 % of each computation (one `StateFlow.update` per computation) | review; `Grid` timing with and without boxes |
 | Debug box update | ≤ 1 s after a new value | device check |
-| Agreement check (only while on) | 200 profiles in the background; map and slider stay responsive | device check |
+| Agreement check (only while on) | 50 profiles in the background (about 1.5 min on the phone); map and slider stay responsive | device check |
 | Heatmap counting pass | ≤ 2 s on the phone at zoom 12 (from #7) | device measurement, D7 |
 | Heatmap image | ≤ 100 ms on the phone (from #7) | device measurement, D7 |
 
@@ -211,7 +212,7 @@ CPU; `investigations/overlay-pan-reuse.md` measures what computing only the unco
   can cost a few more requests per incomplete ray.
 - [Sun periods become known more often offline] → Intended: the rule only calls sun where no
   terrain at the height bound could block it.
-- [The agreement check costs 200 horizon profiles] → Only while its switch is on; it runs on
+- [The agreement check costs 50 horizon profiles] → Only while its switch is on; it runs on
   `computeDispatcher` and is cancelled by the next overlay.
 - [Tile counts by source shift under concurrent loads] → Documented in the box's meaning (D4);
   they are diagnostics, not a spec'd accuracy.
