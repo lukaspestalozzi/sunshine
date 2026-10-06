@@ -59,8 +59,8 @@ terrain, which is correct there.
 - measuring first and deciding later: postpones the improvement without changing the options.
 
 ### D2. Which earlier day
-`DayCache.overlapping(area, date, cellDp, stepMinutes, time)` returns, among the cached days other
-than the current one with the same date, cell size (dp) and step, whose geographic bounds intersect
+`DayCache.overlapping(area, time, cellDp, stepMinutes, except)` returns, among the cached days other
+than `except` (the current one) with `time`'s date and the same cell size (dp) and step, whose geographic bounds intersect
 the visible area's and that have a grid at `time`, the most recently used one. The map zoom may
 differ: after a zoom, the earlier grid is drawn scaled on its own terrain, as the kept overlay is
 today after a camera move. `OverlayUiState.Ready` gains `source` (`OWN_DAY`, `EARLIER_DAY`) for the
@@ -101,8 +101,8 @@ upper bound like the angle (could call sun where one neighbouring bin cannot exc
 ### D4. Debug values: a typed collector
 `DebugInfo` (app, `sunshine/DebugInfo.kt`) holds a `MutableStateFlow<DebugValues>`, an immutable
 data class with one nullable field per spec line (durations, tile counts by source, day state,
-shown source, cache size, agreement). Producers call typed methods (`horizon(total, tiles,
-sources)`, `grid(...)`, `day(...)`, …) at the places that log today; each is a `update { copy }`.
+shown source, cache size, agreement). Producers call `DebugInfo.update { it.copy(…) }` with typed
+values (`HorizonTiming`, `GridTiming`, `DayTiming`, `TileSources`, …) at the places that log today.
 `SunshineApp` builds one instance and passes it to the repositories and `MapViewModel` beside the
 existing `log`. Tile sources: `OverlayRepository` and `SunshineRepository` count `kept` and
 `unavailable` (null tiles) themselves, disk and network from `loads()` deltas, and memory as the
@@ -160,7 +160,7 @@ the heatmap, which is drawn once per day (user decision: optimize both).
 | `DayCache.overlapping` lookup | ≤ 1 ms for ≤ 50 cached days | unit test |
 | Point tracer offline, continuing past gaps | ≤ the online duration of the same location (it reads at most the same tiles) | `Horizon` timing in the debug box, device check |
 | Upper-bound rule in the sweep | no measurable change (one comparison per incomplete cell) | existing sweep timing test |
-| Recording debug values | ≤ 1 % of each computation (one `StateFlow.update` per computation) | review; `Grid` timing with and without boxes |
+| Recording debug values | ≤ 1 % of each computation (one `StateFlow.update` per computation) | not measured: the timing with and without boxes was not compared (verify, 2026-10-06) |
 | Debug box update | ≤ 1 s after a new value | device check |
 | Agreement check (only while on) | 50 profiles in the background (about 1.5 min on the phone); map and slider stay responsive | device check |
 | Heatmap counting pass | ≤ 2 s on the phone at zoom 12 (from #7) | device measurement, D7 |
