@@ -97,23 +97,27 @@ internal class GnomonicFrame(
     }
 
     /**
-     * As [forward] for every point of [latitudes] × [longitudes], row-major, with the sines and
-     * cosines computed once per row and once per column (design D8 of polish-overlay).
+     * As [forward] for every point of [latitudes] × [longitudes] in [rows] × [columns] (all by
+     * default), with its row-major index in [latitudes] × [longitudes], and the sines and cosines
+     * computed once per row and once per column (design D8 of polish-overlay).
      */
     fun forwardGrid(
         latitudes: DoubleArray,
         longitudes: DoubleArray,
+        rows: IntArray = IntArray(latitudes.size) { it },
+        columns: IntArray = IntArray(longitudes.size) { it },
         visit: PlaneVisitor,
     ) {
-        val sinLats = DoubleArray(latitudes.size) { sin(Math.toRadians(latitudes[it])) }
-        val cosLats = DoubleArray(latitudes.size) { cos(Math.toRadians(latitudes[it])) }
-        val sinDls = DoubleArray(longitudes.size) { sin(Math.toRadians(longitudes[it]) - lon0) }
-        val cosDls = DoubleArray(longitudes.size) { cos(Math.toRadians(longitudes[it]) - lon0) }
+        val sinLats = DoubleArray(rows.size) { sin(Math.toRadians(latitudes[rows[it]])) }
+        val cosLats = DoubleArray(rows.size) { cos(Math.toRadians(latitudes[rows[it]])) }
+        val sinDls = DoubleArray(columns.size) { sin(Math.toRadians(longitudes[columns[it]]) - lon0) }
+        val cosDls = DoubleArray(columns.size) { cos(Math.toRadians(longitudes[columns[it]]) - lon0) }
         val out = DoubleArray(2)
-        for (r in latitudes.indices) {
-            for (c in longitudes.indices) {
+        for (r in rows.indices) {
+            val row = rows[r] * longitudes.size
+            for (c in columns.indices) {
                 project(sinLats[r], cosLats[r], sinDls[c], cosDls[c], out)
-                visit.visit(r * longitudes.size + c, out[0], out[1])
+                visit.visit(row + columns[c], out[0], out[1])
             }
         }
     }
@@ -656,12 +660,17 @@ class SunShadeSweep(
         return if (j in 0 until lineCells[k]) k to j else null
     }
 
-    /** [cellOf] for every point of [latitudes] × [longitudes] inside the grid, row-major, in one pass (design D8 of polish-overlay). */
+    /**
+     * [cellOf] for every point of [latitudes] × [longitudes] in [rows] × [columns] inside the grid,
+     * row-major, in one pass (design D8 of polish-overlay).
+     */
     internal fun forEachCell(
         latitudes: DoubleArray,
         longitudes: DoubleArray,
+        rows: IntArray,
+        columns: IntArray,
         visit: CellVisitor,
-    ) = frame.forwardGrid(latitudes, longitudes) { index, x, y ->
+    ) = frame.forwardGrid(latitudes, longitudes, rows, columns) { index, x, y ->
         val k = lineAt(x, y)
         if (k in 0 until lineCount) {
             val j = cellAt(k, x, y)
@@ -735,7 +744,7 @@ class ShadeGridPart internal constructor(
  * earlier day's grid combined with the grids of the parts a pan uncovered ([CombinedGrid]; design D3
  * of overlay-pan-reuse).
  */
-interface StepGrid {
+sealed interface StepGrid {
     val area: MapArea
 
     /** Whether some cell is unknown. */
@@ -819,8 +828,19 @@ class ShadeGrid internal constructor(
         longitudes: DoubleArray,
     ): Array<Sunshine?> {
         val states = arrayOfNulls<Sunshine>(latitudes.size * longitudes.size)
-        sweep.forEachCell(latitudes, longitudes) { index, line, cell -> states[index] = cellState(line, cell) }
+        fillStates(latitudes, longitudes, IntArray(latitudes.size) { it }, IntArray(longitudes.size) { it }, states)
         return states
+    }
+
+    /** [statesAt] for the points in [rows] × [columns] into [states] where they are still `null`. */
+    internal fun fillStates(
+        latitudes: DoubleArray,
+        longitudes: DoubleArray,
+        rows: IntArray,
+        columns: IntArray,
+        states: Array<Sunshine?>,
+    ) = sweep.forEachCell(latitudes, longitudes, rows, columns) { index, line, cell ->
+        if (states[index] == null) states[index] = cellState(line, cell)
     }
 
     override fun sampleCells(
@@ -883,15 +903,26 @@ class CombinedGrid(
         return null
     }
 
-    // Each grid is asked only for the rows and columns within its bounds, so the raster is passed about once.
     override fun statesAt(
         latitudes: DoubleArray,
         longitudes: DoubleArray,
     ): Array<Sunshine?> {
         val states = arrayOfNulls<Sunshine>(latitudes.size * longitudes.size)
-        fill(states, latitudes, longitudes, base, baseBounds)
-        for (i in parts.indices) fill(states, latitudes, longitudes, parts[i], partBounds[i])
+        fillStates(latitudes, longitudes, IntArray(latitudes.size) { it }, IntArray(longitudes.size) { it }, states)
         return states
+    }
+
+    // Each grid fills only the rows and columns within its bounds, base first, so the raster is
+    // passed about once.
+    internal fun fillStates(
+        latitudes: DoubleArray,
+        longitudes: DoubleArray,
+        rows: IntArray,
+        columns: IntArray,
+        states: Array<Sunshine?>,
+    ) {
+        fill(base, baseBounds, latitudes, longitudes, rows, columns, states)
+        for (i in parts.indices) fill(parts[i], partBounds[i], latitudes, longitudes, rows, columns, states)
     }
 
     // Draws a grid in proportion to its area, then keeps its cell if the cell lies in [area] and the
@@ -932,22 +963,20 @@ class CombinedGrid(
     }
 
     private fun fill(
-        states: Array<Sunshine?>,
-        latitudes: DoubleArray,
-        longitudes: DoubleArray,
         grid: StepGrid,
         bounds: GeoBounds,
+        latitudes: DoubleArray,
+        longitudes: DoubleArray,
+        rows: IntArray,
+        columns: IntArray,
+        states: Array<Sunshine?>,
     ) {
-        val rows = latitudes.indices.filter { latitudes[it] >= bounds.south && latitudes[it] <= bounds.north }
-        val columns = longitudes.indices.filter { longitudes[it] >= bounds.west && longitudes[it] <= bounds.east }
-        if (rows.isEmpty() || columns.isEmpty()) return
-        val sub = grid.statesAt(DoubleArray(rows.size) { latitudes[rows[it]] }, DoubleArray(columns.size) { longitudes[columns[it]] })
-        for (r in rows.indices) {
-            val row = rows[r] * longitudes.size
-            for (c in columns.indices) {
-                val i = row + columns[c]
-                if (states[i] == null) states[i] = sub[r * columns.size + c]
-            }
+        val inRows = rows.filter { latitudes[it] >= bounds.south && latitudes[it] <= bounds.north }.toIntArray()
+        val inColumns = columns.filter { longitudes[it] >= bounds.west && longitudes[it] <= bounds.east }.toIntArray()
+        if (inRows.isEmpty() || inColumns.isEmpty()) return
+        when (grid) {
+            is ShadeGrid -> grid.fillStates(latitudes, longitudes, inRows, inColumns, states)
+            is CombinedGrid -> grid.fillStates(latitudes, longitudes, inRows, inColumns, states)
         }
     }
 

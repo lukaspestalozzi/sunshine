@@ -37,15 +37,13 @@ fun countSunHours(day: DayOverlay): SunHours {
     for (step in day.steps) {
         val grid = checkNotNull(day.gridAt(step)) { "step $step is not computed" }
         if (day.isNight(step) && !grid.hasUnknown) continue
-        for (y in 0 until raster.height) {
-            val latitude = raster.latitudes[y]
-            for (x in 0 until width) {
-                val i = y * width + x
-                when (grid.stateAt(latitude, raster.longitudes[x])) {
-                    Sunshine.SUN -> sun[i]++
-                    Sunshine.UNKNOWN -> unknown[i]++
-                    Sunshine.SHADE, null -> Unit
-                }
+        // All pixels' states in one pass, also over combined grids (design D3 of overlay-pan-reuse).
+        val states = grid.statesAt(raster.latitudes, raster.longitudes)
+        for (i in states.indices) {
+            when (states[i]) {
+                Sunshine.SUN -> sun[i]++
+                Sunshine.UNKNOWN -> unknown[i]++
+                Sunshine.SHADE, null -> Unit
             }
         }
     }
