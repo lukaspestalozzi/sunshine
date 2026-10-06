@@ -90,9 +90,24 @@ class SettingsViewModelTest {
     @Test
     fun `a debug switch is stored`() =
         runBlocking {
-            viewModel().onDebug(DebugSwitches(tiles = true))
+            viewModel().onDebug { it.copy(tiles = true) }
 
             assertEquals(DebugSwitches(tiles = true), store.settings.first { it.debug.tiles }.debug)
+        }
+
+    // Copilot review of PR #34: two switches toggled before the first write is read back are both kept.
+    @Test
+    fun `two debug switches changed in quick succession are both stored`() =
+        runBlocking {
+            val viewModel = viewModel()
+
+            viewModel.onDebug { it.copy(timings = true) }
+            viewModel.onDebug { it.copy(dayState = true) }
+
+            assertEquals(
+                DebugSwitches(timings = true, dayState = true),
+                store.settings.first { it.debug.timings && it.debug.dayState }.debug,
+            )
         }
 
     @Test

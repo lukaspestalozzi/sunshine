@@ -59,8 +59,10 @@ class SettingsStore private constructor(
 
     suspend fun setLastView(view: LastView) = edit { it.putAll(*SettingsKeys.lastView(view)) }
 
-    suspend fun setDebug(switches: DebugSwitches) =
+    /** Applies [change] to the stored debug switches within one edit, so that quick successive changes all persist. */
+    suspend fun setDebug(change: (DebugSwitches) -> DebugSwitches) =
         edit {
+            val switches = change(decode(it).debug)
             it[SettingsKeys.DEBUG_TIMINGS] = switches.timings
             it[SettingsKeys.DEBUG_TILES] = switches.tiles
             it[SettingsKeys.DEBUG_DAY_STATE] = switches.dayState

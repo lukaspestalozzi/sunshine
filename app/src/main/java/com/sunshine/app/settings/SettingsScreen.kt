@@ -131,10 +131,13 @@ fun SettingsScreen(
             // In every build, each switch off by default (settings spec, "Debug info"; design D6 of polish-overlay).
             Section(R.string.settings_debug)
             val debug = settings.debug
-            SwitchEntry(R.string.settings_debug_timings, debug.timings) { viewModel.onDebug(debug.copy(timings = it)) }
-            SwitchEntry(R.string.settings_debug_tiles, debug.tiles) { viewModel.onDebug(debug.copy(tiles = it)) }
-            SwitchEntry(R.string.settings_debug_day_state, debug.dayState) { viewModel.onDebug(debug.copy(dayState = it)) }
-            SwitchEntry(R.string.settings_debug_agreement, debug.agreementCheck) { viewModel.onDebug(debug.copy(agreementCheck = it)) }
+            SwitchEntry(R.string.settings_debug_timings, debug.timings) { on -> viewModel.onDebug { it.copy(timings = on) } }
+            SwitchEntry(R.string.settings_debug_tiles, debug.tiles) { on -> viewModel.onDebug { it.copy(tiles = on) } }
+            SwitchEntry(R.string.settings_debug_day_state, debug.dayState) { on -> viewModel.onDebug { it.copy(dayState = on) } }
+            SwitchEntry(
+                R.string.settings_debug_agreement,
+                debug.agreementCheck,
+            ) { on -> viewModel.onDebug { it.copy(agreementCheck = on) } }
 
             Section(R.string.about_title)
             AboutSection()

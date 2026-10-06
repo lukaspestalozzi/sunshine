@@ -2,8 +2,8 @@
 
 ## Why
 
-Three rough edges of the overlay remain from #5 and #7. After a pan, every time the user scrubs to
-waits for its own sweep, although the days computed before the pan still hold that time for most
+Three rough edges of the overlay remain from #5 and #7. After a pan, every selected time the user
+scrubs to waits for its own sweep, although the days computed before the pan still hold that time for most
 of the screen. Offline, the panel says `unknown` where the overlay rightly says sun, because the
 point tracer counts missing terrain even where it is too far away to rise above the sun. And the
 heatmap's speed on the phone was accepted but never measured, so the decision on a partial heatmap

@@ -370,6 +370,7 @@ class MapViewModel(
                         dayJob?.cancelAndJoin()
                         day = null
                         shown.set(null)
+                        debug.update { it.copy(shown = null) }
                         requestedTime = null
                         send(if (input.on && input.camera.zoom < MIN_OVERLAY_ZOOM) OverlayUiState.ZoomedOut else OverlayUiState.Off)
                         return@collect

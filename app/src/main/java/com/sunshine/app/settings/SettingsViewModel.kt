@@ -40,7 +40,7 @@ class SettingsViewModel(
 
     fun onBrowsedLimit(mib: Int) = write { store.setBrowsedLimit(mib) }
 
-    fun onDebug(switches: DebugSwitches) = write { store.setDebug(switches) }
+    fun onDebug(change: (DebugSwitches) -> DebugSwitches) = write { store.setDebug(change) }
 
     private val mutableCustomDraft = MutableStateFlow<Resolution?>(null)
 
