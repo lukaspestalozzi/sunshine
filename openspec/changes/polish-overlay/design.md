@@ -183,6 +183,25 @@ and the `Day` line shows the `Sun & shade` day, not the heatmap's.
 | Cache of days | 5 days, 20 of 64 MiB | – | |
 | Agreement | still `…` when taken | – | |
 
+Second round (task 5.1, 2026-10-06, after design D8, from two screenshots): same area at map zoom
+11.0, 2026-10-06 12:10 UTC+2, `Normal`, online. Zoom and date deviate from D7 again; the image
+times depend on the area in dp, not on the zoom, so they compare with the budgets as they are.
+
+| Value | Measured | Budget | |
+|---|---|---|---|
+| `Sun & shade` image | 75 ms (round 1: 256 ms) | ≤ 100 ms | within |
+| Heatmap image | 65 ms (round 1: 139 ms) | ≤ 100 ms | within |
+| Heatmap counting pass | 452 ms | ≤ 2 s | within |
+| `Sun & shade` grid of the selected time | 725 ms | – | |
+| `Sun & shade` day, 288 steps (144 at night) | 91.8 s | – | |
+| Heatmap day, 144 steps (72 at night) | 16.6 s | ~20–30 s estimated (#7) | within |
+| Horizon of the crosshair | 1646–1846 ms | – | |
+
+Found in this round: a cancelled agreement check left `Agreement …` in the box for good; fixed
+(the check now clears its `…` when cancelled). One check takes 200 horizons of about 1.7 s each,
+about 6 minutes on the phone. A pan costs a whole `Sun & shade` day again, about 92 s of background
+CPU; `investigations/overlay-pan-reuse.md` measures what computing only the uncovered part would save.
+
 ## Risks / Trade-offs
 
 - [The earlier day's grid is only partly on screen after a long pan] → It is correct where drawn;
