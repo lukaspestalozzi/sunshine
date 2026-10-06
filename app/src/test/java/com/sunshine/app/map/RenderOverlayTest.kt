@@ -1,9 +1,11 @@
 package com.sunshine.app.map
 
+import com.sunshine.core.CombinedGrid
 import com.sunshine.core.GeoPoint
 import com.sunshine.core.HeightTile
 import com.sunshine.core.MapArea
 import com.sunshine.core.ShadeGrid
+import com.sunshine.core.StepGrid
 import com.sunshine.core.SunPosition
 import com.sunshine.core.SunShadeSweep
 import com.sunshine.core.Sunshine
@@ -11,6 +13,7 @@ import com.sunshine.core.TileKey
 import kotlin.math.PI
 import kotlin.math.atan
 import kotlin.math.ln
+import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sinh
 import org.junit.jupiter.api.Assertions.assertArrayEquals
@@ -88,8 +91,55 @@ class RenderOverlayTest {
         assertTrue(nanos <= referenceNanos / 2, "${nanos / 1e6} ms against ${referenceNanos / 1e6} ms")
     }
 
+    // Design D3 of overlay-pan-reuse: an earlier grid combined with the part a pan uncovered.
+    @Test
+    fun `a combined grid's image equals the per-pixel reference`() {
+        val cliff = { lat: Double, _: Double -> if (lat < CENTER.latitude) 2000.0 else 500.0 }
+        val sun = SunPosition(135.0, 44.734, true)
+        val new = AREA.eastBy(AREA.widthDp / 2)
+        val part = AREA.eastBy(AREA.widthDp * 3 / 4).copy(widthDp = AREA.widthDp / 2)
+        val combined = CombinedGrid(new, grid(cliff, sun), listOf(grid(null, sun, part)))
+
+        val image = renderOverlay(combined)
+
+        assertArrayEquals(reference(combined).pixels, image.pixels)
+        assertEquals(setOf(0, SHADE_ARGB, UNKNOWN_ARGB), image.pixels.toSet())
+    }
+
+    @Test
+    fun `a phone-sized combined image renders in at most one and a half times a single grid's`() {
+        val old = MapArea(CENTER, 12.0, 411.0, 891.0)
+        val new = old.eastBy(old.widthDp / 2)
+        val sun = SunPosition(135.0, 20.0, true)
+        val single = grid(flat, sun, new)
+        val combined =
+            CombinedGrid(
+                new,
+                grid(flat, sun, old),
+                listOf(
+                    grid(
+                        flat,
+                        sun,
+                        old.eastBy(old.widthDp * 3 / 4).copy(
+                            widthDp =
+                                old.widthDp / 2,
+                        ),
+                    ),
+                ),
+            )
+        repeat(WARM_UP) {
+            renderOverlay(single)
+            renderOverlay(combined)
+        }
+
+        val singleNanos = fastest { renderOverlay(single) }
+        val nanos = fastest { renderOverlay(combined) }
+
+        assertTrue(nanos <= 1.5 * singleNanos, "${nanos / 1e6} ms against ${singleNanos / 1e6} ms")
+    }
+
     // The image as rendered before design D8: one lookup per pixel.
-    private fun reference(grid: ShadeGrid): OverlayImage {
+    private fun reference(grid: StepGrid): OverlayImage {
         val raster = OverlayRaster(grid.area)
         val pixels =
             IntArray(raster.width * raster.height) { i ->
@@ -121,6 +171,10 @@ class RenderOverlayTest {
     }
 
     private val flat = { _: Double, _: Double -> 700.0 }
+
+    // This area moved [dp] dp east.
+    private fun MapArea.eastBy(dp: Double) =
+        copy(center = GeoPoint(center.latitude, center.longitude + dp * 360.0 / (512.0 * 2.0.pow(zoom))))
 
     private fun grid(
         height: ((Double, Double) -> Double)?,

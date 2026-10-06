@@ -21,7 +21,7 @@ Device checks (6.1–6.3) are done by the user at the end, on the debug APK of t
 
 ## 4. Drawing, counting and checks over combined grids (app)
 
-- [ ] 4.1 Let `renderOverlay`, `countSunHours`, the agreement check and the earlier-day fallback take `StepGrid`; switch `countSunHours` to `statesAt`. Extend `RenderOverlayTest` and `SunHoursTest` first: a combined grid's image and counts equal the per-pixel reference with `stateAt`; a combined grid's image renders in at most 1.5× the time of a single grid of the same area after warm-up. Verify: `./gradlew :app:testDebugUnitTest --tests "*RenderOverlay*" --tests "*SunHours*"` passes.
+- [x] 4.1 Let `renderOverlay`, `countSunHours`, the agreement check and the earlier-day fallback take `StepGrid`; switch `countSunHours` to `statesAt`. Extend `RenderOverlayTest` and `SunHoursTest` first: a combined grid's image and counts equal the per-pixel reference with `stateAt`; a combined grid's image renders in at most 1.5× the time of a single grid of the same area after warm-up. Verify: `./gradlew :app:testDebugUnitTest --tests "*RenderOverlay*" --tests "*SunHours*"` passes.
 
 ## 5. Debug box (app)
 

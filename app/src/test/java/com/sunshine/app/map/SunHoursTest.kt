@@ -6,6 +6,7 @@ import com.sunshine.core.MapArea
 import com.sunshine.core.ShadeGrid
 import com.sunshine.core.SunPosition
 import com.sunshine.core.SunShadeSweep
+import com.sunshine.core.Sunshine
 import com.sunshine.core.TileKey
 import com.sunshine.core.sunPosition
 import java.time.LocalDate
@@ -16,6 +17,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -102,6 +104,74 @@ class SunHoursTest {
             assertSame(hours, day.counted)
             assertEquals(before + 4L * hours.sun.size, day.bytes)
         }
+
+    // Design D3 of overlay-pan-reuse: a day reusing an earlier day counts as the per-pixel reference.
+    @Test
+    fun `a day of combined grids counts as one lookup per pixel and step`() =
+        runTest {
+            val base = heatmapDay(DECEMBER_21) { area, sun, cellDp -> grid(area, sun, cellDp, FLAT) }
+            launch { base.computeRest { at(12, 0) } }
+            base.compute(at(12, 0))
+            advanceUntilIdle()
+            // The uncovered parts have no terrain: unknown.
+            val panned = AREA.copy(center = GeoPoint(AREA.center.latitude, AREA.center.longitude + 10 * 360.0 / (512 * 4096)))
+            val day =
+                DayOverlay(panned, DECEMBER_21, ZURICH, { area, sun, cellDp ->
+                    grid(area, sun, cellDp, null)
+                }, StandardTestDispatcher(testScheduler), stepMinutes = 10, cellDp = 8.0, base = base)
+            launch { day.computeRest { at(12, 0) } }
+            day.compute(at(12, 0))
+            advanceUntilIdle()
+
+            val hours = day.sunHours()
+
+            val (sun, unknown) = referenceCounts(day)
+            assertArrayEquals(sun, hours.sun)
+            assertArrayEquals(unknown, hours.unknown)
+            assertTrue(hours.sun.any { it > 0 } && hours.unknown.any { it > 0 }, "both the earlier day and the part are counted")
+        }
+
+    // The counts as made before design D3 of overlay-pan-reuse: one lookup per pixel and step.
+    private fun referenceCounts(day: DayOverlay): Pair<ShortArray, ShortArray> {
+        val raster = OverlayRaster(day.area, day.cellDp)
+        val sun = ShortArray(raster.width * raster.height)
+        val unknown = ShortArray(raster.width * raster.height)
+        for (step in day.steps) {
+            val grid = day.gridAt(step)!!
+            if (day.isNight(step) && !grid.hasUnknown) continue
+            for (y in 0 until raster.height) {
+                for (x in 0 until raster.width) {
+                    when (grid.stateAt(raster.latitudes[y], raster.longitudes[x])) {
+                        Sunshine.SUN -> sun[y * raster.width + x]++
+                        Sunshine.UNKNOWN -> unknown[y * raster.width + x]++
+                        else -> Unit
+                    }
+                }
+            }
+        }
+        return sun to unknown
+    }
+
+    // The grid of [area] over flat ground [tile], unknown without it: sun by day, shade at night.
+    private fun grid(
+        area: MapArea,
+        sun: SunPosition,
+        cellDp: Double,
+        tile: HeightTile?,
+    ): ShadeGrid {
+        val sweep = SunShadeSweep(area, sun, cellDp)
+        val tiles =
+            object : AbstractMap<TileKey, HeightTile?>() {
+                override val entries: Set<Map.Entry<TileKey, HeightTile?>> get() = throw UnsupportedOperationException()
+
+                override fun get(key: TileKey): HeightTile? = tile
+
+                override fun containsKey(key: TileKey) = true
+            }
+        if (sweep.isNight) return sweep.night(sweep.groundTiles().associateWith { tile })
+        sweep.tiles(sweep.groundTiles().associateWith { tile })
+        return sweep.assemble(listOf(sweep.compute(tiles)))
+    }
 
     // A day of AREA whose grid at each step is [state] of that step, computed completely.
     private suspend fun TestScope.completeDay(
