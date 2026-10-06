@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.random.Random
 import kotlin.time.measureTime
 import kotlin.time.measureTimedValue
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -665,7 +666,14 @@ class MapViewModel(
                 if (on && state is OverlayUiState.Ready) {
                     delay(AGREEMENT_DELAY_MILLIS)
                     debug.update { it.copy(agreement = Agreement.Checking) }
-                    val result = overlayAgreement(state)
+                    val result =
+                        try {
+                            overlayAgreement(state)
+                        } catch (cancelled: CancellationException) {
+                            // A cancelled check leaves no `Agreement …` behind.
+                            debug.update { if (it.agreement == Agreement.Checking) it.copy(agreement = null) else it }
+                            throw cancelled
+                        }
                     debug.update { it.copy(agreement = result) }
                     log(
                         "Overlay agreement with the point tracer: ${result.agree} of ${result.checked} cells " +

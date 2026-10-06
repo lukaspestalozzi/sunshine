@@ -1096,6 +1096,36 @@ class MapViewModelTest {
             assertNull(debug.values.value.agreement)
         }
 
+    // Device check of polish-overlay (2026-10-06): a cancelled check must not stay `Agreement …`.
+    @Test
+    fun `an agreement check cancelled by switching the overlay off leaves no running check`() =
+        runTest {
+            val debug = DebugInfo()
+            val never = CompletableDeferred<HorizonProfile?>()
+            val viewModel =
+                MapViewModel(
+                    SavedStateHandle(),
+                    isOnline,
+                    clock,
+                    repository { heightBytes(568) },
+                    { point -> if (point == INTERLAKEN) horizonOf(-1.0) else never.await() },
+                    { area, sun, _ -> flatGrid(area, sun, available = true) },
+                    UnconfinedTestDispatcher(testScheduler),
+                    settings = MutableStateFlow(Settings(debug = DebugSwitches(agreementCheck = true))),
+                    debug = debug,
+                )
+            viewModel.onMapSizeChanged(MAP_WIDTH, MAP_HEIGHT)
+            viewModel.onSliderMoved(12 * 60f)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS + 3_000)
+            assertEquals(Agreement.Checking, debug.values.value.agreement)
+
+            viewModel.onOverlayToggled()
+
+            assertNull(debug.values.value.agreement)
+        }
+
     // Copilot review of PR #34: no source is claimed while no `Sun & shade` overlay is shown.
     @Test
     fun `the shown source is cleared when the overlay is switched off`() =
