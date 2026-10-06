@@ -51,7 +51,9 @@ counted.
 Accuracy: each start and end of a sun period is counted to the nearest step, so where the whole day
 is known, the sun hours SHALL be within one step × the number of period boundaries of the sum of the
 cell's sun periods (point-sunshine "Sun periods of the selected day", evaluated at the cell's
-sample point with the map centre's sun position).
+sample point with the sun position of its computed area at each step, sun-shade-overlay "Sunshine
+of a cell"). The heatmap's day reuses an earlier day after a camera move like the overlay's day
+(sun-shade-overlay "Overlay of the whole day").
 
 #### Scenario: Counting steps
 - **WHEN** the shade resolution is `Normal` and a cell is sun at 29 steps, unknown at 1 step and shade at the other 114 steps of a 24-hour day (144 steps)
@@ -80,6 +82,10 @@ sample point with the map centre's sun position).
 #### Scenario: Winter day in Interlaken with Fast
 - **WHEN** the shade resolution is `Fast`, the map centre is 46.6863° N, 7.8632° E, the map zoom is 12, the selected date is 2025-12-21, and the whole day is known
 - **THEN** the sun hours of the cell containing the map centre are 5 h 23 min ± 60 min (4 boundaries of 15 min)
+
+#### Scenario: Heatmap after a half-screen pan
+- **WHEN** the heatmap of 2025-12-21 has been built and the user pans by half a screen
+- **THEN** only the uncovered half of the new area is computed at the daytime steps, and the new heatmap covers the whole new area
 
 ### Requirement: Heatmap coverage and zoom range
 In `Sun hours` mode, while the overlay is on and the map zoom is 11 or more, the app SHALL show
