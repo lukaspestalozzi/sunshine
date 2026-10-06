@@ -56,7 +56,8 @@ class SettingsStoreTest {
     fun `debug switches are read back by a new store on the same file`() =
         runBlocking {
             val store = open()
-            store.setDebug(DebugSwitches(timings = true, agreementCheck = true))
+            store.setDebug { it.copy(timings = true) }
+            store.setDebug { it.copy(agreementCheck = true) }
             jobs.forEach { it.cancelAndJoin() }
 
             val reopened = open()

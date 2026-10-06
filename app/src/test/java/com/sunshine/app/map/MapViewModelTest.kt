@@ -13,6 +13,7 @@ import com.sunshine.app.settings.Settings
 import com.sunshine.app.settings.StartAt
 import com.sunshine.app.sunshine.Agreement
 import com.sunshine.app.sunshine.DebugInfo
+import com.sunshine.app.sunshine.ShownSource
 import com.sunshine.core.AZIMUTH_COUNT
 import com.sunshine.core.DEFAULT_LOCATION
 import com.sunshine.core.GeoPoint
@@ -1093,6 +1094,22 @@ class MapViewModelTest {
             assertTrue(viewModel.overlay.value is OverlayUiState.Ready)
             assertEquals(emptyList<GeoPoint>(), checked.filter { it != INTERLAKEN })
             assertNull(debug.values.value.agreement)
+        }
+
+    // Copilot review of PR #34: no source is claimed while no `Sun & shade` overlay is shown.
+    @Test
+    fun `the shown source is cleared when the overlay is switched off`() =
+        runTest {
+            val debug = DebugInfo()
+            val viewModel = agreementViewModel(DebugSwitches(dayState = true), debug)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            assertEquals(ShownSource.OWN_DAY, debug.values.value.shown)
+
+            viewModel.onOverlayToggled()
+
+            assertNull(debug.values.value.shown)
         }
 
     private fun TestScope.agreementViewModel(
