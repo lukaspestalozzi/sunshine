@@ -304,6 +304,7 @@ private val mapViewModelFactory =
                 settings = application.settingsStore.settings,
                 saveLastView = application.settingsStore::setLastView,
                 debug = application.debugInfo,
+                checkProfile = { application.sunshineRepository.profile(it, record = false) },
             )
         }
     }

@@ -261,6 +261,24 @@ class DayCacheTest {
         }
 
     @Test
+    fun `the reused day becomes the most recently used`() =
+        runTest {
+            val cache = DayCache(maxBytes = 2L * GRID.stateBytes)
+            val reused = day(AREA, DECEMBER_21, grids = 1)
+            cache.put(reused)
+            val other = day(AREA, DECEMBER_21.plusDays(1), grids = 1)
+            cache.put(other)
+            val current = day(PANNED, DECEMBER_21, grids = 1)
+
+            assertSame(reused, cache.reusable(PANNED, DECEMBER_21, SunShadeSweep.CELL_DP, 5, online = true))
+            cache.put(current)
+            cache.trim(keep = current)
+
+            assertSame(reused, cache.get(AREA, DECEMBER_21))
+            assertNull(cache.get(other.area, other.date))
+        }
+
+    @Test
     fun `the day of the new area itself is not reused`() =
         runTest {
             val cache = DayCache(maxBytes = Long.MAX_VALUE)

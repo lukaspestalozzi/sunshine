@@ -221,6 +221,8 @@ class MapViewModel(
     val settings: StateFlow<Settings> = MutableStateFlow(Settings()),
     /** Stores the map's view when the app goes to the background (map-view spec, "Default viewport"). */
     private val saveLastView: suspend (LastView) -> Unit = {},
+    /** The profiles of the agreement check's cells, not shown as the selected location's (settings spec, "Debug info"). */
+    private val checkProfile: suspend (GeoPoint) -> HorizonProfile? = horizonProfile,
 ) : ViewModel() {
     private val zone: ZoneId = clock.zone
 
@@ -715,7 +717,7 @@ class MapViewModel(
         var agree = 0
         var checked = 0
         for ((point, shown, center) in state.grid.sampleCells(AGREEMENT_CELLS, Random(0))) {
-            val profile = horizonProfile(point) ?: continue
+            val profile = checkProfile(point) ?: continue
             checked++
             if (sunshineAt(profile, center, state.time.toInstant()) == shown) agree++
         }

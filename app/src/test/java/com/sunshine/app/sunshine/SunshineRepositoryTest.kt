@@ -89,6 +89,24 @@ class SunshineRepositoryTest {
             assertEquals(emptyList<TileKey>(), requested)
         }
 
+    // settings spec, "Debug info": the agreement check's profiles neither replace the selected
+    // location's Horizon lines nor push its profile out of the cache.
+    @Test
+    fun `a profile not recorded leaves the debug values and the cache alone`() =
+        runTest {
+            val debug = DebugInfo()
+            val repository = repository(debug = debug)
+            repository.profile(OBSERVER)
+            val recorded = debug.values.value
+
+            for (i in 1..4) repository.profile(GeoPoint(OBSERVER.latitude, OBSERVER.longitude + i * 1e-3), record = false)
+            assertEquals(recorded, debug.values.value)
+            requested.clear()
+            repository.profile(OBSERVER)
+
+            assertEquals(emptyList<TileKey>(), requested)
+        }
+
     @Test
     fun `an incomplete profile is computed again`() =
         runTest {

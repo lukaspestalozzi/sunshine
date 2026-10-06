@@ -319,6 +319,22 @@ class DayOverlayTest {
             assertEquals(0.0, base.reusedShare)
         }
 
+    // The earlier grids a reusing day keeps count in its bytes until they are combined, once.
+    @Test
+    fun `the earlier daytime grids kept for reuse count in the bytes, once`() =
+        runTest {
+            val base = DayOverlay(AREA, DECEMBER_21, ZURICH, fakeGrid, StandardTestDispatcher(testScheduler))
+            base.computeAll { at(12, 0) }
+            val day = reusing(base, PANNED, mutableListOf())
+            val daytime = 288 - day.nightSteps
+
+            assertEquals(daytime.toLong() * GRID.stateBytes, day.bytes)
+            day.compute(at(12, 0))
+            assertEquals(daytime.toLong() * GRID.stateBytes + GRID.stateBytes, day.bytes)
+            day.computeAll { at(12, 0) }
+            assertEquals((2L * daytime + day.nightSteps) * GRID.stateBytes, day.bytes)
+        }
+
     // A day of [area] reusing [base], recording the area and sun of each grid it requests in [requests].
     private fun TestScope.reusing(
         base: DayOverlay,
