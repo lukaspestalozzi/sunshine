@@ -29,6 +29,6 @@ Device checks (6.1–6.3) are done by the user at the end, on the debug APK of t
 
 ## 6. Device checks
 
-- [ ] 6.1 On the phone with `Timings` and `Day state` on, `Normal`, map zoom 12 at Lauterbrunnen: let a `Sun & shade` day finish and note its `Day` line; pan by half a screen east, let the new day finish. Verify: `Reused` shows about 50 %, the new `Day` line is at most 70 % of the first one (design "Performance budget"), and the overlay covers the whole screen at every step. Record both lines in design.md.
+- [x] 6.1 On the phone with `Timings` and `Day state` on, `Normal`, map zoom 12 at Lauterbrunnen: let a `Sun & shade` day finish and note its `Day` line; pan by half a screen east, let the new day finish. Verify: `Reused` shows about 50 %, the new `Day` line is at most 70 % of the first one (design "Performance budget"), and the overlay covers the whole screen at every step. Record both lines in design.md.
 - [ ] 6.2 On the phone: scrub through the reused day and look along the seam between the reused and the new part. Verify: no gap and no doubled tint; shadow edges crossing the seam stay continuous to within a cell; the `Grid … image` line stays ≤ 100 ms.
 - [ ] 6.3 On the phone: zoom in by half a level (no reuse, `Reused 0 %`), zoom back out (reuse), and repeat 6.1 in `Sun hours`. Verify: `Reused` as expected, the heatmap covers the whole screen, and `Sun hours <t>` stays ≤ 2 s.
