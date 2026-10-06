@@ -150,7 +150,23 @@ The day durations are shown to the user either way.
 | Heatmap counting pass | ≤ 2 s on the phone at zoom 12 (from #7) | device measurement, D7 |
 | Heatmap image | ≤ 100 ms on the phone (from #7) | device measurement, D7 |
 
-Measured values (filled in by task 5.1): –
+Measured values (task 5.1, first round, user's phone, 2026-10-06, from a screenshot of the debug
+box): Lauterbrunnen area (46.5921° N, 7.9081° E), map zoom 11.2, area 411 × 891 dp, `Normal`,
+2026-10-06 13:15 UTC+2, online. Not yet the protocol of D7 (zoom 12, 2025-12-21 and 2025-06-21),
+and the `Day` line shows the `Sun & shade` day, not the heatmap's.
+
+| Value | Measured | Budget | |
+|---|---|---|---|
+| Horizon of the crosshair | 1961 ms (tiles 632 ms; 80 tiles: 43 memory, 33 disk, 4 network) | – | |
+| Sun periods | 146 ms | – | |
+| `Sun & shade` grid of the selected time | 776 ms (30 tiles: 28 kept, 2 disk) | – | |
+| `Sun & shade` image | 256 ms | ≤ 100 ms for a computed time (sun-shade-overlay "Overlay of the whole day") | **over** |
+| `Sun & shade` day, 288 steps (144 at night) | 92.4 s | ~20–110 s estimated (#5) | within |
+| Heatmap counting pass | 394 ms | ≤ 2 s | within |
+| Heatmap image | 139 ms | ≤ 100 ms | **over** |
+| Memory tiles | 64 of 64 | – | full |
+| Cache of days | 5 days, 20 of 64 MiB | – | |
+| Agreement | still `…` when taken | – | |
 
 ## Risks / Trade-offs
 
