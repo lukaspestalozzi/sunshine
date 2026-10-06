@@ -32,7 +32,7 @@ class SunShadeNightTest {
         val grid = sweep.night(ground.associateWith { if (it == missing) null else terrain.tile(it) })
 
         assertTrue(grid.hasUnknown)
-        assertTrue(grid.sampleCells(400, kotlin.random.Random(1)).any { it.second == Sunshine.SHADE })
+        assertTrue(grid.sampleCells(400, kotlin.random.Random(1)).any { it.state == Sunshine.SHADE })
     }
 
     @Test

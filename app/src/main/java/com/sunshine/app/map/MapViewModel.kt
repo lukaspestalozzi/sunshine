@@ -704,14 +704,15 @@ class MapViewModel(
 
     private fun cacheState() = CacheState(dayCache.count, dayCache.bytes, dayCache.maxBytes)
 
-    // The cells' states against the point tracer at their sample points, with the map centre's sun.
+    // The cells' states against the point tracer at their sample points, each with the sun of the
+    // centre of the area it was computed for.
     private suspend fun overlayAgreement(state: OverlayUiState.Ready): Agreement.Result {
         var agree = 0
         var checked = 0
-        for ((point, shown) in state.grid.sampleCells(AGREEMENT_CELLS, Random(0))) {
+        for ((point, shown, center) in state.grid.sampleCells(AGREEMENT_CELLS, Random(0))) {
             val profile = horizonProfile(point) ?: continue
             checked++
-            if (sunshineAt(profile, state.grid.area.center, state.time.toInstant()) == shown) agree++
+            if (sunshineAt(profile, center, state.time.toInstant()) == shown) agree++
         }
         return Agreement.Result(agree, checked)
     }
