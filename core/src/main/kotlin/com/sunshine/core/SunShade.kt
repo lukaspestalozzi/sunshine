@@ -56,6 +56,24 @@ data class MapArea(
     }
 }
 
+/** A point of [GnomonicFrame.forwardGrid]: its row-major [index] and plane coordinates. */
+internal fun interface PlaneVisitor {
+    fun visit(
+        index: Int,
+        x: Double,
+        y: Double,
+    )
+}
+
+/** A point of [SunShadeSweep.forEachCell] inside the grid: its row-major [index], [line] and [cell]. */
+internal fun interface CellVisitor {
+    fun visit(
+        index: Int,
+        line: Int,
+        cell: Int,
+    )
+}
+
 /**
  * Gnomonic projection centred on [center], in metres east ([0]) and north ([1]) on the tangent
  * plane: straight lines are great circles, as the rays of [HorizonTracer] (design D2).
@@ -75,9 +93,42 @@ internal class GnomonicFrame(
     ) {
         val lat = Math.toRadians(latitude)
         val dl = Math.toRadians(longitude) - lon0
-        val cosC = sinLat0 * sin(lat) + cosLat0 * cos(lat) * cos(dl)
-        out[0] = EARTH_RADIUS * cos(lat) * sin(dl) / cosC
-        out[1] = EARTH_RADIUS * (cosLat0 * sin(lat) - sinLat0 * cos(lat) * cos(dl)) / cosC
+        project(sin(lat), cos(lat), sin(dl), cos(dl), out)
+    }
+
+    /**
+     * As [forward] for every point of [latitudes] × [longitudes], row-major, with the sines and
+     * cosines computed once per row and once per column (design D8 of polish-overlay).
+     */
+    fun forwardGrid(
+        latitudes: DoubleArray,
+        longitudes: DoubleArray,
+        visit: PlaneVisitor,
+    ) {
+        val sinLats = DoubleArray(latitudes.size) { sin(Math.toRadians(latitudes[it])) }
+        val cosLats = DoubleArray(latitudes.size) { cos(Math.toRadians(latitudes[it])) }
+        val sinDls = DoubleArray(longitudes.size) { sin(Math.toRadians(longitudes[it]) - lon0) }
+        val cosDls = DoubleArray(longitudes.size) { cos(Math.toRadians(longitudes[it]) - lon0) }
+        val out = DoubleArray(2)
+        for (r in latitudes.indices) {
+            for (c in longitudes.indices) {
+                project(sinLats[r], cosLats[r], sinDls[c], cosDls[c], out)
+                visit.visit(r * longitudes.size + c, out[0], out[1])
+            }
+        }
+    }
+
+    // The same arithmetic for single points and grids, so that both give identical coordinates.
+    private fun project(
+        sinLat: Double,
+        cosLat: Double,
+        sinDl: Double,
+        cosDl: Double,
+        out: DoubleArray,
+    ) {
+        val cosC = sinLat0 * sinLat + cosLat0 * cosLat * cosDl
+        out[0] = EARTH_RADIUS * cosLat * sinDl / cosC
+        out[1] = EARTH_RADIUS * (cosLat0 * sinLat - sinLat0 * cosLat * cosDl) / cosC
     }
 
     /** Plane coordinates to latitude ([0]) and longitude ([1]) in degrees in [out]. */
@@ -599,11 +650,35 @@ class SunShadeSweep(
     ): Pair<Int, Int>? {
         val xy = DoubleArray(2)
         frame.forward(latitude, longitude, xy)
-        val k = floor((toW(xy[0], xy[1]) - wMin) / spacing).toInt()
+        val k = lineAt(xy[0], xy[1])
         if (k !in 0 until lineCount) return null
-        val j = floor((toS(xy[0], xy[1]) - lineStart[k]) / spacing).toInt()
+        val j = cellAt(k, xy[0], xy[1])
         return if (j in 0 until lineCells[k]) k to j else null
     }
+
+    /** [cellOf] for every point of [latitudes] × [longitudes] inside the grid, row-major, in one pass (design D8 of polish-overlay). */
+    internal fun forEachCell(
+        latitudes: DoubleArray,
+        longitudes: DoubleArray,
+        visit: CellVisitor,
+    ) = frame.forwardGrid(latitudes, longitudes) { index, x, y ->
+        val k = lineAt(x, y)
+        if (k in 0 until lineCount) {
+            val j = cellAt(k, x, y)
+            if (j in 0 until lineCells[k]) visit.visit(index, k, j)
+        }
+    }
+
+    private fun lineAt(
+        x: Double,
+        y: Double,
+    ) = floor((toW(x, y) - wMin) / spacing).toInt()
+
+    private fun cellAt(
+        line: Int,
+        x: Double,
+        y: Double,
+    ) = floor((toS(x, y) - lineStart[line]) / spacing).toInt()
 
     private fun toS(
         x: Double,
@@ -690,6 +765,19 @@ class ShadeGrid internal constructor(
     }
 
     fun stateAt(point: GeoPoint): Sunshine? = stateAt(point.latitude, point.longitude)
+
+    /**
+     * The states of the points [latitudes] × [longitudes], row-major, `null` outside the grid: as
+     * [stateAt] for each, in one pass (design D8 of polish-overlay).
+     */
+    fun statesAt(
+        latitudes: DoubleArray,
+        longitudes: DoubleArray,
+    ): Array<Sunshine?> {
+        val states = arrayOfNulls<Sunshine>(latitudes.size * longitudes.size)
+        sweep.forEachCell(latitudes, longitudes) { index, line, cell -> states[index] = cellState(line, cell) }
+        return states
+    }
 
     /** The sample points and states of [count] random cells, e.g. to check them against the point tracer. */
     fun sampleCells(

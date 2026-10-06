@@ -6,13 +6,16 @@ import com.sunshine.core.MapArea
 import com.sunshine.core.ShadeGrid
 import com.sunshine.core.SunPosition
 import com.sunshine.core.SunShadeSweep
+import com.sunshine.core.Sunshine
 import com.sunshine.core.TileKey
 import kotlin.math.PI
 import kotlin.math.atan
 import kotlin.math.ln
 import kotlin.math.sin
 import kotlin.math.sinh
+import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 // Design D9 of add-sun-shade-overlay.
@@ -62,6 +65,52 @@ class RenderOverlayTest {
         assertEquals(SHADE_ARGB, image.pixels[(edge + 3) * image.width + column])
     }
 
+    // Design D8 of polish-overlay: the raster in one pass gives the pixels of one lookup per pixel.
+    @Test
+    fun `the image equals the per-pixel reference for sun, shade and unknown`() {
+        val cliff = { lat: Double, _: Double -> if (lat < CENTER.latitude) 2000.0 else 500.0 }
+        for (grid in listOf(grid(cliff, SunPosition(135.0, 44.734, true)), grid(null, SunPosition(180.0, 30.0, true)))) {
+            assertArrayEquals(reference(grid).pixels, renderOverlay(grid).pixels)
+        }
+    }
+
+    @Test
+    fun `a phone-sized image renders in at most half the time of the per-pixel reference`() {
+        val grid = grid(flat, SunPosition(135.0, 20.0, true), MapArea(CENTER, 12.0, 411.0, 891.0))
+        repeat(WARM_UP) {
+            reference(grid)
+            renderOverlay(grid)
+        }
+
+        val referenceNanos = fastest { reference(grid) }
+        val nanos = fastest { renderOverlay(grid) }
+
+        assertTrue(nanos <= referenceNanos / 2, "${nanos / 1e6} ms against ${referenceNanos / 1e6} ms")
+    }
+
+    // The image as rendered before design D8: one lookup per pixel.
+    private fun reference(grid: ShadeGrid): OverlayImage {
+        val raster = OverlayRaster(grid.area)
+        val pixels =
+            IntArray(raster.width * raster.height) { i ->
+                val x = i % raster.width
+                val y = i / raster.width
+                when (grid.stateAt(raster.latitudes[y], raster.longitudes[x])) {
+                    Sunshine.SHADE -> SHADE_ARGB
+                    Sunshine.UNKNOWN -> if ((x + y) % 8 < 2) UNKNOWN_ARGB else 0
+                    Sunshine.SUN, null -> 0
+                }
+            }
+        return OverlayImage(raster.width, raster.height, pixels, grid.area.corners())
+    }
+
+    private fun fastest(render: () -> Unit): Long =
+        (1..RUNS).minOf {
+            val start = System.nanoTime()
+            render()
+            System.nanoTime() - start
+        }
+
     // Image row of the point [north] metres north of the centre latitude (north-up, 1 px per dp).
     private fun rowAt(north: Double): Int {
         val world = 512.0 * (1 shl AREA.zoom.toInt())
@@ -76,8 +125,9 @@ class RenderOverlayTest {
     private fun grid(
         height: ((Double, Double) -> Double)?,
         sun: SunPosition,
+        area: MapArea = AREA,
     ): ShadeGrid {
-        val sweep = SunShadeSweep(AREA, sun)
+        val sweep = SunShadeSweep(area, sun)
         val built = mutableMapOf<TileKey, HeightTile>()
         val tiles =
             object : AbstractMap<TileKey, HeightTile?>() {
@@ -105,6 +155,8 @@ class RenderOverlayTest {
         val CENTER = GeoPoint(46.6, 7.9)
         val AREA = MapArea(CENTER, zoom = 13.0, widthDp = 80.0, heightDp = 400.0)
         val METRES_PER_DEGREE = Math.toRadians(1.0) * 6_371_000.0
+        const val WARM_UP = 5
+        const val RUNS = 5
 
         // #455A64 and #9E9E9E, opaque: the overlay layer applies the chosen opacity (design D5 of
         // add-settings; the colours are those of design D10 of add-sun-exposure-heatmap).

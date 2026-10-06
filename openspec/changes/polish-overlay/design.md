@@ -136,6 +136,21 @@ shade` and `Sun hours`), `Sun hours` counting and image, and one `Agreement` res
 stops and the user decides on incremental counting or a partial heatmap, in a follow-up change.
 The day durations are shown to the user either way.
 
+### D8. Images by rows and columns (user decision after the first device measurement, 2026-10-06)
+The first device round measured 256 ms for the `Sun & shade` image and 139 ms for the heatmap
+image, against 100 ms each; every scrub to a computed time redraws the overlay image. Both are
+sped up without changing a pixel:
+- **Overlay:** `renderOverlay` asked `ShadeGrid.stateAt` for each pixel, i.e. four trigonometric
+  functions and two allocations per pixel of the gnomonic projection. `ShadeGrid.statesAt(latitudes,
+  longitudes)` projects the raster in one pass with the sines and cosines computed once per row
+  and once per column (`GnomonicFrame.forwardGrid`), with the same arithmetic per point as
+  `forward`, so every state equals `stateAt`'s.
+- **Heatmap:** `renderSunHours` computes each count's colour once (band or transparent) and each
+  column's and row's count index once; per pixel only the hatching remains.
+
+*Alternatives (asked):* deferring to `polish-ui`; relaxing the spec's 100 ms; accepting 139 ms for
+the heatmap, which is drawn once per day (user decision: optimize both).
+
 ## Performance budget
 
 | Computation (user-triggered) | Budget | Check |

@@ -3,6 +3,8 @@ package com.sunshine.app.map
 import com.sunshine.core.GeoPoint
 import com.sunshine.core.MapArea
 import java.time.Duration
+import kotlin.random.Random
+import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
@@ -42,6 +44,39 @@ class RenderSunHoursTest {
         assertEquals(HEIGHT, image.height)
         assertEquals(AREA.corners(), image.corners)
         assertPixels(image) { x, _ -> if (x < 8) bands.colours[0] else bands.colours[9] }
+    }
+
+    // Design D8 of polish-overlay: colours per count and indices per row and column change no pixel.
+    @Test
+    fun `a phone-sized image equals the per-pixel reference`() {
+        val area = MapArea(GeoPoint(46.6863, 7.8632), zoom = 12.0, widthDp = 411.0, heightDp = 891.0)
+        val columns = 52
+        val rows = 112
+        val random = Random(7)
+        // Sun all day, shade all day, partly and fully unknown cells.
+        val unknown = ShortArray(columns * rows) { listOf(0, 0, 3, 144)[random.nextInt(4)].toShort() }
+        val sun = ShortArray(columns * rows) { random.nextInt(0, 145 - unknown[it]).toShort() }
+        val hours = SunHours(area, columns, rows, 144, sun, unknown, STEP_MINUTES, CELL_DP)
+
+        assertArrayEquals(reference(hours).pixels, renderSunHours(hours, bands).pixels)
+    }
+
+    // The image as drawn before design D8 of polish-overlay: every value per pixel.
+    private fun reference(hours: SunHours): OverlayImage {
+        val raster = OverlayRaster(hours.area)
+        val pixels =
+            IntArray(raster.width * raster.height) { i ->
+                val x = i % raster.width
+                val y = i / raster.width
+                val count = countIndex(hours, x + 0.5, y + 0.5)
+                val unknown = hours.unknown[count].toInt()
+                when {
+                    unknown > 0 && isHatched(x, y) -> UNKNOWN_ARGB
+                    unknown == hours.steps -> 0
+                    else -> bands.colours[bands.bandOf(hours.sun[count] * hours.stepMinutes)]
+                }
+            }
+        return OverlayImage(raster.width, raster.height, pixels, hours.area.corners())
     }
 
     private fun assertPixels(
