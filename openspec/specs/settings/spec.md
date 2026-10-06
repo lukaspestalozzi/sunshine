@@ -173,6 +173,8 @@ durations in whole milliseconds as `ms`, or in seconds with one decimal as `s` f
   - `Day <c>/<n> steps, <cell> dp / <step> min`: the day of the shown overlay mode, its computed
     steps of all, its cell size and step;
   - `Area <w>×<h> dp, zoom <z>`: its area, the zoom with one decimal;
+  - `Reused <p> %`: the share of its area covered by a reused earlier day (sun-shade-overlay
+    "Overlay of the whole day"), in whole percent; `0 %` when none is reused;
   - `Shown <source>`: where the shown `Sun & shade` overlay comes from: `own day`, `earlier day`
     (sun-shade-overlay "Overlay updates") or `previous overlay`;
   - `Cache <n> days, <m> of <max> MiB`: the cache of days.
@@ -210,3 +212,7 @@ they describe by more than 1 %.
 #### Scenario: Release build
 - **WHEN** the app is a release build
 - **THEN** the Settings page shows the `Debug` section with its four switches
+
+#### Scenario: Reuse shown
+- **WHEN** `Day state` is on and after a half-screen pan the earlier day covers half of the new area
+- **THEN** the debug box shows `Reused 50 %` (±2 %)

@@ -43,7 +43,10 @@ area, which must be at least ¼. The new `DayOverlay` gets it as `base`. At each
 - otherwise → compute the whole area, as today.
 
 The decision is taken when the step is computed, so a base still lacking steps (the pan came while
-it was computing) is used wherever it can be.
+it was computing) is used wherever it can be. The new day keeps the base's usable grids (daytime,
+not combined twice), not the base day itself, so that days do not hold on to each other; they count
+in its bytes until combined into a step, and are released once the day is complete (review
+finding). `reusable` makes the chosen day the most recently used.
 
 *Alternatives (asked):* same zoom only (any pinch recomputes all); any zoom (cells larger than the
 cell size after zooming in); several days (rectangle cover, more grids per step); complete days only
@@ -86,7 +89,10 @@ area's bounds at the same zoom (instead of "centre moved by at most half the sma
 consecutive parts and the next step reuse the tiles already in memory.
 
 ### D6. Debug and logging
-`DayOverlay.reusedShare` (0 without a base) feeds `Reused <p> %` in the `Day state` group; the
+`DayOverlay.reusedShare` (0 without a base) feeds `Reused <p> %` in the `Day state` group. The parts
+of one step are computed within a `GridTileTally` coroutine context element, so `Grid tiles` counts
+the tiles of the whole combined step; the agreement check traces its cells with `checkProfile`, which
+neither replaces the selected location's `Horizon` lines nor caches its profiles (review findings). The
 `Overlay day` log line and the `Day` timing line are unchanged, so a pan's day duration compares
 directly with a fresh day's.
 

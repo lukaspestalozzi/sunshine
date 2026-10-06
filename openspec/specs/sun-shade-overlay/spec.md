@@ -16,14 +16,18 @@ the rule of point-sunshine "Sunshine at an instant":
 - **shade:** it is at or below that horizon;
 - **unknown:** the horizon is incomplete there and the upper edge is above its lower bound.
 
-The sun's azimuth and apparent elevation are those of the map centre at the selected time; the
-same sun position applies to every cell. The terrain horizon of a sample point is the horizon of
+The sun's azimuth and apparent elevation are those of the centre of the computed area at the
+selected time. The computed area is the visible area, or, where an earlier day is reused after a
+camera move ("Overlay of the whole day"), the earlier day's area or the uncovered part a cell lies
+in; one sun position applies to every cell of one computed area. Against the map centre's sun this
+is equivalent to a time offset of at most 2 min (map zoom 11, the largest areas). The terrain
+horizon of a sample point is the horizon of
 terrain-horizon "Horizon profile" in that one direction: the same eye height, earth curvature,
 refraction and 150 km range. Only the data resolution differs:
-- zoom z_v = min(14, ⌊map zoom⌋ + 2) within the visible area and up to 1.5 km beyond its edge
-  towards the sun;
+- zoom z_v = min(14, ⌊map zoom⌋ + 2), with the map zoom the computed area was computed for, within
+  the computed area and up to 1.5 km beyond its edge towards the sun;
 - then zoom 12 (or z_v if coarser) up to 6 km, zoom 11 up to 25 km and zoom 10 beyond, with
-  distances measured from the edge of the visible area;
+  distances measured from the edge of the computed area;
 - the next coarser published zoom where a zoom is not published.
 
 Terrain more than 6 km from a sample point may be taken from a line offset sideways by at most
@@ -31,7 +35,8 @@ d · tan(0.125°), where d is its distance. This is at most the error of the poi
 0.25° azimuth bins.
 
 Accuracy: at map zoom ≥ 12, for at least 99.5 % of the cells, the state SHALL equal point-sunshine
-"Sunshine at an instant" evaluated at the cell's sample point with the map centre's sun position.
+"Sunshine at an instant" evaluated at the cell's sample point with the sun position of its
+computed area.
 At the foot of cliffs, results vary within a cell. The spike measured up to p90 25 min per day of
 different state between two points 6.5 m apart.
 
@@ -62,6 +67,10 @@ different state between two points 6.5 m apart.
 #### Scenario: Cell size of Fast
 - **WHEN** the shade resolution is `Fast`, the map zoom is 12 and the visible area is 400 × 850 dp
 - **THEN** the overlay's cells are at most 4 × 4 dp, and at least 99.5 % of them have the state that point-sunshine gives at their sample points
+
+#### Scenario: Sun position of a reused part
+- **WHEN** after a pan the cells of the left half of the visible area are taken from an earlier day whose area was centred half a screen further west
+- **THEN** those cells are decided with the sun position of the earlier area's centre, and the other cells with that of the uncovered part's centre
 
 ### Requirement: Unknown cells
 When terrain data that a cell's horizon needs cannot be obtained, the cell's horizon SHALL be
@@ -261,6 +270,16 @@ its actual length. These are the slider's positions while `Sun & shade` is shown
   again, and only its missing positions SHALL be computed, the selected time first. A change of the selected time within the day SHALL NOT restart it; if that time has
   not been computed yet, it is computed next. Leaving the app SHALL NOT discard the computed steps;
   the computation continues in the background.
+- **Reuse after a camera move:** when the camera rests on a new area, the cached day of the same
+  date, cell size and step that covers the largest share of the new area SHALL be reused if it
+  covers at least a quarter of it, was computed at the new map zoom or up to one level higher
+  (its cells are then no larger than the cell size), and, while the network is
+  available, has no unknown cells. At each daytime step the earlier day has computed, only the
+  parts of the new area it does not cover SHALL be computed, and the step shows the earlier day's
+  cells where it covers the new area and the new cells elsewhere. At the other steps, at night
+  positions, and at steps where the earlier day's grid is itself combined from two earlier days
+  already, the whole new area SHALL be computed. A reused day's grids stay in use until the new
+  day is dropped; they count towards the cache of days in both days.
 - **Cache of days:** computed days SHALL be kept by visible area, date, cell size and step, up to a quarter of the
   app's heap limit. Beyond it, the least recently used days SHALL be dropped, never the day being
   shown. A day with unknown cells SHALL be computed anew when it is selected while the network is
@@ -279,7 +298,27 @@ its actual length. These are the slider's positions while `Sun & shade` is shown
 
 #### Scenario: A pan starts the day over
 - **WHEN** the day is being computed and the user pans the map
-- **THEN** after the camera has rested for 300 ms, the day is computed again for the new area, starting with the selected time
+- **THEN** after the camera has rested for 300 ms, the day is computed again for the new area, starting with the selected time; where an earlier day covers part of the new area, only the rest is computed at the steps that day has
+
+#### Scenario: Half-screen pan
+- **WHEN** the day of 2025-12-21 has been computed at Lauterbrunnen, 46.5935° N, 7.9091° E, map zoom 12, and the user pans by half a screen to the east
+- **THEN** at every daytime step only the eastern half of the new area is computed, and the overlay of every step covers the whole new area
+
+#### Scenario: Pan while the day is computed
+- **WHEN** 100 of the 288 steps of the day have been computed and the user pans by half a screen
+- **THEN** at those 100 steps only the uncovered half of the new area is computed, and at the other daytime steps the whole new area
+
+#### Scenario: Zoomed in
+- **WHEN** the day has been computed at map zoom 12 and the user zooms in to 12.5 without panning
+- **THEN** the whole day of the new area is computed, without reusing the earlier day
+
+#### Scenario: Zoomed out
+- **WHEN** the day has been computed at map zoom 12.5 and the user zooms out to 12 without panning
+- **THEN** the earlier day's cells are reused where it covers the new area, and only the rest of the new area is computed
+
+#### Scenario: Little overlap
+- **WHEN** the day has been computed and the user pans by 0.8 of the screen's width, so that the earlier area covers a fifth of the new one
+- **THEN** the whole day of the new area is computed
 
 #### Scenario: Back to the app
 - **WHEN** the day has been computed and the user leaves the app for a minute and returns
