@@ -1383,6 +1383,38 @@ class MapViewModelTest {
             assertEquals(new, (viewModel.heatmap.value as HeatmapUiState.Ready).hours.area)
         }
 
+    // settings spec, "Debug info": a finished day shows all its steps, also when its last step is
+    // stored just before the progress stops (seen on the device as `Day 287/288` after a finished day).
+    @Test
+    fun `the day state of a finished day counts every step`() =
+        runTest {
+            val debug = DebugInfo()
+            val viewModel = dayViewModel(mutableListOf(), computeDispatcher = StandardTestDispatcher(testScheduler), debug = debug)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceUntilIdle()
+
+            assertEquals(
+                DAY_STEPS,
+                debug.values.value.day
+                    ?.steps,
+            )
+            assertEquals(
+                DAY_STEPS,
+                debug.values.value.dayState
+                    ?.computed,
+            )
+
+            // The heatmap's day likewise.
+            viewModel.onOverlayModeSelected(OverlayMode.SUN_HOURS)
+            advanceUntilIdle()
+            assertEquals(
+                144,
+                debug.values.value.dayState
+                    ?.computed,
+            )
+        }
+
     // The night steps of [area]'s day of 2025-12-21 every [stepMinutes] minutes.
     private fun nightSteps(
         area: MapArea,
@@ -1943,6 +1975,8 @@ class MapViewModelTest {
         cells: MutableList<Double> = mutableListOf(),
         beforeCell: suspend (Double) -> Unit = {},
         settings: StateFlow<Settings> = MutableStateFlow(Settings()),
+        computeDispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(testScheduler),
+        debug: DebugInfo = DebugInfo(),
     ): MapViewModel {
         val viewModel =
             MapViewModel(
@@ -1959,11 +1993,12 @@ class MapViewModelTest {
                     cells += cellDp
                     cheapGrid(area, isOnline.value, cellDp)
                 },
-                UnconfinedTestDispatcher(testScheduler),
+                computeDispatcher,
                 dayDispatcher = StandardTestDispatcher(testScheduler),
                 log = log,
                 dayCache = dayCache,
                 settings = settings,
+                debug = debug,
             )
         viewModel.onMapSizeChanged(MAP_WIDTH, MAP_HEIGHT)
         viewModel.onSliderMoved(12 * 60f)
