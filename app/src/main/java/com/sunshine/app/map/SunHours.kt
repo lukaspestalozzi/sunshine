@@ -62,17 +62,19 @@ fun renderSunHours(
     bands: HeatmapBands,
 ): OverlayImage {
     val image = OverlayRaster(hours.area)
+    // Each count's colour once, and each column's and row's count once (design D8 of polish-overlay).
+    val colours =
+        IntArray(hours.sun.size) { count ->
+            if (hours.unknown[count].toInt() == hours.steps) 0 else bands.colours[bands.bandOf(hours.sun[count] * hours.stepMinutes)]
+        }
+    val columns = IntArray(image.width) { x -> countIndex(hours, x + 0.5, 0.5) }
+    val rows = IntArray(image.height) { y -> countIndex(hours, 0.5, y + 0.5) }
     val pixels =
         IntArray(image.width * image.height) { i ->
             val x = i % image.width
             val y = i / image.width
-            val count = countIndex(hours, x + 0.5, y + 0.5)
-            val unknown = hours.unknown[count].toInt()
-            when {
-                unknown > 0 && isHatched(x, y) -> UNKNOWN_ARGB
-                unknown == hours.steps -> 0
-                else -> bands.colours[bands.bandOf(hours.sun[count] * hours.stepMinutes)]
-            }
+            val count = rows[y] + columns[x]
+            if (hours.unknown[count] > 0 && isHatched(x, y)) UNKNOWN_ARGB else colours[count]
         }
     return OverlayImage(image.width, image.height, pixels, hours.area.corners())
 }

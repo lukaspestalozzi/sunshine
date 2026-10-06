@@ -28,18 +28,16 @@ class OverlayImage(
 fun renderOverlay(grid: ShadeGrid): OverlayImage {
     val raster = OverlayRaster(grid.area)
     val width = raster.width
-    val pixels = IntArray(width * raster.height)
-    for (y in 0 until raster.height) {
-        val latitude = raster.latitudes[y]
-        for (x in 0 until width) {
-            pixels[y * width + x] =
-                when (grid.stateAt(latitude, raster.longitudes[x])) {
-                    Sunshine.SHADE -> SHADE_ARGB
-                    Sunshine.UNKNOWN -> if (isHatched(x, y)) UNKNOWN_ARGB else TRANSPARENT
-                    Sunshine.SUN, null -> TRANSPARENT
-                }
+    // All pixels' states in one pass (design D8 of polish-overlay).
+    val states = grid.statesAt(raster.latitudes, raster.longitudes)
+    val pixels =
+        IntArray(width * raster.height) { i ->
+            when (states[i]) {
+                Sunshine.SHADE -> SHADE_ARGB
+                Sunshine.UNKNOWN -> if (isHatched(i % width, i / width)) UNKNOWN_ARGB else TRANSPARENT
+                Sunshine.SUN, null -> TRANSPARENT
+            }
         }
-    }
     return OverlayImage(width, raster.height, pixels, grid.area.corners())
 }
 
