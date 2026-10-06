@@ -70,26 +70,43 @@ class OverlayRepositoryTest {
             assertTrue(requested.none { it in first }, "requested again: ${requested.filter { it in first }}")
         }
 
+    // Design D5 of overlay-pan-reuse: kept while the areas intersect.
     @Test
-    fun `a small pan keeps the tiles, a pan by more than half a screen drops them`() =
+    fun `a pan within a screen keeps the tiles, a pan by more than a screen drops them`() =
         runTest {
             val repository = repository()
             repository.grid(AREA, SUN)
             val ground = SunShadeSweep(AREA, SUN).groundTiles()
 
             requested.clear()
-            val near = AREA.movedEast(0.3 * AREA.widthDp)
+            val near = AREA.movedEast(0.6 * AREA.widthDp)
             repository.grid(near, SUN)
-            assertTrue(requested.none { it in ground }, "a small pan requests kept tiles again")
+            assertTrue(requested.none { it in ground }, "a pan within a screen requests kept tiles again")
 
-            // The kept tiles are now those of `near`; pan 0.6 screens away from it.
+            // The kept tiles are now those of `near`; pan 1.2 screens away from it.
             requested.clear()
-            val far = near.movedEast(0.6 * AREA.widthDp)
+            val far = near.movedEast(1.2 * AREA.widthDp)
             repository.grid(far, SUN)
             val nearSweep = SunShadeSweep(near, SUN)
             val kept = nearSweep.tiles(nearSweep.groundTiles().associateWith(::heightTile))
             val overlap = SunShadeSweep(far, SUN).groundTiles() intersect kept
             assertTrue(overlap.isNotEmpty() && requested.containsAll(overlap), "a far pan reuses tiles")
+        }
+
+    // Design D5 of overlay-pan-reuse: the parts of a panned area and the next step share the tiles.
+    @Test
+    fun `a grid of an intersecting part at the same zoom requests no tile it has kept`() =
+        runTest {
+            val repository = repository()
+            repository.grid(AREA, SUN)
+            val kept = requested.toSet()
+            requested.clear()
+
+            // The east half of AREA panned by half its width: it touches AREA's east edge.
+            val part = AREA.movedEast(0.75 * AREA.widthDp).copy(widthDp = AREA.widthDp / 2)
+            repository.grid(part, SunPosition(SUN.azimuth + 0.1, SUN.elevation, true))
+
+            assertTrue(requested.none { it in kept }, "requested again: ${requested.filter { it in kept }}")
         }
 
     // settings spec, "Debug info": the grid's tiles by where they came from (design D4 of polish-overlay).

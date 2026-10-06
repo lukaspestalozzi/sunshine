@@ -2,7 +2,7 @@ package com.sunshine.app.map
 
 import com.sunshine.core.GeoPoint
 import com.sunshine.core.MapArea
-import com.sunshine.core.ShadeGrid
+import com.sunshine.core.StepGrid
 import com.sunshine.core.Sunshine
 import kotlin.math.PI
 import kotlin.math.atan
@@ -25,7 +25,7 @@ class OverlayImage(
  * add-sun-shade-overlay): shade tinted, sun clear, unknown hatched, each pixel from the cell under
  * its centre.
  */
-fun renderOverlay(grid: ShadeGrid): OverlayImage {
+fun renderOverlay(grid: StepGrid): OverlayImage {
     val raster = OverlayRaster(grid.area)
     val width = raster.width
     // All pixels' states in one pass (design D8 of polish-overlay).

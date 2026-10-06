@@ -1,15 +1,13 @@
 package com.sunshine.app.sunshine
 
 import com.sunshine.app.elevation.TileLoads
+import com.sunshine.core.GeoBounds
 import com.sunshine.core.HeightTile
 import com.sunshine.core.MapArea
 import com.sunshine.core.ShadeGrid
 import com.sunshine.core.SunPosition
 import com.sunshine.core.SunShadeSweep
 import com.sunshine.core.TileKey
-import kotlin.math.cos
-import kotlin.math.hypot
-import kotlin.math.min
 import kotlin.time.TimeSource
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -19,8 +17,9 @@ import kotlinx.coroutines.ensureActive
 /**
  * Sun-shade grids of the visible area (design D8 of add-sun-shade-overlay). [tile] loads a tile,
  * `null` if it is unavailable. The lines are computed in [chunks] coroutines on the caller's
- * dispatcher. The tiles of the last grid are kept for the next one while the area moves by less than
- * half a screen, so a new time at the same place loads only the tiles its new upwind lines need.
+ * dispatcher. The tiles of the last grid are kept for the next one while the areas intersect, so a
+ * new time at the same place loads only the tiles its new upwind lines need, and the parts of a
+ * panned area share their tiles (design D5 of overlay-pan-reuse).
  */
 class OverlayRepository(
     private val tile: suspend (TileKey) -> HeightTile?,
@@ -46,7 +45,7 @@ class OverlayRepository(
         coroutineScope {
             val start = TimeSource.Monotonic.markNow()
             val sweep = SunShadeSweep(area, sun, cellDp)
-            val reusable = kept?.takeIf { it.area.isNear(area) }?.tiles.orEmpty()
+            val reusable = kept?.takeIf { it.area.intersects(area) }?.tiles.orEmpty()
             val before = loads()
             val ground = load(sweep.groundTiles(), reusable)
             // Below −3.5° every cell with ground is shade: no upwind tiles, no sweep (design D12). The
@@ -108,15 +107,11 @@ class OverlayRepository(
             keys.map { key -> async { key to (reusable[key] ?: tile(key)) } }.awaitAll().toMap()
         }
 
-    // Same zoom, centre moved by at most half the smaller side of the screen.
-    private fun MapArea.isNear(other: MapArea): Boolean {
+    // Same zoom, and the bounds overlap or touch.
+    private fun MapArea.intersects(other: MapArea): Boolean {
         if (zoom != other.zoom) return false
-        val north = Math.toRadians(other.center.latitude - center.latitude) * EARTH_RADIUS
-        val east = Math.toRadians(other.center.longitude - center.longitude) * EARTH_RADIUS * cos(Math.toRadians(center.latitude))
-        return hypot(north, east) <= min(widthDp, heightDp) / 2 * metresPerDp
-    }
-
-    private companion object {
-        const val EARTH_RADIUS = 6_371_000.0
+        val a = GeoBounds.of(this)
+        val b = GeoBounds.of(other)
+        return a.south <= b.north && b.south <= a.north && a.west <= b.east && b.west <= a.east
     }
 }
