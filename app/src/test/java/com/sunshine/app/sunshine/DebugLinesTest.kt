@@ -23,6 +23,7 @@ class DebugLinesTest {
                 "Memory –",
                 "Day –",
                 "Area –",
+                "Reused –",
                 "Shown –",
                 "Cache –",
                 "Agreement –",
@@ -52,6 +53,7 @@ class DebugLinesTest {
                         widthDp = 400.0,
                         heightDp = 850.0,
                         zoom = 12.04,
+                        reusedShare = 0.5,
                     ),
                 shown = ShownSource.EARLIER_DAY,
                 cache = CacheState(days = 3, bytes = 41L * MIB + MIB / 2, maxBytes = 96L * MIB),
@@ -70,6 +72,7 @@ class DebugLinesTest {
                 "Memory 52 of 64 tiles",
                 "Day 72/288 steps, 2 dp / 5 min",
                 "Area 400×850 dp, zoom 12.0",
+                "Reused 50 %",
                 "Shown earlier day",
                 "Cache 3 days, 42 of 96 MiB",
                 "Agreement 199 of 200 cells (99 %)",
@@ -91,9 +94,19 @@ class DebugLinesTest {
         val previous = debugLines(DebugValues(shown = ShownSource.PREVIOUS_OVERLAY), DebugSwitches(dayState = true))
         val checking = debugLines(DebugValues(agreement = Agreement.Checking), DebugSwitches(agreementCheck = true))
 
-        assertEquals("Shown own day", own[2])
-        assertEquals("Shown previous overlay", previous[2])
+        assertEquals("Shown own day", own[3])
+        assertEquals("Shown previous overlay", previous[3])
         assertEquals(listOf("Agreement …"), checking)
+    }
+
+    // settings spec, "Reuse shown" (design D6 of overlay-pan-reuse).
+    @Test
+    fun `a day without an earlier day reuses 0 %`() {
+        val state = DayState(computed = 1, steps = 288, cellDp = 2.0, stepMinutes = 5, widthDp = 400.0, heightDp = 850.0, zoom = 12.0)
+
+        val lines = debugLines(DebugValues(dayState = state), DebugSwitches(dayState = true))
+
+        assertEquals("Reused 0 %", lines[2])
     }
 
     @Test

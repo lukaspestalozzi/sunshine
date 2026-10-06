@@ -25,7 +25,7 @@ Device checks (6.1–6.3) are done by the user at the end, on the debug APK of t
 
 ## 5. Debug box (app)
 
-- [ ] 5.1 Extend `DebugLinesTest` first: `Reused 50 %` after `Area`, `Reused 0 %` without a base, `Reused –` before a first day (settings "Debug info", "Reuse shown"). Then record `reusedShare` in `DayState`. Update `CLAUDE.md`'s `app/` and `core/` rows for `StepGrid`, `CombinedGrid` and the reuse. Verify: `./gradlew :app:testDebugUnitTest --tests "*DebugLines*"` passes and `./scripts/verify-local.sh` passes.
+- [x] 5.1 Extend `DebugLinesTest` first: `Reused 50 %` after `Area`, `Reused 0 %` without a base, `Reused –` before a first day (settings "Debug info", "Reuse shown"). Then record `reusedShare` in `DayState`. Update `CLAUDE.md`'s `app/` and `core/` rows for `StepGrid`, `CombinedGrid` and the reuse. Verify: `./gradlew :app:testDebugUnitTest --tests "*DebugLines*"` passes and `./scripts/verify-local.sh` passes.
 
 ## 6. Device checks
 

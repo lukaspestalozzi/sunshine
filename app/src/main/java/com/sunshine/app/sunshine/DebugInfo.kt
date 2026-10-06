@@ -45,7 +45,7 @@ data class MemoryTiles(
     val max: Int,
 )
 
-/** The day of the shown overlay mode. */
+/** The day of the shown overlay mode; [reusedShare] of its area is taken from an earlier day (design D6 of overlay-pan-reuse). */
 data class DayState(
     val computed: Int,
     val steps: Int,
@@ -54,6 +54,7 @@ data class DayState(
     val widthDp: Double,
     val heightDp: Double,
     val zoom: Double,
+    val reusedShare: Double = 0.0,
 )
 
 /** Where the shown `Sun & shade` overlay comes from (sun-shade-overlay spec, "Overlay updates"). */
@@ -156,6 +157,7 @@ fun debugLines(
                         } ?: NONE
                     ),
             )
+            add("Reused " + (values.dayState?.let { "${(it.reusedShare * PERCENT).roundToLong()} %" } ?: NONE))
             add("Shown " + (values.shown?.label ?: NONE))
             add("Cache " + (values.cache?.let { "${it.days} days, ${mebibytes(it.bytes)} of ${mebibytes(it.maxBytes)} MiB" } ?: NONE))
         }
