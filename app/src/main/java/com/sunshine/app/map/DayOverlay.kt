@@ -1,7 +1,9 @@
 package com.sunshine.app.map
 
+import com.sunshine.core.CombinedGrid
 import com.sunshine.core.MapArea
 import com.sunshine.core.ShadeGrid
+import com.sunshine.core.StepGrid
 import com.sunshine.core.SunPosition
 import com.sunshine.core.SunShadeSweep
 import com.sunshine.core.sunPosition
@@ -21,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -32,7 +35,8 @@ import kotlinx.coroutines.withContext
  * add-sun-exposure-heatmap, D3 of add-settings). [compute] gives the selected time on the
  * caller's dispatcher; [computeRest] then fills in the other steps on [background], nearest to the
  * selected time first. One grid is computed at a time: a selected time waiting in [compute] goes
- * before the next background step.
+ * before the next background step. With a [base], an earlier day chosen by [DayCache.reusable], a
+ * daytime step it has is computed only where it does not cover [area] (design D1 of overlay-pan-reuse).
  */
 class DayOverlay(
     val area: MapArea,
@@ -42,6 +46,7 @@ class DayOverlay(
     private val background: CoroutineDispatcher,
     val stepMinutes: Int = SLIDER_STEP_MINUTES,
     val cellDp: Double = SunShadeSweep.CELL_DP,
+    base: DayOverlay? = null,
 ) {
     /** Every [stepMinutes] minutes over the day's real length: the slider's positions for that step. */
     val steps: List<ZonedDateTime> =
@@ -56,7 +61,17 @@ class DayOverlay(
 
     private val stepInstants: Set<Instant> = steps.mapTo(HashSet()) { it.toInstant() }
 
-    private val grids = ConcurrentHashMap<Instant, ShadeGrid>()
+    private val grids = ConcurrentHashMap<Instant, StepGrid>()
+
+    private val uncovered: Uncovered? = base?.let { uncovered(area, it.area, cellDp) }
+
+    // The base's grids when this day is created (the base is stopped then), not the base itself, so
+    // that days do not hold on to each other; released once every step is computed.
+    @Volatile
+    private var baseGrids: Map<Instant, StepGrid>? = base?.grids?.toMap()
+
+    /** The share of [area] taken from [base], 0 without one (design D6 of overlay-pan-reuse). */
+    val reusedShare: Double = uncovered?.coveredShare ?: 0.0
 
     private val mutableComputed = MutableStateFlow(0)
 
@@ -99,13 +114,13 @@ class DayOverlay(
         }
 
     /** The grid at [time] if it has been computed. */
-    fun gridAt(time: ZonedDateTime): ShadeGrid? = grids[time.toInstant()]
+    fun gridAt(time: ZonedDateTime): StepGrid? = grids[time.toInstant()]
 
     /** The grid at [time], computed on the caller's dispatcher unless it is known. */
-    suspend fun compute(time: ZonedDateTime): ShadeGrid =
+    suspend fun compute(time: ZonedDateTime): StepGrid =
         lock.withLock {
             gridAt(time)
-                ?: grid(area, sunAt(time), cellDp).also { store(time, it) }
+                ?: gridOf(time).also { store(time, it) }
         }
 
     /**
@@ -125,19 +140,28 @@ class DayOverlay(
         while (true) {
             val next = nearestUncomputed(selected()) ?: return
             lock.withLock {
-                if (gridAt(next) == null) store(next, withContext(background) { grid(area, sunAt(next), cellDp) })
+                if (gridAt(next) == null) store(next, withContext(background) { gridOf(next) })
             }
         }
     }
 
+    // The base's grid with the uncovered parts, each with the sun of its own centre; the whole area
+    // at night, where the base lacks the step, or where its grid is combined twice already (design D3).
+    private suspend fun gridOf(time: ZonedDateTime): StepGrid {
+        val earlier = baseGrids?.get(time.toInstant())
+        if (earlier == null || uncovered == null || isNight(time) || earlier.depth >= MAX_DEPTH) return grid(area, sunAt(time), cellDp)
+        val parts = uncovered.parts.map { part -> grid(part, sunPosition(part.center, time.toInstant()), cellDp) }
+        return CombinedGrid(area, earlier, parts)
+    }
+
     private fun store(
         time: ZonedDateTime,
-        computed: ShadeGrid,
+        computed: StepGrid,
     ) {
         grids[time.toInstant()] = computed
         mutableBytes.addAndGet(computed.stateBytes.toLong())
         if (computed.hasUnknown) hasUnknown = true
-        if (time.toInstant() in stepInstants) mutableComputed.update { it + 1 }
+        if (time.toInstant() in stepInstants && mutableComputed.updateAndGet { it + 1 } == steps.size) baseGrids = null
         stored.update { it + 1 }
     }
 
@@ -148,6 +172,11 @@ class DayOverlay(
             .minWithOrNull(compareBy({ abs(Duration.between(time, it).toMillis()) }, { it.isBefore(time) }))
 
     private fun sunAt(time: ZonedDateTime): SunPosition = sunPosition(area.center, time.toInstant())
+
+    private companion object {
+        // Combinations of an earlier grid beyond which a step is computed whole (design D3 of overlay-pan-reuse).
+        const val MAX_DEPTH = 2
+    }
 }
 
 /** The dispatcher of the day's background steps: half the cores, at least one (user decision, design D11). */

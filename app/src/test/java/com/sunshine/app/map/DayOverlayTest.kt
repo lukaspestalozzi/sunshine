@@ -1,6 +1,7 @@
 package com.sunshine.app.map
 
 import com.sunshine.app.sunshine.OverlayRepository
+import com.sunshine.core.CombinedGrid
 import com.sunshine.core.GeoPoint
 import com.sunshine.core.HeightTile
 import com.sunshine.core.MapArea
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -31,6 +33,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -239,6 +242,103 @@ class DayOverlayTest {
             assertEquals(177, day.nightSteps)
         }
 
+    // An earlier day reused after a camera move (sun-shade-overlay spec, "Overlay of the whole day";
+    // design D1, D3 of overlay-pan-reuse).
+    @Test
+    fun `with a complete earlier day, daytime steps compute only the uncovered part with its own sun`() =
+        runTest {
+            val base = DayOverlay(AREA, DECEMBER_21, ZURICH, fakeGrid, StandardTestDispatcher(testScheduler))
+            base.computeAll { at(12, 0) }
+            val requests = mutableListOf<Pair<MapArea, SunPosition>>()
+            val day = reusing(base, PANNED, requests)
+
+            day.computeAll { at(12, 0) }
+
+            val part = uncovered(PANNED, AREA, SunShadeSweep.CELL_DP).parts.single()
+            assertEquals(288 - day.nightSteps, requests.count { it.first == part })
+            assertEquals(day.nightSteps, requests.count { it.first == PANNED })
+            assertEquals(288, requests.size)
+            for (step in day.steps) {
+                val grid = day.gridAt(step)
+                assertEquals(!day.isNight(step), grid is CombinedGrid, "$step")
+                if (grid is CombinedGrid) assertSame(base.gridAt(step), grid.base)
+            }
+            val partSuns = requests.filter { it.first == part }.map { it.second }
+            assertEquals(
+                day.steps
+                    .filterNot(day::isNight)
+                    .map { sunPosition(part.center, it.toInstant()) }
+                    .toSet(),
+                partSuns.toSet(),
+            )
+            assertEquals(0.5, day.reusedShare, 0.01)
+        }
+
+    @Test
+    fun `steps the earlier day lacks compute the whole area`() =
+        runTest {
+            val base = DayOverlay(AREA, DECEMBER_21, ZURICH, fakeGrid, StandardTestDispatcher(testScheduler))
+            for (step in base.steps.filterNot(base::isNight).take(100)) base.compute(step)
+            val requests = mutableListOf<Pair<MapArea, SunPosition>>()
+            val day = reusing(base, PANNED, requests)
+
+            day.computeAll { at(12, 0) }
+
+            val part = uncovered(PANNED, AREA, SunShadeSweep.CELL_DP).parts.single()
+            assertEquals(100, requests.count { it.first == part })
+            assertEquals(188, requests.count { it.first == PANNED })
+        }
+
+    @Test
+    fun `a step whose earlier grid is combined twice computes the whole area`() =
+        runTest {
+            var previous = DayOverlay(AREA, DECEMBER_21, ZURICH, fakeGrid, StandardTestDispatcher(testScheduler))
+            previous.compute(at(12, 0))
+            val depths = mutableListOf<Int>()
+            val requests = mutableListOf<Pair<MapArea, SunPosition>>()
+            for (pan in 1..3) {
+                val day = reusing(previous, AREA.panned(10.0 * pan), requests)
+                depths += day.compute(at(12, 0)).depth
+                previous = day
+            }
+
+            assertEquals(listOf(1, 2, 0), depths)
+            assertEquals(AREA.panned(30.0), requests.last().first)
+        }
+
+    @Test
+    fun `a reusing day's bytes include the earlier grids, and without an earlier day nothing is reused`() =
+        runTest {
+            val base = DayOverlay(AREA, DECEMBER_21, ZURICH, fakeGrid, StandardTestDispatcher(testScheduler))
+            base.compute(at(12, 0))
+            val day = reusing(base, PANNED, mutableListOf())
+
+            day.compute(at(12, 0))
+
+            assertEquals(2L * GRID.stateBytes, day.bytes)
+            assertEquals(0.0, base.reusedShare)
+        }
+
+    // A day of [area] reusing [base], recording the area and sun of each grid it requests in [requests].
+    private fun TestScope.reusing(
+        base: DayOverlay,
+        area: MapArea,
+        requests: MutableList<Pair<MapArea, SunPosition>>,
+    ) = DayOverlay(
+        area,
+        DECEMBER_21,
+        ZURICH,
+        { requested, sun, _ ->
+            requests += requested to sun
+            GRID
+        },
+        StandardTestDispatcher(testScheduler),
+        base = base,
+    )
+
+    // This area moved [dx] dp east.
+    private fun MapArea.panned(dx: Double) = copy(center = GeoPoint(center.latitude, center.longitude + dx * 360.0 / (512 * 4096)))
+
     // Largest number of tasks running at once on [dispatcher], out of 8 that each take 50 ms.
     private fun peakParallelism(dispatcher: CoroutineDispatcher): Int {
         val running = AtomicInteger()
@@ -266,6 +366,9 @@ class DayOverlayTest {
         val ZURICH: ZoneId = ZoneId.of("Europe/Zurich")
         val DECEMBER_21: LocalDate = LocalDate.of(2025, 12, 21)
         val AREA = MapArea(GeoPoint(46.6863, 7.8632), zoom = 12.0, widthDp = 20.0, heightDp = 30.0)
+
+        // AREA moved 10 dp east: half of it is covered by AREA.
+        val PANNED = AREA.copy(center = GeoPoint(46.6863, 7.8632 + 10 * 360.0 / (512 * 4096)))
         val FLAT: HeightTile = HeightTile.fromMetres(512, FloatArray(512 * 512) { 568f })
         val GRID: ShadeGrid =
             SunShadeSweep(AREA, SunPosition(0.0, -30.0, false)).let { it.night(it.groundTiles().associateWith { FLAT }) }

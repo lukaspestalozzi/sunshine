@@ -15,6 +15,7 @@ import com.sunshine.app.sunshine.Agreement
 import com.sunshine.app.sunshine.DebugInfo
 import com.sunshine.app.sunshine.ShownSource
 import com.sunshine.core.AZIMUTH_COUNT
+import com.sunshine.core.CombinedGrid
 import com.sunshine.core.DEFAULT_LOCATION
 import com.sunshine.core.GeoPoint
 import com.sunshine.core.HeightTile
@@ -697,7 +698,7 @@ class MapViewModelTest {
 
             val ready = viewModel.overlay.value as OverlayUiState.Ready
             assertEquals(ZonedDateTime.of(2025, 12, 21, 13, 0, 0, 0, ZURICH), ready.time)
-            assertEquals(ready.grid.sun, suns.last())
+            assertEquals((ready.grid as ShadeGrid).sun, suns.last())
         }
 
     @Test
@@ -1259,6 +1260,135 @@ class MapViewModelTest {
             assertEquals(HALF_A_SCREEN_EAST, own.grid.area.center)
             assertEquals(earlier.time, own.time)
         }
+
+    // sun-shade-overlay spec, "Overlay of the whole day", reuse after a camera move (design D1 of overlay-pan-reuse).
+    @Test
+    fun `after a half-screen pan only the uncovered half is computed at daytime steps`() =
+        runTest {
+            val areas = mutableListOf<MapArea>()
+            val viewModel = dayViewModel(mutableListOf(), areas)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceUntilIdle()
+            areas.clear()
+
+            viewModel.onCameraMoved(CameraState(center = HALF_A_SCREEN_EAST, zoom = 12.0))
+            advanceUntilIdle()
+
+            val new = MapArea(HALF_A_SCREEN_EAST, 12.0, MAP_WIDTH, MAP_HEIGHT)
+            val half = uncovered(new, MapArea(INTERLAKEN, 12.0, MAP_WIDTH, MAP_HEIGHT), 2.0).parts.single()
+            val night = nightSteps(new, 5)
+            assertEquals(mapOf(half to DAY_STEPS - night, new to night), areas.groupingBy { it }.eachCount())
+            val ready = viewModel.overlay.value as OverlayUiState.Ready
+            assertTrue(ready.grid is CombinedGrid)
+            assertEquals(new, ready.grid.area)
+        }
+
+    @Test
+    fun `a pan while the day is computed reuses the steps computed so far`() =
+        runTest {
+            val areas = mutableListOf<MapArea>()
+            var limit = 100
+            val gate = MutableStateFlow(false)
+            val viewModel = dayViewModel(mutableListOf(), areas, before = { if (areas.size >= limit) gate.first { it } })
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            runCurrent()
+            assertEquals(100, areas.size)
+            areas.clear()
+            limit = Int.MAX_VALUE
+
+            viewModel.onCameraMoved(CameraState(center = HALF_A_SCREEN_EAST, zoom = 12.0))
+            advanceUntilIdle()
+
+            val new = MapArea(HALF_A_SCREEN_EAST, 12.0, MAP_WIDTH, MAP_HEIGHT)
+            val half = uncovered(new, MapArea(INTERLAKEN, 12.0, MAP_WIDTH, MAP_HEIGHT), 2.0).parts.single()
+            assertEquals(mapOf(half to 100, new to DAY_STEPS - 100), areas.groupingBy { it }.eachCount())
+        }
+
+    @Test
+    fun `zoomed in, the whole day of the new area is computed`() =
+        runTest {
+            val areas = mutableListOf<MapArea>()
+            val viewModel = dayViewModel(mutableListOf(), areas)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceUntilIdle()
+            areas.clear()
+
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.5))
+            advanceUntilIdle()
+
+            assertEquals(mapOf(MapArea(INTERLAKEN, 12.5, MAP_WIDTH, MAP_HEIGHT) to DAY_STEPS), areas.groupingBy { it }.eachCount())
+        }
+
+    @Test
+    fun `zoomed out, only the strips around the earlier area are computed at daytime steps`() =
+        runTest {
+            val areas = mutableListOf<MapArea>()
+            val viewModel = dayViewModel(mutableListOf(), areas)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.5))
+            viewModel.onOverlayToggled()
+            advanceUntilIdle()
+            areas.clear()
+
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            advanceUntilIdle()
+
+            val new = MapArea(INTERLAKEN, 12.0, MAP_WIDTH, MAP_HEIGHT)
+            val strips = uncovered(new, MapArea(INTERLAKEN, 12.5, MAP_WIDTH, MAP_HEIGHT), 2.0).parts
+            val night = nightSteps(new, 5)
+            assertEquals(4, strips.size)
+            assertEquals(strips.associateWith { DAY_STEPS - night } + (new to night), areas.groupingBy { it }.eachCount())
+        }
+
+    @Test
+    fun `with little overlap the whole day of the new area is computed`() =
+        runTest {
+            val areas = mutableListOf<MapArea>()
+            val viewModel = dayViewModel(mutableListOf(), areas)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceUntilIdle()
+            areas.clear()
+
+            // 0.8 of the screen's width to the east: the earlier area covers a fifth of the new one.
+            val center = GeoPoint(INTERLAKEN.latitude, INTERLAKEN.longitude + 0.8 * MAP_WIDTH * 360.0 / (512 * 4096))
+            viewModel.onCameraMoved(CameraState(center = center, zoom = 12.0))
+            advanceUntilIdle()
+
+            assertEquals(mapOf(MapArea(center, 12.0, MAP_WIDTH, MAP_HEIGHT) to DAY_STEPS), areas.groupingBy { it }.eachCount())
+        }
+
+    // sun-exposure-heatmap spec, "Heatmap after a half-screen pan".
+    @Test
+    fun `after a half-screen pan the heatmap's day computes only the uncovered half at daytime steps`() =
+        runTest {
+            val areas = mutableListOf<MapArea>()
+            val viewModel = dayViewModel(mutableListOf(), areas)
+            viewModel.onOverlayModeSelected(OverlayMode.SUN_HOURS)
+            viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            viewModel.onOverlayToggled()
+            advanceUntilIdle()
+            areas.clear()
+
+            viewModel.onCameraMoved(CameraState(center = HALF_A_SCREEN_EAST, zoom = 12.0))
+            advanceUntilIdle()
+
+            val new = MapArea(HALF_A_SCREEN_EAST, 12.0, MAP_WIDTH, MAP_HEIGHT)
+            val half = uncovered(new, MapArea(INTERLAKEN, 12.0, MAP_WIDTH, MAP_HEIGHT), 8.0).parts.single()
+            val night = nightSteps(new, 10)
+            assertEquals(mapOf(half to 144 - night, new to night), areas.groupingBy { it }.eachCount())
+            assertEquals(new, (viewModel.heatmap.value as HeatmapUiState.Ready).hours.area)
+        }
+
+    // The night steps of [area]'s day of 2025-12-21 every [stepMinutes] minutes.
+    private fun nightSteps(
+        area: MapArea,
+        stepMinutes: Int,
+    ) = DayOverlay(area, LocalDate.of(2025, 12, 21), ZURICH, { _, _, _ -> error("not computed") }, StandardTestDispatcher(), stepMinutes)
+        .nightSteps
 
     @Test
     fun `after a pan to an area no earlier day overlaps, a time not yet computed waits with the notice`() =

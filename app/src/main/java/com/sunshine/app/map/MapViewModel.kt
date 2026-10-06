@@ -22,6 +22,7 @@ import com.sunshine.core.GeoPoint
 import com.sunshine.core.HorizonProfile
 import com.sunshine.core.MapArea
 import com.sunshine.core.ShadeGrid
+import com.sunshine.core.StepGrid
 import com.sunshine.core.SunDay
 import com.sunshine.core.SunPeriods
 import com.sunshine.core.SunPosition
@@ -133,7 +134,7 @@ sealed interface OverlayUiState {
      * ([source]; design D2 of polish-overlay).
      */
     data class Ready(
-        val grid: ShadeGrid,
+        val grid: StepGrid,
         val time: ZonedDateTime,
         val image: OverlayImage,
         val cellDp: Double = SunShadeSweep.CELL_DP,
@@ -416,6 +417,8 @@ class MapViewModel(
                                 dayDispatcher ?: computeDispatcher,
                                 input.stepMinutes,
                                 input.cellDp,
+                                // An earlier day covering part of the area (design D1 of overlay-pan-reuse).
+                                dayCache.reusable(area, date, input.cellDp, input.stepMinutes, input.online),
                             )
                         day = newDay
                         recordDay(newDay)
@@ -562,6 +565,7 @@ class MapViewModel(
                             dayDispatcher ?: computeDispatcher,
                             input.stepMinutes,
                             input.cellDp,
+                            dayCache.reusable(area, input.date, input.cellDp, input.stepMinutes, input.online),
                         )
                     day = newDay
                     recordDay(newDay)
