@@ -64,7 +64,7 @@ None.
 - Changes to the heatmap after a pan. It already stays on its terrain until the new one is built.
 - Incremental counting or a partial heatmap. They are decided after the measurement, in a
   follow-up, only if needed.
-- The time tape and every other UI redesign (roadmap #11, `polish-ui`).
+- The time tape and every other UI redesign (roadmap #12, `polish-ui`).
 - GPS follow mode.
 - Exporting or sharing debug data, a log file, or debug values beyond the four groups.
 - Removing the logcat lines of debug builds.
