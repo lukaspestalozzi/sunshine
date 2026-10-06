@@ -203,6 +203,12 @@ Found in this round: a cancelled agreement check left `Agreement …` in the box
 about 6 minutes on the phone. A pan costs a whole `Sun & shade` day again, about 92 s of background
 CPU; `investigations/overlay-pan-reuse.md` measures what computing only the uncovered part would save.
 
+Third round (2026-10-06, APK with 50 agreement cells, same area at zoom 11.0, 12:05 UTC+2): `Sun &
+shade` grid 606 ms, image 59 ms, day 83.8 s (288 steps, 144 at night); heatmap day 13.9 s (144
+steps, 72 at night), counting 363 ms, image 56 ms; horizon 1137–1334 ms. Every budget met again,
+and switching to `Sun hours` now clears `Agreement …` to `Agreement –`. No agreement result was
+captured yet.
+
 ## Risks / Trade-offs
 
 - [The earlier day's grid is only partly on screen after a long pan] → It is correct where drawn;
