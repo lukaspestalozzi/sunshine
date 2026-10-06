@@ -83,6 +83,7 @@ class DayCache(
      * The day to reuse for a new day of [area] (design D1 of overlay-pan-reuse): of [date], [cellDp]
      * and [stepMinutes], computed at [area]'s zoom or up to one level higher, without unknown cells
      * while [online], covering the largest share of [area] and at least [MIN_REUSED_SHARE]; or `null`.
+     * It becomes the most recently used.
      */
     @Synchronized
     fun reusable(
@@ -104,7 +105,7 @@ class DayCache(
                 bestShare = share
             }
         }
-        return best
+        return best?.also { days[it.key()] }
     }
 
     private fun GeoBounds.intersects(other: GeoBounds) =

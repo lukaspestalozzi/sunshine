@@ -31,8 +31,14 @@ class SunshineRepository(
             override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Pair<Long, Long>, HorizonProfile>) = size > CACHED_PROFILES
         }
 
-    /** The horizon profile at [point], or `null` when its ground height is unknown. */
-    suspend fun profile(point: GeoPoint): HorizonProfile? {
+    /**
+     * The horizon profile at [point], or `null` when its ground height is unknown. Unless [record],
+     * e.g. for the agreement check's cells, it is neither shown in the debug box nor cached.
+     */
+    suspend fun profile(
+        point: GeoPoint,
+        record: Boolean = true,
+    ): HorizonProfile? {
         val key = cacheKey(point)
         synchronized(profiles) { profiles[key] }?.let { return it }
         val start = TimeSource.Monotonic.markNow()
@@ -52,6 +58,7 @@ class SunshineRepository(
         while (!tracer.isDone) tracer.advance(timedLoad(tracer.nextTiles()))
         val profile = tracer.profile()
         val total = start.elapsedNow()
+        if (!record) return profile
         log("Horizon at $point: ${total.inWholeMilliseconds} ms, of which $tiles tiles ${loading.inWholeMilliseconds} ms")
         // Other features loading tiles at the same time can inflate the disk and network counts.
         val disk = loads().store - before.store

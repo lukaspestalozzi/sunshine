@@ -1,5 +1,6 @@
 package com.sunshine.app.map
 
+import com.sunshine.app.sunshine.GridTileTally
 import com.sunshine.core.CombinedGrid
 import com.sunshine.core.MapArea
 import com.sunshine.core.ShadeGrid
@@ -65,10 +66,21 @@ class DayOverlay(
 
     private val uncovered: Uncovered? = base?.let { uncovered(area, it.area, cellDp) }
 
-    // The base's grids when this day is created (the base is stopped then), not the base itself, so
-    // that days do not hold on to each other; released once every step is computed.
-    @Volatile
-    private var baseGrids: Map<Instant, StepGrid>? = base?.grids?.toMap()
+    // The base's grids this day can reuse (daytime, not combined twice), taken when it is created (the
+    // base is stopped then) rather than the base itself, so that days do not hold on to each other.
+    // Counted in [bytes] until combined into a step, where the combined grid counts them; released
+    // once every step is computed.
+    private val baseGrids = ConcurrentHashMap<Instant, StepGrid>()
+    private val baseBytes = AtomicLong()
+
+    init {
+        base?.grids?.forEach { (instant, grid) ->
+            if (instant !in nightInstants && grid.depth < MAX_DEPTH) {
+                baseGrids[instant] = grid
+                baseBytes.addAndGet(grid.stateBytes.toLong())
+            }
+        }
+    }
 
     /** The share of [area] taken from [base], 0 without one (design D6 of overlay-pan-reuse). */
     val reusedShare: Double = uncovered?.coveredShare ?: 0.0
@@ -84,7 +96,7 @@ class DayOverlay(
     private val mutableBytes = AtomicLong()
 
     /** Bytes of the stored grids' states (design D14) and of the sun hours once counted. */
-    val bytes: Long get() = mutableBytes.get() + (counted?.bytes ?: 0L)
+    val bytes: Long get() = mutableBytes.get() + baseBytes.get() + (counted?.bytes ?: 0L)
 
     /** The day's sun hours once [sunHours] has counted them (design D2 of add-sun-exposure-heatmap). */
     @Volatile
@@ -148,9 +160,13 @@ class DayOverlay(
     // The base's grid with the uncovered parts, each with the sun of its own centre; the whole area
     // at night, where the base lacks the step, or where its grid is combined twice already (design D3).
     private suspend fun gridOf(time: ZonedDateTime): StepGrid {
-        val earlier = baseGrids?.get(time.toInstant())
-        if (earlier == null || uncovered == null || isNight(time) || earlier.depth >= MAX_DEPTH) return grid(area, sunAt(time), cellDp)
-        val parts = uncovered.parts.map { part -> grid(part, sunPosition(part.center, time.toInstant()), cellDp) }
+        val earlier = baseGrids[time.toInstant()]
+        if (earlier == null || uncovered == null) return grid(area, sunAt(time), cellDp)
+        // The debug box counts the tiles of all parts together.
+        val parts =
+            withContext(GridTileTally()) {
+                uncovered.parts.map { part -> grid(part, sunPosition(part.center, time.toInstant()), cellDp) }
+            }
         return CombinedGrid(area, earlier, parts)
     }
 
@@ -160,8 +176,12 @@ class DayOverlay(
     ) {
         grids[time.toInstant()] = computed
         mutableBytes.addAndGet(computed.stateBytes.toLong())
+        if (computed is CombinedGrid) baseGrids.remove(time.toInstant())?.let { baseBytes.addAndGet(-it.stateBytes.toLong()) }
         if (computed.hasUnknown) hasUnknown = true
-        if (time.toInstant() in stepInstants && mutableComputed.updateAndGet { it + 1 } == steps.size) baseGrids = null
+        if (time.toInstant() in stepInstants && mutableComputed.updateAndGet { it + 1 } == steps.size) {
+            baseGrids.clear()
+            baseBytes.set(0)
+        }
         stored.update { it + 1 }
     }
 

@@ -18,6 +18,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -128,6 +129,31 @@ class OverlayRepositoryTest {
             val sources = checkNotNull(debug.values.value.gridTiles)
             assertEquals(requested.toSet().size, sources.disk + sources.unavailable)
             assertTrue(sources.kept > 0, "nothing kept: $sources")
+        }
+
+    // settings spec, "Debug info": a step combined of parts counts the tiles of all its parts
+    // (design D3, D5 of overlay-pan-reuse).
+    @Test
+    fun `the grids of one tally count their tiles together`() =
+        runTest {
+            val debug = DebugInfo()
+            val repository = repository(debug = debug)
+            val east = AREA.movedEast(2.0 * AREA.widthDp)
+
+            withContext(GridTileTally()) {
+                repository.grid(AREA, SUN)
+                repository.grid(east, SUN)
+            }
+
+            val total = requested.size
+            assertEquals(TileSources(kept = 0, memory = 0, disk = total, network = 0, unavailable = 0), debug.values.value.gridTiles)
+            repository.grid(AREA, SUN)
+            assertEquals(
+                requested.size - total,
+                debug.values.value.gridTiles!!
+                    .disk,
+                "outside a tally only the last grid counts",
+            )
         }
 
     @Test

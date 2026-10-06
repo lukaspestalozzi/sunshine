@@ -8,6 +8,8 @@ import com.sunshine.core.ShadeGrid
 import com.sunshine.core.SunPosition
 import com.sunshine.core.SunShadeSweep
 import com.sunshine.core.TileKey
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 import kotlin.time.TimeSource
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -43,6 +45,7 @@ class OverlayRepository(
         cellDp: Double = SunShadeSweep.CELL_DP,
     ): ShadeGrid =
         coroutineScope {
+            val tally = coroutineContext[GridTileTally]
             val start = TimeSource.Monotonic.markNow()
             val sweep = SunShadeSweep(area, sun, cellDp)
             val reusable = kept?.takeIf { it.area.intersects(area) }?.tiles.orEmpty()
@@ -52,7 +55,7 @@ class OverlayRepository(
             // kept upwind tiles stay for the next daytime grid.
             if (sweep.isNight) {
                 kept = Kept(area, reusable + ground.mapNotNull { (key, tile) -> tile?.let { key to it } })
-                record(ground, reusable, before)
+                record(ground, reusable, before, tally)
                 log("Overlay at night: ${ground.size} ground tiles in ${start.elapsedNow().inWholeMilliseconds} ms")
                 return@coroutineScope sweep.night(ground)
             }
@@ -67,7 +70,7 @@ class OverlayRepository(
                     }
                 }
             val grid = sweep.assemble(parts.awaitAll())
-            val sources = record(tiles, reusable, before)
+            val sources = record(tiles, reusable, before, tally)
             log(
                 "Overlay tiles: ${tiles.size} (${sources.kept} kept, ${sources.disk} from store, ${sources.network} from network, " +
                     "${sources.memory} in memory, ${sources.unavailable} unavailable) in ${loaded.inWholeMilliseconds} ms; " +
@@ -81,11 +84,13 @@ class OverlayRepository(
     /**
      * Counts [tiles] by source for the debug box (settings spec, "Debug info"). Other features
      * loading tiles at the same time can inflate the disk and network counts at memory's expense.
+     * Within a [tally], the counts of its grids so far are shown.
      */
     private fun record(
         tiles: Map<TileKey, HeightTile?>,
         reusable: Map<TileKey, HeightTile>,
         before: TileLoads,
+        tally: GridTileTally?,
     ): TileSources {
         val kept = tiles.keys.count { it in reusable }
         val unavailable = tiles.values.count { it == null }
@@ -94,7 +99,8 @@ class OverlayRepository(
         val memory = (tiles.size - kept - unavailable - disk - network).coerceAtLeast(0)
         val sources = TileSources(kept, memory, disk, network, unavailable)
         val held = memoryTiles()
-        debug.update { it.copy(gridTiles = sources, memoryTiles = held ?: it.memoryTiles) }
+        val shown = tally?.add(sources) ?: sources
+        debug.update { it.copy(gridTiles = shown, memoryTiles = held ?: it.memoryTiles) }
         return sources
     }
 
@@ -114,4 +120,28 @@ class OverlayRepository(
         val b = GeoBounds.of(other)
         return a.south <= b.north && b.south <= a.north && a.west <= b.east && b.west <= a.east
     }
+}
+
+/**
+ * Adds up the tiles of the grids computed within it, e.g. the parts of one step combined with an
+ * earlier day's grid, for the debug box's `Grid tiles` (design D3 of overlay-pan-reuse).
+ */
+class GridTileTally : AbstractCoroutineContextElement(GridTileTally) {
+    private var total: TileSources? = null
+
+    @Synchronized
+    fun add(sources: TileSources): TileSources =
+        (
+            total?.let {
+                TileSources(
+                    it.kept + sources.kept,
+                    it.memory + sources.memory,
+                    it.disk + sources.disk,
+                    it.network + sources.network,
+                    it.unavailable + sources.unavailable,
+                )
+            } ?: sources
+        ).also { total = it }
+
+    companion object Key : CoroutineContext.Key<GridTileTally>
 }
