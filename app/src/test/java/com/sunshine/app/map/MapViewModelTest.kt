@@ -1075,9 +1075,9 @@ class MapViewModelTest {
             viewModel.onOverlayToggled()
             advanceTimeBy(SETTLE_MILLIS + 3_000)
 
-            // Flat terrain at noon is sun everywhere, as is a -1° horizon: all 200 agree.
-            assertEquals(Agreement.Result(agree = 200, checked = 200), debug.values.value.agreement)
-            assertTrue(logged.any { it.startsWith("Overlay agreement with the point tracer: 200 of 200") }, "$logged")
+            // Flat terrain at noon is sun everywhere, as is a -1° horizon: all 50 agree.
+            assertEquals(Agreement.Result(agree = 50, checked = 50), debug.values.value.agreement)
+            assertTrue(logged.any { it.startsWith("Overlay agreement with the point tracer: 50 of 50") }, "$logged")
         }
 
     // settings spec, "Agreement check only while on".

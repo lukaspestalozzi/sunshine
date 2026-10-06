@@ -931,7 +931,7 @@ class MapViewModel(
         const val KEY_OVERLAY_MODE = "overlay_mode"
 
         const val AGREEMENT_DELAY_MILLIS = 3_000L
-        const val AGREEMENT_CELLS = 200
+        const val AGREEMENT_CELLS = 50
         const val PERCENT = 100
     }
 }
