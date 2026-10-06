@@ -701,6 +701,7 @@ class MapViewModel(
                         day.area.widthDp,
                         day.area.heightDp,
                         day.area.zoom,
+                        day.reusedShare,
                     ),
                 cache = cacheState(),
             )
