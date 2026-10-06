@@ -443,6 +443,8 @@ class MapViewModel(
                                     try {
                                         val took = measureTime { newDay.computeRest { mutableSelectedTime.value } }
                                         debug.update { it.copy(day = DayTiming(newDay.steps.size, newDay.nightSteps, took)) }
+                                        // The progress may stop before it sees the last step.
+                                        recordDay(newDay)
                                         log(
                                             "Overlay day ${newDay.date}: ${newDay.computed.value} of ${newDay.steps.size} steps, " +
                                                 "${newDay.nightSteps} at night, in ${took.inWholeMilliseconds} ms",
@@ -610,6 +612,8 @@ class MapViewModel(
                     // The grids run on the background dispatcher, as for the overlay's day.
                     val took = measureTime { day.computeAll { mutableSelectedTime.value } }
                     debug.update { it.copy(day = DayTiming(day.steps.size, day.nightSteps, took)) }
+                    // The progress may stop before it sees the last step.
+                    recordDay(day)
                     log(
                         "Overlay day ${day.date} at ${day.cellDp.toInt()} dp every ${day.stepMinutes} min: " +
                             "${day.computed.value} of ${day.steps.size} steps, ${day.nightSteps} at night, in ${took.inWholeMilliseconds} ms",
