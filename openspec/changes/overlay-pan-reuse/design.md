@@ -100,6 +100,23 @@ directly with a fresh day's.
 | Heatmap counting over a combined day | ≤ 2 s on the phone | `Sun hours` line, device check |
 | A time change to a computed step of a combined day | ≤ 100 ms | existing spec scenario, device check |
 
+### Device results (user's phone, 2026-10-06; `Normal`, map zoom 12.0, 411×891 dp, day 2026-10-09)
+
+| Day | Centre | `Reused` | `Day` line | `Grid … image` |
+|---|---|---|---|---|
+| Fresh | 46.6778° N, 8.1365° E | 0 % | 288 steps (146 night) 235.2 s | 441 ms, 62 ms |
+| After a pan | 46.6552° N, 8.0944° E | 33 % | 288 steps (146 night) 47.6 s | 493 ms, 85 ms |
+
+- The pan was 245 dp west and 192 dp south (0.6 and 0.2 of the screen), not half a screen east:
+  the earlier area covers (411 − 245) · (891 − 192) / (411 · 891) = 32 % of the new one, as shown.
+- The reused day took 20 % of the fresh one. The fresh day loaded its tiles from the store (the
+  first day there), so this overstates the saving; against round 3's fresh day of polish-overlay
+  (83.8 s, another area) it is 57 %. Both are within the 70 % budget. An earlier pan near the first
+  centre: `Reused 35 %`, `Day` 53.0 s, image 72 ms.
+- The overlay covered the whole screen; the image stays within 100 ms.
+- The debug box showed `Day 287/288 steps` for the finished day: the progress stopped before it
+  saw the last step. Fixed: the day state is recorded once more when a day finishes.
+
 ## Risks / Trade-offs
 
 - [A visible seam between the base and a part] → Both sides are correct to their sun position (≤ 2
