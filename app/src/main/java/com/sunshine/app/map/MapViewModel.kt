@@ -41,6 +41,7 @@ import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.random.Random
+import kotlin.time.Duration
 import kotlin.time.measureTime
 import kotlin.time.measureTimedValue
 import kotlinx.coroutines.CancellationException
@@ -213,7 +214,7 @@ class MapViewModel(
     private val elevationRepository: ElevationRepository,
     private val horizonProfile: suspend (GeoPoint) -> HorizonProfile?,
     private val overlayGrid: suspend (MapArea, SunPosition, Double) -> ShadeGrid,
-    computeDispatcher: CoroutineDispatcher,
+    private val computeDispatcher: CoroutineDispatcher,
     private val dayDispatcher: CoroutineDispatcher? = null,
     private val dayCache: DayCache = DayCache(DEFAULT_DAY_CACHE_BYTES),
     private val log: (String) -> Unit = {},
@@ -476,53 +477,20 @@ class MapViewModel(
                             !unchanged
                     if (!sameDay) {
                         dayJob?.cancelAndJoin()
-                        var cached = dayCache.get(area, date, input.cellDp, input.stepMinutes)
-                        // A day with unknown cells is computed anew while online, as after a reconnect (D14).
-                        if (cached != null && input.online && cached.hasUnknown) {
-                            dayCache.remove(cached)
-                            cached = null
-                        }
                         val newDay =
-                            cached ?: DayOverlay(
-                                area,
-                                date,
-                                zone,
-                                overlayGrid,
-                                dayDispatcher ?: computeDispatcher,
-                                input.stepMinutes,
-                                input.cellDp,
-                                // An earlier day covering part of the area (design D1 of overlay-pan-reuse).
-                                dayCache.reusable(area, date, input.cellDp, input.stepMinutes, input.online),
-                            )
+                            cachedDay(area, date, input.cellDp, input.stepMinutes, input.online)
+                                ?: newDay(area, date, input.cellDp, input.stepMinutes, input.online)
                         day = newDay
                         overlayDay.value = newDay
                         recordDay(newDay)
                         dayJob =
                             dayDispatcher?.takeIf { newDay.computed.value < newDay.steps.size }?.let {
                                 launch {
-                                    val progress =
-                                        launch {
-                                            newDay.computed.collect {
-                                                // Cached once it has a grid; each step may push older days out.
-                                                if (it > 0) {
-                                                    dayCache.put(newDay)
-                                                    dayCache.trim(keep = newDay)
-                                                }
-                                                recordDay(newDay)
-                                            }
-                                        }
-                                    try {
-                                        val took = measureTime { newDay.computeRest { mutableSelectedTime.value } }
-                                        debug.update { it.copy(day = DayTiming(newDay.steps.size, newDay.nightSteps, took)) }
-                                        // The progress may stop before it sees the last step.
-                                        recordDay(newDay)
-                                        log(
-                                            "Overlay day ${newDay.date}: ${newDay.computed.value} of ${newDay.steps.size} steps, " +
-                                                "${newDay.nightSteps} at night, in ${took.inWholeMilliseconds} ms",
-                                        )
-                                    } finally {
-                                        withContext(NonCancellable) { progress.cancelAndJoin() }
-                                    }
+                                    val took = runDay(newDay, newDay::computeRest)
+                                    log(
+                                        "Overlay day ${newDay.date}: ${newDay.computed.value} of ${newDay.steps.size} steps, " +
+                                            "${newDay.nightSteps} at night, in ${took.inWholeMilliseconds} ms",
+                                    )
                                 }
                             }
                     }
@@ -624,23 +592,8 @@ class MapViewModel(
                         if (!input.online || !current.hasUnknown) return@collect
                     }
                     job?.cancelAndJoin()
-                    var cached = dayCache.get(area, input.date, input.cellDp, input.stepMinutes)
-                    // A day with unknown cells is computed anew while online, as for the overlay (D14 of #5).
-                    if (cached != null && input.online && cached.hasUnknown) {
-                        dayCache.remove(cached)
-                        cached = null
-                    }
-                    val newDay =
-                        cached ?: DayOverlay(
-                            area,
-                            input.date,
-                            zone,
-                            overlayGrid,
-                            dayDispatcher ?: computeDispatcher,
-                            input.stepMinutes,
-                            input.cellDp,
-                            dayCache.reusable(area, input.date, input.cellDp, input.stepMinutes, input.online),
-                        )
+                    val cached = cachedDay(area, input.date, input.cellDp, input.stepMinutes, input.online)
+                    val newDay = cached ?: newDay(area, input.date, input.cellDp, input.stepMinutes, input.online)
                     day = newDay
                     heatmapDay.value = newDay
                     recordDay(newDay)
@@ -667,30 +620,12 @@ class MapViewModel(
             if (day.computed.value < day.steps.size) {
                 if (dayDispatcher == null) return@coroutineScope null
                 if (settle) delay(SETTLE_MILLIS)
-                val progress =
-                    launch {
-                        day.computed.collect {
-                            // Cached once it has a grid; each step may push older days out.
-                            if (it > 0) {
-                                dayCache.put(day)
-                                dayCache.trim(keep = day)
-                            }
-                            recordDay(day)
-                        }
-                    }
-                try {
-                    // The grids run on the background dispatcher, as for the overlay's day.
-                    val took = measureTime { day.computeAll { mutableSelectedTime.value } }
-                    debug.update { it.copy(day = DayTiming(day.steps.size, day.nightSteps, took)) }
-                    // The progress may stop before it sees the last step.
-                    recordDay(day)
-                    log(
-                        "Overlay day ${day.date} at ${day.cellDp.toInt()} dp every ${day.stepMinutes} min: " +
-                            "${day.computed.value} of ${day.steps.size} steps, ${day.nightSteps} at night, in ${took.inWholeMilliseconds} ms",
-                    )
-                } finally {
-                    withContext(NonCancellable) { progress.cancelAndJoin() }
-                }
+                // The grids run on the background dispatcher, as for the overlay's day.
+                val took = runDay(day, day::computeAll)
+                log(
+                    "Overlay day ${day.date} at ${day.cellDp.toInt()} dp every ${day.stepMinutes} min: " +
+                        "${day.computed.value} of ${day.steps.size} steps, ${day.nightSteps} at night, in ${took.inWholeMilliseconds} ms",
+                )
             }
             val counted = day.counted
             val (hours, counting) = measureTimedValue { day.sunHours() }
@@ -761,6 +696,70 @@ class MapViewModel(
             }
         }
     }
+
+    // The cached day of these inputs, or `null`. A day with unknown cells is dropped and computed anew
+    // while online, as after a reconnect (design D14 of add-sun-shade-overlay).
+    private fun cachedDay(
+        area: MapArea,
+        date: LocalDate,
+        cellDp: Double,
+        stepMinutes: Int,
+        online: Boolean,
+    ): DayOverlay? {
+        val cached = dayCache.get(area, date, cellDp, stepMinutes) ?: return null
+        if (online && cached.hasUnknown) {
+            dayCache.remove(cached)
+            return null
+        }
+        return cached
+    }
+
+    // A new day, reusing an earlier day that covers part of the area (design D1 of overlay-pan-reuse).
+    private fun newDay(
+        area: MapArea,
+        date: LocalDate,
+        cellDp: Double,
+        stepMinutes: Int,
+        online: Boolean,
+    ) = DayOverlay(
+        area,
+        date,
+        zone,
+        overlayGrid,
+        dayDispatcher ?: computeDispatcher,
+        stepMinutes,
+        cellDp,
+        dayCache.reusable(area, date, cellDp, stepMinutes, online),
+    )
+
+    // Runs [compute] on [day] (its computeRest or computeAll) and returns how long it took. Meanwhile
+    // the day is cached once it has a grid, each step may push older days out, and the debug box
+    // follows its progress.
+    private suspend fun runDay(
+        day: DayOverlay,
+        compute: suspend (selected: () -> ZonedDateTime) -> Unit,
+    ): Duration =
+        coroutineScope {
+            val progress =
+                launch {
+                    day.computed.collect {
+                        if (it > 0) {
+                            dayCache.put(day)
+                            dayCache.trim(keep = day)
+                        }
+                        recordDay(day)
+                    }
+                }
+            try {
+                val took = measureTime { compute { mutableSelectedTime.value } }
+                debug.update { it.copy(day = DayTiming(day.steps.size, day.nightSteps, took)) }
+                // The progress may stop before it sees the last step.
+                recordDay(day)
+                took
+            } finally {
+                withContext(NonCancellable) { progress.cancelAndJoin() }
+            }
+        }
 
     // The day of the shown overlay mode and the cache of days, for the debug box (design D4 of polish-overlay).
     private fun recordDay(day: DayOverlay) =
