@@ -59,10 +59,11 @@ tasks.withType<Test>().configureEach {
 // Room's bundled SQLite driver needs its native library in JVM unit tests. The Android artifact
 // carries only Android ABIs, so the host's copy is taken from the desktop JVM artifact (design D5
 // of add-offline-regions).
-val sqliteNatives: Configuration by configurations.creating {
-    isTransitive = false
-    attributes.attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
-}
+val sqliteNatives: Configuration =
+    configurations.create("sqliteNatives") {
+        isTransitive = false
+        attributes.attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
+    }
 
 dependencies {
     sqliteNatives(libs.sqlite.bundled.jvm)
@@ -79,10 +80,11 @@ val hostNatives: String =
         }
     }
 
-val extractSqliteNatives by tasks.registering(Sync::class) {
-    from({ zipTree(sqliteNatives.singleFile) }) { include("natives/$hostNatives/**") }
-    into(layout.buildDirectory.dir("sqlite-natives"))
-}
+val extractSqliteNatives =
+    tasks.register<Sync>("extractSqliteNatives") {
+        from({ zipTree(sqliteNatives.singleFile) }) { include("natives/$hostNatives/**") }
+        into(layout.buildDirectory.dir("sqlite-natives"))
+    }
 
 tasks.withType<Test>().configureEach {
     dependsOn(extractSqliteNatives)
