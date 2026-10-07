@@ -16,9 +16,7 @@ data class Validators(
 class StoredTile(
     val bytes: ByteArray?,
     val validators: Validators,
-) {
-    val isFound: Boolean get() = bytes != null
-}
+)
 
 /**
  * The persistent DEM tiles (design D5 of add-offline-regions): one file per tile under

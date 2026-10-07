@@ -49,12 +49,10 @@ data class MapArea(
         val latitude = Math.toDegrees(atan(sinh(PI * (1 - 2 * y / worldDp))))
         return GeoPoint(latitude.coerceIn(-MAX_MAP_LATITUDE, MAX_MAP_LATITUDE), longitude)
     }
-
-    private companion object {
-        const val MAP_TILE_DP = 512.0
-        const val MAX_MAP_LATITUDE = 85.0511287798
-    }
 }
+
+/** Width of a map tile in dp, as MapLibre lays out its 512 px tiles: the world is 512 · 2^zoom dp wide. */
+const val MAP_TILE_DP = 512.0
 
 /** A point of [GnomonicFrame.forwardGrid]: its row-major [index] and plane coordinates. */
 internal fun interface PlaneVisitor {

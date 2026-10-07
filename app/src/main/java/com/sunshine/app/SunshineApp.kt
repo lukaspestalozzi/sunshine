@@ -17,6 +17,7 @@ import com.sunshine.app.offline.AmbientLimit
 import com.sunshine.app.offline.DemTileStore
 import com.sunshine.app.offline.DownloadNotification
 import com.sunshine.app.offline.DownloadWork
+import com.sunshine.app.offline.MEBIBYTE
 import com.sunshine.app.offline.MapLibreRegionPart
 import com.sunshine.app.offline.OfflineDatabase
 import com.sunshine.app.offline.RegionDeleter
@@ -260,7 +261,6 @@ class SunshineApp : Application() {
 
     private companion object {
         const val MAX_TILE_REQUESTS_PER_HOST = 20
-        const val MEBIBYTE = 1024L * 1024
         const val MAP_DATABASE = "mbgl-offline"
         const val SETTINGS_FILE = "datastore/settings.preferences_pb"
         const val NANOS_PER_MILLI = 1_000_000

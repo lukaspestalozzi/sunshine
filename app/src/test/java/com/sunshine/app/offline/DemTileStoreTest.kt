@@ -33,9 +33,8 @@ class DemTileStoreTest {
             store.putMissing(B, validators(), region = null)
 
             val found = store.get(A)!!
-            assertTrue(found.isFound)
             assertArrayEquals(BYTES, found.bytes)
-            assertFalse(store.get(B)!!.isFound)
+            assertNull(store.get(B)!!.bytes)
             assertNull(store.get(C))
         }
 
@@ -130,7 +129,7 @@ class DemTileStoreTest {
             assertNull(store.get(B))
             assertFalse(File(directory, "12/1/1.webp").exists())
             assertArrayEquals(BIG, store.get(R)!!.bytes)
-            assertFalse(store.get(D)!!.isFound)
+            assertNull(store.get(D)!!.bytes)
             assertEquals(0, store.browsedBytes())
             assertEquals(BIG.size.toLong(), store.totalBytes())
         }

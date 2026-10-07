@@ -120,7 +120,7 @@ private fun samplesAround(
     zoom: Int,
     tileSize: Int,
 ): Neighbourhood? {
-    if (point.latitude !in -MAX_LATITUDE..MAX_LATITUDE) return null
+    if (point.latitude !in -MAX_MAP_LATITUDE..MAX_MAP_LATITUDE) return null
     val worldPixels = (1L shl zoom) * tileSize
     // Global pixel coordinates relative to pixel centres.
     val x = (point.longitude + 180.0) / 360.0 * worldPixels - 0.5
@@ -144,4 +144,4 @@ private fun samplesAround(
 }
 
 /** Latitude limit of the square Web-Mercator world. */
-private const val MAX_LATITUDE = 85.0511287798
+internal const val MAX_MAP_LATITUDE = 85.0511287798

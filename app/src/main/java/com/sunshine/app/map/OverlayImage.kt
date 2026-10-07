@@ -1,6 +1,7 @@
 package com.sunshine.app.map
 
 import com.sunshine.core.GeoPoint
+import com.sunshine.core.MAP_TILE_DP
 import com.sunshine.core.MapArea
 import com.sunshine.core.StepGrid
 import com.sunshine.core.Sunshine
@@ -73,7 +74,6 @@ internal fun isHatched(
     y: Int,
 ): Boolean = (x + y) % HATCH_PERIOD < HATCH_WIDTH
 
-private const val MAP_TILE_DP = 512.0
 private const val TRANSPARENT = 0
 
 // An area 850.0000001 dp high still has 850 rows.
