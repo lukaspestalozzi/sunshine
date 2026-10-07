@@ -6,6 +6,7 @@ import com.sunshine.core.WholeDay
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.Duration
+import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -18,6 +19,25 @@ import kotlin.math.abs
 
 /** E.g. `2025-12-21 12:00 UTC+1`. */
 fun formatSelectedTime(time: ZonedDateTime): String = "${time.format(DATE_TIME)} ${formatUtcOffset(time.offset)}"
+
+/**
+ * The selected time in the panel's header, e.g. `Sun 21 Dec · 12:00` (time-selection spec, "Time zone
+ * of the selected time"; design D2 of polish-ui): the year only when it is not [today]'s, the UTC
+ * offset only on a day whose offset changes.
+ */
+fun formatHeaderTime(
+    time: ZonedDateTime,
+    today: LocalDate,
+): String {
+    val date = time.toLocalDate()
+    val day = time.format(if (date.year == today.year) HEADER_DAY else HEADER_DAY_YEAR)
+    val rules = time.zone.rules
+    val clockChange =
+        rules.getOffset(date.atStartOfDay(time.zone).toInstant()) !=
+            rules.getOffset(date.plusDays(1).atStartOfDay(time.zone).toInstant())
+    val offset = if (clockChange) " ${formatUtcOffset(time.offset)}" else ""
+    return "$day · ${time.format(TIME)}$offset"
+}
 
 /** Whole degrees and the 8-point compass direction of the rounded value, e.g. `173° S`. */
 fun formatAzimuth(azimuth: Double): String {
@@ -121,6 +141,8 @@ private fun roundHalfUp(
 
 private val DATE_TIME = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm", Locale.ROOT)
 private val TIME = DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT)
+private val HEADER_DAY = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)
+private val HEADER_DAY_YEAR = DateTimeFormatter.ofPattern("EEE d MMM uuuu", Locale.ENGLISH)
 private val COMPASS = listOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
 private const val FULL_CIRCLE = 360
 private const val SECTOR_DOUBLED = 90
