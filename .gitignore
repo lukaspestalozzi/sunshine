@@ -72,4 +72,3 @@ Thumbs.db
 # Virtual machine crash logs
 hs_err_pid*
 replay_pid*
-.local-tools/
