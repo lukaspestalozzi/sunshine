@@ -1,13 +1,17 @@
 package com.sunshine.app.map
 
 import com.sunshine.core.AZIMUTH_COUNT
+import com.sunshine.core.AZIMUTH_STEP
 import com.sunshine.core.GeoPoint
 import com.sunshine.core.HeightTile
 import com.sunshine.core.HorizonProfile
 import com.sunshine.core.MapArea
+import com.sunshine.core.SunPeriods
 import com.sunshine.core.SunPosition
 import com.sunshine.core.SunShadeSweep
 import com.sunshine.core.Sunshine
+import com.sunshine.core.sunPeriods
+import java.time.Duration
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -68,6 +72,27 @@ class TapeStripTest {
         assertEquals(Sunshine.SUN, tracerState(profile, INTERLAKEN, times[144]))
         assertEquals(Sunshine.SHADE, tracerState(profile, INTERLAKEN, times[114]))
         assertEquals(Sunshine.UNKNOWN, tracerState(null, INTERLAKEN, times[144]))
+    }
+
+    // Scenario "Overlay off in Interlaken": the strip is sun where the headline's periods say so and
+    // terrain shade between them (±1 step). A horizon with a notch at noon gives two periods, as there.
+    @Test
+    fun `from the horizon the strip is sun within the day's sun periods and shade between them`() {
+        val times = TapeScale(DECEMBER_21, ZURICH, step = 5).times()
+        val angles = DoubleArray(AZIMUTH_COUNT) { if (it * AZIMUTH_STEP in 178.0..182.0) 40.0 else 10.0 }
+        val profile = HorizonProfile(eyeHeight = 568.0, angles = angles, upper = angles.copyOf())
+        val periods = (sunPeriods(profile, INTERLAKEN, DECEMBER_21, ZURICH) as SunPeriods.Known).periods
+
+        val strip = tapeStrip(nightSteps(INTERLAKEN, times)) { tracerState(profile, INTERLAKEN, times[it]) }
+
+        assertEquals(2, periods.size)
+        val boundaries = periods.flatMap { listOf(it.start, it.end) }
+        for ((i, time) in times.withIndex()) {
+            if (strip[i] == StripState.NIGHT || boundaries.any { Duration.between(it, time).abs() < Duration.ofMinutes(5) }) continue
+            val sunny = periods.any { !time.isBefore(it.start) && time.isBefore(it.end) }
+            assertEquals(if (sunny) StripState.SUN else StripState.SHADE, strip[i], "$time")
+        }
+        assertEquals(setOf(StripState.NIGHT, StripState.SUN, StripState.SHADE), strip.toSet())
     }
 
     @Test
