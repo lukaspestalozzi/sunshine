@@ -25,7 +25,8 @@ See proposal.md for the motivation and the specs for the behaviour. Relevant cur
   `SettingsStore` setters, read once at start.
 - **Tests.** No Compose UI tests: behaviour is tested through pure functions and the view model on
   the JVM (JUnit 6); look and gestures are checked on the device. Material 3 is 1.4.0 (Compose BOM
-  2026.09.00): `TopAppBar` is available; its `TimePicker` and `TooltipBox` are experimental.
+  2026.09.00): its `TopAppBar`, `TimePicker` and `TooltipBox` are experimental (found while
+  applying; see D6, D8 and D11).
 
 ## Goals / Non-Goals
 
