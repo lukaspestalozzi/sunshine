@@ -32,7 +32,7 @@ Device checks (7.1–7.4) are done by the user at the end, on the debug APK of t
 
 ## 6. Docs and the full check
 
-- [ ] 6.1 Update `CLAUDE.md`'s `app/` row (time tape, strip, panel, hint, top bars; the slider and the progress bar gone). Verify: `./scripts/verify-local.sh` passes.
+- [x] 6.1 Update `CLAUDE.md`'s `app/` row (time tape, strip, panel, hint, top bars; the slider and the progress bar gone). Verify: `./scripts/verify-local.sh` passes.
 
 ## 7. Device checks
 
