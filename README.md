@@ -81,4 +81,9 @@ limited to 5 requests per second per server.
 
 ## Licence
 
-No licence has been chosen yet, so all rights are reserved.
+Sunshine is free software: you can redistribute it and/or modify it under the terms of the GNU
+General Public License as published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version (SPDX: `GPL-3.0-or-later`). It is distributed
+without any warranty. See [`LICENSE`](LICENSE) for the full text.
+
+The map and elevation data and the icons keep their own licences (see "Data sources").
