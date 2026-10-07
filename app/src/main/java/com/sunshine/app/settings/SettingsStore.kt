@@ -59,6 +59,10 @@ class SettingsStore private constructor(
 
     suspend fun setLastView(view: LastView) = edit { it.putAll(*SettingsKeys.lastView(view)) }
 
+    suspend fun setDetailsExpanded(expanded: Boolean) = edit { it[SettingsKeys.DETAILS_EXPANDED] = expanded }
+
+    suspend fun setHintDismissed() = edit { it[SettingsKeys.HINT_DISMISSED] = true }
+
     /** Applies [change] to the stored debug switches within one edit, so that quick successive changes all persist. */
     suspend fun setDebug(change: (DebugSwitches) -> DebugSwitches) =
         edit {

@@ -35,6 +35,7 @@ import com.sunshine.core.sunshineAt
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
@@ -48,6 +49,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -268,6 +270,9 @@ class MapViewModel(
         }.flowOn(computeDispatcher)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), initialValue = ElevationState.Loading)
 
+    // The last horizon computed, for the time tape's strip (design D5 of polish-ui).
+    private val computedHorizon = MutableStateFlow<HorizonState.Computed?>(null)
+
     // The horizon of the camera centre, recomputed when the centre changes or the network returns
     // after an incomplete result. Latest wins, as for elevation. The camera must rest for
     // [SETTLE_MILLIS] first, so that panning starts no downloads (design D8).
@@ -287,6 +292,7 @@ class MapViewModel(
                             delay(SETTLE_MILLIS)
                             val computed = HorizonState.Computed(point, horizonProfile(point))
                             done.set(computed)
+                            computedHorizon.value = computed
                             send(computed)
                         }
                 }
@@ -312,15 +318,10 @@ class MapViewModel(
     // Size of the map in dp; `null` until the screen reports it.
     private val mapSize = MutableStateFlow<Pair<Double, Double>?>(null)
 
-    // The progress of each mode's day; only the shown mode's day runs (design D9 of add-sun-exposure-heatmap).
-    private val overlayDayProgress = MutableStateFlow<Float?>(null)
-    private val heatmapDayProgress = MutableStateFlow<Float?>(null)
-
-    /** Share of the day's slider steps computed while the day's computation runs, else `null` (design D11). */
-    val dayProgress: StateFlow<Float?> =
-        combine(mutableOverlayMode, overlayDayProgress, heatmapDayProgress) { mode, overlay, heatmap ->
-            if (mode == OverlayMode.SUN_HOURS) heatmap else overlay
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = null)
+    // The day of each mode while it is shown, else `null`; only the shown mode's day runs (design D9
+    // of add-sun-exposure-heatmap). The time tape's strip shows its progress (design D5 of polish-ui).
+    private val overlayDay = MutableStateFlow<DayOverlay?>(null)
+    private val heatmapDay = MutableStateFlow<DayOverlay?>(null)
 
     // The `Sun & shade` overlay is computed only while it is shown (design D9 of add-sun-exposure-heatmap).
     private val sunAndShadeShown = combine(mutableOverlayOn, mutableOverlayMode) { on, mode -> on && mode == OverlayMode.SUN_AND_SHADE }
@@ -340,6 +341,65 @@ class MapViewModel(
     val sliderStep: StateFlow<Int> =
         combine(sunAndShadeShown, resolution) { shown, _ -> stepFor(shown) }
             .stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = stepFor(isSunAndShadeShown()))
+
+    // The camera centre once the camera has rested for [SETTLE_MILLIS], as the horizon and the
+    // overlay wait. Latest wins, as for the horizon.
+    private val restedCenter: Flow<GeoPoint> =
+        channelFlow {
+            var wait: Job? = null
+            camera.map { it.center }.distinctUntilChanged().collect { point ->
+                wait?.cancel()
+                wait =
+                    launch {
+                        delay(SETTLE_MILLIS)
+                        send(point)
+                    }
+            }
+        }
+
+    /**
+     * The states of the time tape's steps at the rested crosshair (time-selection spec, "Time tape
+     * strip"; design D5 of polish-ui): from the shown mode's day while it belongs to the crosshair,
+     * updated at each computed step, else from the crosshair's horizon; not computed while neither
+     * is there. While the camera moves, the states stay.
+     */
+    val tapeStrip: StateFlow<List<StripState>> =
+        channelFlow {
+            var job: Job? = null
+            combine(
+                restedCenter,
+                selectedTime.map { it.toLocalDate() }.distinctUntilChanged(),
+                sliderStep,
+                computedHorizon,
+                combine(overlayDay, heatmapDay) { overlay, heatmap -> overlay ?: heatmap },
+            ) { point, date, step, horizon, day -> StripInput(point, date, step, horizon, day) }
+                .collect { input ->
+                    job?.cancelAndJoin()
+                    job = launch { stripOf(input) }
+                }
+        }.flowOn(computeDispatcher)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), initialValue = emptyList())
+
+    private suspend fun ProducerScope<List<StripState>>.stripOf(input: StripInput) {
+        val point = input.point
+        val times = TapeScale(input.date, zone, input.step).times()
+        val night = nightSteps(point, times)
+        val day = input.day?.takeIf { it.area.center == point && it.date == input.date }
+        if (day != null) {
+            day.computed.collect { send(tapeStrip(night) { dayState(day, point, it * input.step.toFloat()) }) }
+        } else {
+            val horizon = input.horizon?.takeIf { it.point == point }
+            send(tapeStrip(night) { step -> horizon?.let { tracerState(it.profile, point, times[step]) } })
+        }
+    }
+
+    private class StripInput(
+        val point: GeoPoint,
+        val date: LocalDate,
+        val step: Int,
+        val horizon: HorizonState.Computed?,
+        val day: DayOverlay?,
+    )
 
     // The overlay of the visible area at the selected time (design D8 of add-sun-shade-overlay).
     // Latest wins, as for the horizon. A camera move waits [SETTLE_MILLIS]; a time change starts at
@@ -373,6 +433,7 @@ class MapViewModel(
                         lookup?.cancelAndJoin()
                         dayJob?.cancelAndJoin()
                         day = null
+                        overlayDay.value = null
                         shown.set(null)
                         debug.update { it.copy(shown = null) }
                         requestedTime = null
@@ -423,6 +484,7 @@ class MapViewModel(
                                 dayCache.reusable(area, date, input.cellDp, input.stepMinutes, input.online),
                             )
                         day = newDay
+                        overlayDay.value = newDay
                         recordDay(newDay)
                         dayJob =
                             dayDispatcher?.takeIf { newDay.computed.value < newDay.steps.size }?.let {
@@ -435,8 +497,6 @@ class MapViewModel(
                                                     dayCache.put(newDay)
                                                     dayCache.trim(keep = newDay)
                                                 }
-                                                overlayDayProgress.value =
-                                                    it.toFloat() / newDay.steps.size
                                                 recordDay(newDay)
                                             }
                                         }
@@ -450,9 +510,7 @@ class MapViewModel(
                                                 "${newDay.nightSteps} at night, in ${took.inWholeMilliseconds} ms",
                                         )
                                     } finally {
-                                        // Joined, so that no late progress value follows the null.
                                         withContext(NonCancellable) { progress.cancelAndJoin() }
-                                        overlayDayProgress.value = null
                                     }
                                 }
                             }
@@ -538,6 +596,7 @@ class MapViewModel(
                     if (area == null) {
                         job?.cancelAndJoin()
                         day = null
+                        heatmapDay.value = null
                         // Kept across a switch to `Sun & shade`, so that switching back is at once.
                         if (!input.on) kept.set(null)
                         send(if (input.shown && input.camera.zoom < MIN_OVERLAY_ZOOM) HeatmapUiState.ZoomedOut else HeatmapUiState.Off)
@@ -572,6 +631,7 @@ class MapViewModel(
                             dayCache.reusable(area, input.date, input.cellDp, input.stepMinutes, input.online),
                         )
                     day = newDay
+                    heatmapDay.value = newDay
                     recordDay(newDay)
                     val previous = kept.get()
                     val counted = newDay.counted
@@ -604,7 +664,6 @@ class MapViewModel(
                                 dayCache.put(day)
                                 dayCache.trim(keep = day)
                             }
-                            heatmapDayProgress.value = it.toFloat() / day.steps.size
                             recordDay(day)
                         }
                     }
@@ -619,9 +678,7 @@ class MapViewModel(
                             "${day.computed.value} of ${day.steps.size} steps, ${day.nightSteps} at night, in ${took.inWholeMilliseconds} ms",
                     )
                 } finally {
-                    // Joined, so that no late progress value follows the null.
                     withContext(NonCancellable) { progress.cancelAndJoin() }
-                    heatmapDayProgress.value = null
                 }
             }
             val counted = day.counted
@@ -859,6 +916,16 @@ class MapViewModel(
 
     /** Sets the current time once; the selected time does not follow the clock. */
     fun onNowClicked() = select(now())
+
+    /**
+     * Selects [hour]:[minute] on the selected date from the clock dialog (time-selection spec, "Exact
+     * time"; design D6 of polish-ui): a time in a spring-forward gap moves forward by the gap, one that
+     * occurs twice is the first, before the clocks go back.
+     */
+    fun onTimeTyped(
+        hour: Int,
+        minute: Int,
+    ) = select(ZonedDateTime.of(selectedTime.value.toLocalDate(), LocalTime.of(hour, minute), zone))
 
     // Saved so the selected time survives rotation and process death; a new launch starts at now.
     // While `Sun & shade` is shown, the time is a step of its day (design D4 of add-settings).

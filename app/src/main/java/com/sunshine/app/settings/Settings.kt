@@ -41,6 +41,10 @@ data class Settings(
     val browsedLimitMib: Int = 512,
     val lastView: LastView? = null,
     val debug: DebugSwitches = DebugSwitches(),
+    /** Whether the panel's details are expanded (sun-position spec, "Sun information panel"); not on the Settings page. */
+    val detailsExpanded: Boolean = false,
+    /** Whether the first-run hint has been dismissed (map-view spec, "First-run hint"); not on the Settings page. */
+    val hintDismissed: Boolean = false,
 ) {
     /** The cell sizes and steps in use. */
     val resolution: Resolution get() = preset.resolution(custom)
@@ -70,6 +74,8 @@ object SettingsKeys {
     val DEBUG_TILES = booleanPreferencesKey("debug_tiles")
     val DEBUG_DAY_STATE = booleanPreferencesKey("debug_day_state")
     val DEBUG_AGREEMENT = booleanPreferencesKey("debug_agreement_check")
+    val DETAILS_EXPANDED = booleanPreferencesKey("details_expanded")
+    val HINT_DISMISSED = booleanPreferencesKey("hint_dismissed")
 
     fun lastView(view: LastView): Array<Preferences.Pair<*>> =
         arrayOf(LAST_LATITUDE to view.latitude, LAST_LONGITUDE to view.longitude, LAST_ZOOM to view.zoom)
@@ -116,6 +122,8 @@ fun decode(preferences: Preferences): Settings {
                 dayState = preferences.read(SettingsKeys.DEBUG_DAY_STATE) ?: false,
                 agreementCheck = preferences.read(SettingsKeys.DEBUG_AGREEMENT) ?: false,
             ),
+        detailsExpanded = preferences.read(SettingsKeys.DETAILS_EXPANDED) ?: defaults.detailsExpanded,
+        hintDismissed = preferences.read(SettingsKeys.HINT_DISMISSED) ?: defaults.hintDismissed,
     )
 }
 

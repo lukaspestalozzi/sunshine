@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -37,17 +36,15 @@ import java.time.ZonedDateTime
 
 /**
  * The three-way overlay toggle showing [option] and, while the overlay is on, the status card of
- * its width below it: the mode's name, its [notice], directly below the notice (or the name) the
- * progress of the day's computation while it runs ([dayProgress] from 0 to 1, or `null`), and the
- * mode's legend (sun-shade-overlay spec, "Overlay toggle", "Overlay status card", "Overlay
- * appearance"; sun-exposure-heatmap spec, "Heatmap legend"; design D7 of add-sun-exposure-heatmap).
- * The heatmap's scale is shown once its [bands] are known.
+ * its width below it: the mode's name, its [notice] and the mode's legend (sun-shade-overlay spec,
+ * "Overlay toggle", "Overlay status card", "Overlay appearance"; sun-exposure-heatmap spec, "Heatmap
+ * legend"; design D7 of add-sun-exposure-heatmap). The day's progress is on the time tape (design D5
+ * of polish-ui). The heatmap's scale is shown once its [bands] are known.
  */
 @Composable
 fun OverlayControl(
     option: OverlayOption,
     @StringRes notice: Int?,
-    dayProgress: Float?,
     bands: HeatmapBands?,
     onOptionSelected: (OverlayOption) -> Unit,
     modifier: Modifier = Modifier,
@@ -64,7 +61,6 @@ fun OverlayControl(
             Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(stringResource(name), style = MaterialTheme.typography.labelLarge)
                 notice?.let { Text(stringResource(it), style = MaterialTheme.typography.labelMedium) }
-                dayProgress?.let { progress -> LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth()) }
                 legend()
                 LegendRow(R.string.overlay_legend_unknown) { drawHatching() }
             }

@@ -3,6 +3,7 @@ package com.sunshine.app.map
 import java.time.Duration
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZonedDateTime
 import kotlin.math.floor
 
 /**
@@ -20,6 +21,12 @@ class TapeScale(
 
     /** The day's last step, in minutes. */
     val lastMinutes: Float = (stepCount - 1f) * step
+
+    /** The time of every step, as the slider's positions (`sliderTime`). */
+    fun times(): List<ZonedDateTime> {
+        val start = date.atStartOfDay(zone)
+        return List(stepCount) { start.plusMinutes(it.toLong() * step) }
+    }
 
     /** The nearest step to [minutes], half up, within the day. */
     fun snap(minutes: Float): Float = (floor(minutes / step + HALF) * step).coerceIn(0f, lastMinutes)
