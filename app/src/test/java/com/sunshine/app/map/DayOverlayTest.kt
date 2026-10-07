@@ -335,6 +335,30 @@ class DayOverlayTest {
             assertEquals((2L * daytime + day.nightSteps) * GRID.stateBytes, day.bytes)
         }
 
+    // A reconnect recomputes a day with unknown cells (design D14 of add-sun-shade-overlay); an earlier
+    // grid kept for reuse brings its unknown cells along before it is combined.
+    @Test
+    fun `a reusing day has unknown cells from the start where an earlier daytime grid it keeps has them`() =
+        runTest {
+            val base = DayOverlay(AREA, DECEMBER_21, ZURICH, fakeGrid, StandardTestDispatcher(testScheduler))
+            base.compute(at(12, 0))
+            assertEquals(false, reusing(base, PANNED, mutableListOf()).hasUnknown)
+
+            val offline =
+                DayOverlay(
+                    AREA,
+                    DECEMBER_21,
+                    ZURICH,
+                    { _, sun, _ -> if (sun == sunAt(at(9, 0))) UNKNOWN_GRID else GRID },
+                    StandardTestDispatcher(testScheduler),
+                )
+            offline.compute(at(9, 0))
+            offline.compute(at(12, 0))
+            val day = reusing(offline, PANNED, mutableListOf())
+
+            assertEquals(true, day.hasUnknown)
+        }
+
     // A day of [area] reusing [base], recording the area and sun of each grid it requests in [requests].
     private fun TestScope.reusing(
         base: DayOverlay,

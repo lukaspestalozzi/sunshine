@@ -105,9 +105,12 @@ class DayOverlay(
 
     private val counting = Mutex()
 
-    /** Whether some stored grid has unknown cells (design D14). */
+    /**
+     * Whether some stored grid has unknown cells (design D14), or an earlier grid kept for reuse, whose
+     * cells its combined grid will carry.
+     */
     @Volatile
-    var hasUnknown: Boolean = false
+    var hasUnknown: Boolean = baseGrids.values.any { it.hasUnknown }
         private set
 
     // Fair, so a selected time waiting for it comes before the next background step.
