@@ -5,14 +5,18 @@ The map screen SHALL permanently show a panel, without covering the crosshair or
 button (settings "Settings button"), for the selected location and time. From top to bottom it
 SHALL hold (user decisions, 2026-10-05 and 2026-10-06):
 1. **Header:** the selected time (time-selection "Time zone of the selected time"; tapping it opens
-   the clock dialog, time-selection "Exact time"), and the buttons `Date` (time-selection "Choose
+   the clock dialog, time-selection "Exact time"), in the colour of the `Date` and `Now` buttons'
+   texts, and the buttons `Date` (time-selection "Choose
    the date") and `Now` (time-selection "Return to now");
 2. **Headline:** the sun periods of the selected day (point-sunshine "Sunshine in the information
    panel");
 3. in `Sun hours` mode, the `Sun hours` line (sun-exposure-heatmap "Sun hours in the information
    panel");
-4. **Time tape** (time-selection "Choose the time of day", "Time tape strip");
-5. **Details:** a row `Details` that expands and collapses, at least 48 dp high to touch, with the
+4. **Time tape** with its progress right of it (time-selection "Choose the time of day", "Time tape
+   strip");
+5. **Details:** a row `Details`, its text in the colour of the `Date` and `Now` buttons' texts
+   (user decision, 2026-10-07: every clickable text of the panel has that colour), that expands and
+   collapses, at least 48 dp high to touch, with the
    content description `Show details` while collapsed and `Hide details` while expanded. Expanded,
    it shows the altitude (elevation-data "Altitude in the information panel"), the values below, and
    the device time zone's ID, e.g. `Europe/Zurich`.
