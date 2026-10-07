@@ -11,8 +11,8 @@
 #   ./scripts/verify-local.sh          # all steps; run before every push
 #   ./scripts/verify-local.sh --quick  # ktlint only
 #
-# Requirements: ANDROID_HOME (or ANDROID_SDK_ROOT) set, Java 17+, and the OpenSpec CLI
-# (`npm install -g @fission-ai/openspec`; the version CI uses is in ci.yml).
+# Requirements: ANDROID_HOME (or ANDROID_SDK_ROOT) set, Java 17+, and the OpenSpec CLI in the
+# version CI pins in ci.yml (`npm install -g @fission-ai/openspec@<that version>`).
 
 set -u
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -48,9 +48,19 @@ if [ -z "${ANDROID_HOME:-}" ] && [ -z "${ANDROID_SDK_ROOT:-}" ]; then
     echo -e "${RED}[FAIL]${NC} ANDROID_HOME or ANDROID_SDK_ROOT must be set"
     exit 1
 fi
-if [ "${#STEPS[@]}" -gt 1 ] && ! command -v openspec > /dev/null; then
-    echo -e "${RED}[FAIL]${NC} openspec not found: npm install -g @fission-ai/openspec"
-    exit 1
+# The OpenSpec version CI pins, so that both validate by the same rules.
+if [ "${#STEPS[@]}" -gt 1 ]; then
+    OPENSPEC_VERSION="$(grep -oE '@fission-ai/openspec@[0-9][0-9.]*' .github/workflows/ci.yml | head -n 1 | cut -d@ -f3)"
+    if [ -z "$OPENSPEC_VERSION" ]; then
+        echo -e "${RED}[FAIL]${NC} no pinned OpenSpec version found in .github/workflows/ci.yml"
+        exit 1
+    fi
+    installed="$(openspec --version 2> /dev/null || true)"
+    if [ "$installed" != "$OPENSPEC_VERSION" ]; then
+        echo -e "${RED}[FAIL]${NC} openspec ${installed:-not found}, CI uses $OPENSPEC_VERSION:" \
+            "npm install -g @fission-ai/openspec@$OPENSPEC_VERSION"
+        exit 1
+    fi
 fi
 export OPENSPEC_TELEMETRY=0
 
