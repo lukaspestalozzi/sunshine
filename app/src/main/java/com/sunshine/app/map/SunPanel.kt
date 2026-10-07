@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.MaterialTheme
@@ -31,6 +32,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sunshine.app.R
@@ -40,8 +42,9 @@ import java.time.ZonedDateTime
 /**
  * The sun information panel (sun-position spec, "Sun information panel"; design D1 of polish-ui):
  * the header with the selected time, `Date` and `Now`; the headline with the day's sun periods;
- * the `Sun hours` line when shown; the time tape with its [strip]; and the details, expanded while
- * [detailsExpanded].
+ * the `Sun hours` line when shown; the time tape with its [strip] and the strip's progress; and the
+ * details, expanded while [detailsExpanded]. The clickable texts take the primary colour, as the
+ * buttons' texts do.
  */
 @Composable
 fun SunPanel(
@@ -51,7 +54,7 @@ fun SunPanel(
     elevation: ElevationState,
     sunshine: SunshineUiState,
     sunHours: String?,
-    strip: List<StripState>,
+    strip: TapeStrip,
     detailsExpanded: Boolean,
     onDetailsToggled: (Boolean) -> Unit,
     onDateSelected: (LocalDate) -> Unit,
@@ -75,6 +78,7 @@ fun SunPanel(
                 Text(
                     text = formatHeaderTime(selectedTime, today),
                     style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier =
                         Modifier
                             .weight(1f)
@@ -92,7 +96,16 @@ fun SunPanel(
             )
             // Only in the mode `Sun hours` (sun-exposure-heatmap spec, "Sun hours in the information panel").
             sunHours?.let { Value(R.string.sun_panel_sun_hours, it) }
-            TimeTape(selectedTime, sliderStep, strip, onSliderMoved)
+            Row {
+                TimeTape(selectedTime, sliderStep, strip.states, onSliderMoved, Modifier.weight(1f))
+                // The strip's progress beside the strip, wide enough for `100 %` so the tape keeps its width.
+                Text(
+                    "${strip.percent} %",
+                    style = MaterialTheme.typography.labelSmall,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.padding(start = 4.dp, top = 7.dp).widthIn(min = PROGRESS_MIN_WIDTH),
+                )
+            }
             DetailsRow(detailsExpanded, onDetailsToggled)
             AnimatedVisibility(detailsExpanded) {
                 Column {
@@ -142,8 +155,14 @@ private fun DetailsRow(
             .semantics(mergeDescendants = true) { contentDescription = description },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(stringResource(R.string.sun_panel_details), style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
-        Text(if (expanded) "▴" else "▾", style = MaterialTheme.typography.labelLarge)
+        val colour = MaterialTheme.colorScheme.primary
+        Text(
+            stringResource(R.string.sun_panel_details),
+            style = MaterialTheme.typography.labelLarge,
+            color = colour,
+            modifier = Modifier.weight(1f),
+        )
+        Text(if (expanded) "▴" else "▾", style = MaterialTheme.typography.labelLarge, color = colour)
     }
 }
 
@@ -223,3 +242,4 @@ private fun SunTimePickerDialog(
 
 private const val PANEL_ALPHA = 0.85f
 private val HEADLINE_SIZE = 18.sp
+private val PROGRESS_MIN_WIDTH = 36.dp

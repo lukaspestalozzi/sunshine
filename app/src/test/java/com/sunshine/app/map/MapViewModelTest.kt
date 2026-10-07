@@ -1073,14 +1073,17 @@ class MapViewModelTest {
             viewModel.onOverlaySelected(OverlayOption.SUN_HOURS)
             advanceUntilIdle()
 
-            val partial = viewModel.tapeStrip.value
+            val partial = viewModel.tapeStrip.value.states
             assertEquals(DAY_STEPS, partial.size)
             // Every 10-minute heatmap step covers two 5-minute tape steps; the night steps are known at once.
             assertTrue(partial.count { it == StripState.SHADE } in 2 * 36 - 2..2 * 36, "${partial.count { it == StripState.SHADE }}")
             assertTrue(partial.contains(StripState.NOT_COMPUTED))
             gate.value = true
             advanceUntilIdle()
-            assertTrue(viewModel.tapeStrip.value.none { it == StripState.NOT_COMPUTED })
+            assertTrue(
+                viewModel.tapeStrip.value.states
+                    .none { it == StripState.NOT_COMPUTED },
+            )
         }
 
     @Test
@@ -1590,7 +1593,7 @@ class MapViewModelTest {
             viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
             advanceUntilIdle()
 
-            val strip = viewModel.tapeStrip.value
+            val strip = viewModel.tapeStrip.value.states
             assertEquals(DAY_STEPS, strip.size)
             assertEquals(StripState.NIGHT, strip[24])
             assertEquals(StripState.SHADE, strip[114])
@@ -1607,12 +1610,20 @@ class MapViewModelTest {
             val loading = dayViewModel(mutableListOf(), horizon = { awaitCancellation() })
             loading.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
             advanceTimeBy(SETTLE_MILLIS)
-            assertEquals(setOf(StripState.NIGHT, StripState.NOT_COMPUTED), loading.tapeStrip.value.toSet())
+            assertEquals(
+                setOf(StripState.NIGHT, StripState.NOT_COMPUTED),
+                loading.tapeStrip.value.states
+                    .toSet(),
+            )
 
             val unknown = dayViewModel(mutableListOf(), horizon = { null })
             unknown.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
             advanceUntilIdle()
-            assertEquals(setOf(StripState.NIGHT, StripState.UNKNOWN), unknown.tapeStrip.value.toSet())
+            assertEquals(
+                setOf(StripState.NIGHT, StripState.UNKNOWN),
+                unknown.tapeStrip.value.states
+                    .toSet(),
+            )
         }
 
     @Test
@@ -1627,14 +1638,44 @@ class MapViewModelTest {
             runCurrent()
 
             // The 72 steps nearest to 12:00, later first (09:05 to 15:00), are computed: shade, as the test's grids are.
-            val strip = viewModel.tapeStrip.value
+            val strip = viewModel.tapeStrip.value.states
             assertEquals((109..180).toList(), strip.indices.filter { strip[it] == StripState.SHADE })
             assertTrue(strip.indices.filter { strip[it] == StripState.NOT_COMPUTED }.all { it < 109 || it > 180 })
             assertTrue(strip.contains(StripState.NOT_COMPUTED))
 
             gate.value = true
             advanceUntilIdle()
-            assertEquals(setOf(StripState.NIGHT, StripState.SHADE), viewModel.tapeStrip.value.toSet())
+            assertEquals(
+                setOf(StripState.NIGHT, StripState.SHADE),
+                viewModel.tapeStrip.value.states
+                    .toSet(),
+            )
+        }
+
+    // time-selection spec, "Time tape strip": the progress right of the tape (user decision, 2026-10-07).
+    @Test
+    fun `the strip's progress is the horizon's, 0 or 100 %, and with sun and shade the day's computed share`() =
+        runTest {
+            val horizonGate = MutableStateFlow(false)
+            val off = dayViewModel(mutableListOf(), horizon = { horizonGate.first { it }.let { horizonOf(15.0) } })
+            off.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            advanceTimeBy(SETTLE_MILLIS)
+            assertEquals(0, off.tapeStrip.value.percent)
+            horizonGate.value = true
+            advanceUntilIdle()
+            assertEquals(100, off.tapeStrip.value.percent)
+
+            val suns = mutableListOf<SunPosition>()
+            val gate = MutableStateFlow(false)
+            val on = dayViewModel(suns, before = { if (suns.size == 72) gate.first { it } }, horizon = { horizonOf(-1.0) })
+            on.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
+            on.onOverlayToggled()
+            advanceTimeBy(SETTLE_MILLIS)
+            runCurrent()
+            assertEquals(25, on.tapeStrip.value.percent)
+            gate.value = true
+            advanceUntilIdle()
+            assertEquals(100, on.tapeStrip.value.percent)
         }
 
     @Test
@@ -1648,17 +1689,25 @@ class MapViewModelTest {
                 )
             viewModel.onCameraMoved(CameraState(center = INTERLAKEN, zoom = 12.0))
             advanceUntilIdle()
-            val first = viewModel.tapeStrip.value
+            val first = viewModel.tapeStrip.value.states
 
             viewModel.onCameraMoved(CameraState(center = GeoPoint(46.69, 7.87), zoom = 12.0))
             advanceTimeBy(SETTLE_MILLIS - 100)
-            assertEquals(first, viewModel.tapeStrip.value)
+            assertEquals(first, viewModel.tapeStrip.value.states)
 
             advanceTimeBy(200)
-            assertEquals(setOf(StripState.NIGHT, StripState.NOT_COMPUTED), viewModel.tapeStrip.value.toSet())
+            assertEquals(
+                setOf(StripState.NIGHT, StripState.NOT_COMPUTED),
+                viewModel.tapeStrip.value.states
+                    .toSet(),
+            )
             second.value = true
             advanceUntilIdle()
-            assertEquals(setOf(StripState.NIGHT, StripState.SUN), viewModel.tapeStrip.value.toSet())
+            assertEquals(
+                setOf(StripState.NIGHT, StripState.SUN),
+                viewModel.tapeStrip.value.states
+                    .toSet(),
+            )
         }
 
     @Test
@@ -1679,7 +1728,10 @@ class MapViewModelTest {
             assertEquals(ZonedDateTime.of(2025, 12, 21, 12, 0, 0, 0, ZURICH), (viewModel.overlay.value as OverlayUiState.Ready).time)
             advanceUntilIdle()
             assertEquals(emptyList<SunPosition>(), suns)
-            assertTrue(viewModel.tapeStrip.value.none { it == StripState.NOT_COMPUTED })
+            assertTrue(
+                viewModel.tapeStrip.value.states
+                    .none { it == StripState.NOT_COMPUTED },
+            )
         }
 
     @Test
@@ -1700,7 +1752,10 @@ class MapViewModelTest {
             assertEquals(ZonedDateTime.of(2025, 12, 21, 12, 0, 0, 0, ZURICH), (viewModel.overlay.value as OverlayUiState.Ready).time)
             advanceUntilIdle()
             assertEquals(emptyList<SunPosition>(), suns)
-            assertTrue(viewModel.tapeStrip.value.none { it == StripState.NOT_COMPUTED })
+            assertTrue(
+                viewModel.tapeStrip.value.states
+                    .none { it == StripState.NOT_COMPUTED },
+            )
             assertTrue(logged.none { it.startsWith("Overlay day") }, "$logged")
         }
 
