@@ -33,8 +33,9 @@ shows.
   (**BREAKING** for the spec: "Overlay status card" item 3).
 - **Navigation:** the Settings, Custom resolution and Offline pages get a top bar with a back
   arrow and the page's title.
-- **Discoverability:** long-press tooltips on the three overlay toggle icons; a hint card on first
-  launch explaining the crosshair, tap to centre and the overlay modes, shown once.
+- **Discoverability:** a hint card on first launch explaining the crosshair, tap to centre and the
+  overlay modes, shown once. Tooltips on the toggle were dropped while applying: Material 3's tooltip
+  is still an experimental API (user decision, 2026-10-07).
 - **Tap to centre:** a single tap on the map moves the camera so that the tapped point is under the
   crosshair.
 
@@ -50,7 +51,7 @@ None.
   tape replaces the slider); added "Time tape strip" and "Exact time".
 - `sun-position`: "Sun information panel" (header, headline, tape and collapsible details).
 - `point-sunshine`: "Sunshine in the information panel" (the periods as the headline).
-- `sun-shade-overlay`: "Overlay toggle" (tooltips), "Overlay status card" (no progress bar),
+- `sun-shade-overlay`: "Overlay status card" (no progress bar),
   "Overlay of the whole day" (progress on the tape).
 - `sun-exposure-heatmap`: "Heatmap updates" (progress on the tape).
 - `map-view`: "Selected location crosshair" (tap to centre); added "First-run hint".
@@ -72,10 +73,10 @@ None.
 
 - `app`, `map/`: a new time tape composable with its strip model (pure, unit-tested), the panel
   rebuilt around it (`SunPanel.kt`), the time header and headline formatting (`SunFormat.kt`), the
-  clock dialog, the progress bar removed from `OverlayControl.kt`, tooltips on the toggle, the
+  clock dialog, the progress bar removed from `OverlayControl.kt`, the
   first-run hint, and tap to centre in `MapLibreMap.kt`. `MapViewModel` exposes the strip's states.
 - `app`, `settings/` and `offline/`: top bars; two stored values (details expanded, hint shown).
 - `core`: unchanged, except possibly a helper for the tracer's state at given instants if the app
   cannot use `sunshineAt` as is.
-- No new dependencies (Material 3's time picker, tooltip and top app bar are in the current
-  Compose BOM).
+- No new dependencies and no experimental APIs (the clock dialog is the platform's; Material 3's
+  time picker and tooltip are experimental in the current Compose BOM).

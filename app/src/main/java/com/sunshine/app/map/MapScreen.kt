@@ -84,6 +84,7 @@ fun MapScreen(
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val sliderStep by viewModel.sliderStep.collectAsStateWithLifecycle()
     val debugValues by viewModel.debugValues.collectAsStateWithLifecycle()
+    val tapeStrip by viewModel.tapeStrip.collectAsStateWithLifecycle()
     val sunshine = computedSunshine.at(camera.center)
 
     val context = LocalContext.current
@@ -175,6 +176,7 @@ fun MapScreen(
         ) {
             SunPanel(
                 selectedTime = selectedTime,
+                today = viewModel.today(),
                 sun = sun,
                 elevation = elevation,
                 sunshine = sunshine,
@@ -182,10 +184,14 @@ fun MapScreen(
                     formatSunHours(heatmap, camera.center).takeIf {
                         isOverlayOn && overlayMode == OverlayMode.SUN_HOURS && camera.zoom >= MIN_OVERLAY_ZOOM
                     },
+                strip = tapeStrip,
+                detailsExpanded = settings.detailsExpanded,
+                onDetailsToggled = viewModel::onDetailsToggled,
                 onDateSelected = viewModel::onDateSelected,
                 onSliderMoved = viewModel::onSliderMoved,
                 sliderStep = sliderStep,
                 onNowClicked = viewModel::onNowClicked,
+                onTimeTyped = viewModel::onTimeTyped,
                 modifier = Modifier.widthIn(max = panelMaxWidth),
             )
         }
@@ -303,6 +309,8 @@ private val mapViewModelFactory =
                 saveLastView = application.settingsStore::setLastView,
                 debug = application.debugInfo,
                 checkProfile = { application.sunshineRepository.profile(it, record = false) },
+                saveDetailsExpanded = application.settingsStore::setDetailsExpanded,
+                saveHintDismissed = application.settingsStore::setHintDismissed,
             )
         }
     }

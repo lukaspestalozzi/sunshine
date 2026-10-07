@@ -129,6 +129,22 @@ class MapViewModelTest {
         assertEquals(moved, recreated.camera.value)
     }
 
+    // settings spec, "Stored settings": the panel's details and the first-run hint (design D7 of polish-ui).
+    @Test
+    fun `toggling the details and dismissing the hint are stored`() {
+        val details = mutableListOf<Boolean>()
+        var dismissed = 0
+        val viewModel = newViewModel(saveDetailsExpanded = { details += it }, saveHintDismissed = { dismissed++ })
+
+        viewModel.onDetailsToggled(true)
+        viewModel.onDetailsToggled(false)
+        viewModel.onHintDismissed()
+
+        assertEquals(listOf(true, false), details)
+        assertEquals(1, dismissed)
+        assertEquals(LocalDate.of(2025, 12, 21), viewModel.today())
+    }
+
     @Test
     fun `going to the background stores the camera as the last view`() {
         val stored = mutableListOf<LastView>()
@@ -2140,6 +2156,8 @@ class MapViewModelTest {
         settings: Settings = Settings(),
         saveLastView: suspend (LastView) -> Unit = {},
         settingsFlow: StateFlow<Settings> = MutableStateFlow(settings),
+        saveDetailsExpanded: suspend (Boolean) -> Unit = {},
+        saveHintDismissed: suspend () -> Unit = {},
     ) = MapViewModel(
         savedState,
         isOnline,
@@ -2150,6 +2168,8 @@ class MapViewModelTest {
         computeDispatcher,
         settings = settingsFlow,
         saveLastView = saveLastView,
+        saveDetailsExpanded = saveDetailsExpanded,
+        saveHintDismissed = saveHintDismissed,
     )
 
     private fun horizonOf(

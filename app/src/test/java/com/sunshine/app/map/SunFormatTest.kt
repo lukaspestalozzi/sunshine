@@ -23,66 +23,18 @@ class SunFormatTest {
     @CsvSource(
         delimiter = '|',
         value = [
-            "2025-12-21T12:00+01:00[Europe/Zurich] | 2025-12-21 12:00 UTC+1",
-            "2025-06-21T15:00+02:00[Europe/Zurich] | 2025-06-21 15:00 UTC+2",
-            "2025-06-21T06:00+05:30[Asia/Kolkata]  | 2025-06-21 06:00 UTC+5:30",
-            "2025-06-21T06:00Z[Etc/UTC]            | 2025-06-21 06:00 UTC",
-            "2025-06-21T06:00-02:30[America/St_Johns] | 2025-06-21 06:00 UTC-2:30",
+            "2025-12-21T12:00+01:00[Europe/Zurich] | UTC+1",
+            "2025-06-21T15:00+02:00[Europe/Zurich] | UTC+2",
+            "2025-06-21T06:00+05:30[Asia/Kolkata]  | UTC+5:30",
+            "2025-06-21T06:00Z[Etc/UTC]            | UTC",
+            "2025-06-21T06:00-02:30[America/St_Johns] | UTC-2:30",
         ],
     )
-    fun `formats the selected time with its UTC offset`(
+    fun `formats a UTC offset`(
         time: String,
         expected: String,
     ) {
-        assertEquals(expected, formatSelectedTime(ZonedDateTime.parse(time)))
-    }
-
-    @Test
-    fun `selected time does not depend on the device locale`() {
-        val originalLocale = Locale.getDefault()
-        Locale.setDefault(Locale.forLanguageTag("de-CH"))
-        try {
-            assertEquals("2025-12-21 12:00 UTC+1", formatSelectedTime(ZonedDateTime.parse("2025-12-21T12:00+01:00[Europe/Zurich]")))
-        } finally {
-            Locale.setDefault(originalLocale)
-        }
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @CsvSource(
-        delimiter = '|',
-        value = ["173.49 | 173° S", "22.4 | 22° N", "22.5 | 23° NE", "359.6 | 0° N", "225.407 | 225° SW", "337.4 | 337° NW"],
-    )
-    fun `formats the azimuth in whole degrees with the compass direction`(
-        azimuth: Double,
-        expected: String,
-    ) {
-        assertEquals(expected, formatAzimuth(azimuth))
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @CsvSource(delimiter = '|', value = ["19.66 | 19.7°", "-0.7246 | -0.7°", "-0.04 | 0.0°", "0.05 | 0.1°"])
-    fun `formats the elevation with one decimal`(
-        elevation: Double,
-        expected: String,
-    ) {
-        assertEquals(expected, formatElevation(elevation))
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @CsvSource(
-        delimiter = '|',
-        value = [
-            "2025-12-21T07:11:45+01:00[Europe/Zurich] | 07:12",
-            "2025-12-21T17:22:29+01:00[Europe/Zurich] | 17:22",
-            "2025-12-21T17:22:30+01:00[Europe/Zurich] | 17:23",
-        ],
-    )
-    fun `rounds event times to the nearest minute`(
-        event: String,
-        expected: String,
-    ) {
-        assertEquals(expected, formatEventTime(ZonedDateTime.parse(event), selected = WINTER_NOON))
+        assertEquals(expected, formatUtcOffset(ZonedDateTime.parse(time).offset))
     }
 
     @Test

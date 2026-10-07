@@ -225,6 +225,10 @@ class MapViewModel(
     private val saveLastView: suspend (LastView) -> Unit = {},
     /** The profiles of the agreement check's cells, not shown as the selected location's (settings spec, "Debug info"). */
     private val checkProfile: suspend (GeoPoint) -> HorizonProfile? = horizonProfile,
+    /** Stores whether the panel's details are expanded (settings spec, "Stored settings"). */
+    private val saveDetailsExpanded: suspend (Boolean) -> Unit = {},
+    /** Stores that the first-run hint was dismissed (map-view spec, "First-run hint"). */
+    private val saveHintDismissed: suspend () -> Unit = {},
 ) : ViewModel() {
     private val zone: ZoneId = clock.zone
 
@@ -865,6 +869,19 @@ class MapViewModel(
         savedState[KEY_LONGITUDE] = camera.center.longitude
         savedState[KEY_ZOOM] = camera.zoom
     }
+
+    /** The panel's details expanded or collapsed by the user (sun-position spec, "Sun information panel"). */
+    fun onDetailsToggled(expanded: Boolean) {
+        viewModelScope.launch { saveDetailsExpanded(expanded) }
+    }
+
+    /** `Got it` on the first-run hint (map-view spec, "First-run hint"). */
+    fun onHintDismissed() {
+        viewModelScope.launch { saveHintDismissed() }
+    }
+
+    /** Today in the device's time zone, for the header's year (time-selection spec, "Time zone of the selected time"). */
+    fun today(): LocalDate = LocalDate.now(clock)
 
     /**
      * Stores the map's view, the one `Last view` opens at: when the app goes to the background and

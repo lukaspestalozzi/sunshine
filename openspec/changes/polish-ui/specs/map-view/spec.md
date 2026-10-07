@@ -65,8 +65,8 @@ The first time the map screen is shown after the app is installed, a hint card S
 the map, without covering the crosshair, the overlay toggle or the time tape (user decision,
 2026-10-06). It SHALL read:
 - `The crosshair marks the place the panel describes. Drag the map, or tap a point to centre it.`
-- `◐ shows sun and shade at the selected time, ◔ the hours of sun over the day. Long-press an icon
-  for its name.`, with the toggle's own icons in place of ◐ and ◔;
+- `◐ shows sun and shade at the selected time, ◔ the hours of sun over the day.`, with the toggle's
+  own icons in place of ◐ and ◔;
 
 and offer the button `Got it`. The map, the toggle and the panel SHALL stay usable while the hint is
 shown. `Got it` SHALL dismiss the hint; once dismissed, it SHALL NOT be shown again, also after

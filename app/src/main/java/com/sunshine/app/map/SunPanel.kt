@@ -1,48 +1,68 @@
 package com.sunshine.app.map
 
+import android.app.TimePickerDialog
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.sunshine.app.R
 import java.time.LocalDate
 import java.time.ZonedDateTime
 
-/** Selected time with its controls, and the sun values for the selected location and time. */
+/**
+ * The sun information panel (sun-position spec, "Sun information panel"; design D1 of polish-ui):
+ * the header with the selected time, `Date` and `Now`; the headline with the day's sun periods;
+ * the `Sun hours` line when shown; the time tape with its [strip]; and the details, expanded while
+ * [detailsExpanded].
+ */
 @Composable
 fun SunPanel(
     selectedTime: ZonedDateTime,
+    today: LocalDate,
     sun: SunInfo?,
     elevation: ElevationState,
     sunshine: SunshineUiState,
     sunHours: String?,
+    strip: List<StripState>,
+    detailsExpanded: Boolean,
+    onDetailsToggled: (Boolean) -> Unit,
     onDateSelected: (LocalDate) -> Unit,
     onSliderMoved: (Float) -> Unit,
     onNowClicked: () -> Unit,
+    onTimeTyped: (hour: Int, minute: Int) -> Unit,
     modifier: Modifier = Modifier,
     sliderStep: Int = SLIDER_STEP_MINUTES,
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
 
     Surface(
         modifier = modifier,
@@ -51,28 +71,37 @@ fun SunPanel(
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Tapping the time opens the clock dialog (time-selection spec, "Exact time").
                 Text(
-                    text = "${formatSelectedTime(selectedTime)}  ${selectedTime.zone.id}",
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.weight(1f),
+                    text = formatHeaderTime(selectedTime, today),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .clickable(role = Role.Button) { showTimePicker = true }
+                            .padding(vertical = 12.dp),
                 )
                 TextButton(onClick = { showDatePicker = true }) { Text(stringResource(R.string.sun_panel_date)) }
                 TextButton(onClick = onNowClicked) { Text(stringResource(R.string.sun_panel_now)) }
             }
-            val timeOfDay = stringResource(R.string.sun_panel_time_of_day)
-            Slider(
-                value = sliderMinutes(selectedTime),
-                onValueChange = onSliderMoved,
-                // Up to the day's last step: 23:55 with 5 minutes, 23:50 with 10 (design D4 of add-settings).
-                valueRange = 0f..(sliderPositions(selectedTime.toLocalDate(), selectedTime.zone, sliderStep) - 1) * sliderStep.toFloat(),
-                modifier = Modifier.semantics { contentDescription = timeOfDay },
+            // The headline: the day's sun periods, the panel's largest text (point-sunshine spec,
+            // "Sunshine in the information panel").
+            Text(
+                "${stringResource(R.string.sun_panel_sunshine)} ${formatSunshine(sunshine, selectedTime)}",
+                style = MaterialTheme.typography.titleMedium.copy(fontSize = HEADLINE_SIZE),
             )
-            // Altitude and sunshine belong to the location and day, so they do not wait for the sun values.
-            Value(R.string.sun_panel_altitude, formatAltitude(elevation))
-            Value(R.string.sun_panel_sunshine, formatSunshine(sunshine, selectedTime))
             // Only in the mode `Sun hours` (sun-exposure-heatmap spec, "Sun hours in the information panel").
             sunHours?.let { Value(R.string.sun_panel_sun_hours, it) }
-            if (sun != null) SunValues(sun, selectedTime)
+            TimeTape(selectedTime, sliderStep, strip, onSliderMoved)
+            DetailsRow(detailsExpanded, onDetailsToggled)
+            AnimatedVisibility(detailsExpanded) {
+                Column {
+                    // Altitude and sunshine belong to the location and day, so they do not wait for the sun values.
+                    Value(R.string.sun_panel_altitude, formatAltitude(elevation))
+                    if (sun != null) SunValues(sun, selectedTime)
+                    Value(R.string.sun_panel_time_zone, selectedTime.zone.id)
+                }
+            }
         }
     }
 
@@ -85,6 +114,36 @@ fun SunPanel(
             },
             onDismiss = { showDatePicker = false },
         )
+    }
+    if (showTimePicker) {
+        SunTimePickerDialog(
+            time = selectedTime,
+            onTimeSelected = { hour, minute ->
+                showTimePicker = false
+                onTimeTyped(hour, minute)
+            },
+            onDismiss = { showTimePicker = false },
+        )
+    }
+}
+
+// The row that expands and collapses the details, 48 dp high to touch.
+@Composable
+private fun DetailsRow(
+    expanded: Boolean,
+    onToggled: (Boolean) -> Unit,
+) {
+    val description = stringResource(if (expanded) R.string.sun_panel_hide_details else R.string.sun_panel_show_details)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable(role = Role.Button) { onToggled(!expanded) }
+            .semantics(mergeDescendants = true) { contentDescription = description },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(stringResource(R.string.sun_panel_details), style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+        Text(if (expanded) "▴" else "▾", style = MaterialTheme.typography.labelLarge)
     }
 }
 
@@ -139,4 +198,28 @@ private fun SunDatePickerDialog(
     }
 }
 
+// A 24-hour clock at the selected hour and minute (time-selection spec, "Exact time"; design D6 of
+// polish-ui). The platform's dialog: Material 3's TimePicker is still an experimental API.
+@Composable
+private fun SunTimePickerDialog(
+    time: ZonedDateTime,
+    onTimeSelected: (hour: Int, minute: Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    val currentOnTimeSelected by rememberUpdatedState(onTimeSelected)
+    val currentOnDismiss by rememberUpdatedState(onDismiss)
+    DisposableEffect(Unit) {
+        val dialog = TimePickerDialog(context, { _, hour, minute -> currentOnTimeSelected(hour, minute) }, time.hour, time.minute, true)
+        // OK, Cancel, back and a tap outside all end in a dismissal.
+        dialog.setOnDismissListener { currentOnDismiss() }
+        dialog.show()
+        onDispose {
+            dialog.setOnDismissListener(null)
+            dialog.dismiss()
+        }
+    }
+}
+
 private const val PANEL_ALPHA = 0.85f
+private val HEADLINE_SIZE = 18.sp

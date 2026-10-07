@@ -17,9 +17,6 @@ import kotlin.math.abs
 // Texts of the sun panel values, fixed by the sun-position and time-selection specs. All output is
 // independent of the device locale.
 
-/** E.g. `2025-12-21 12:00 UTC+1`. */
-fun formatSelectedTime(time: ZonedDateTime): String = "${time.format(DATE_TIME)} ${formatUtcOffset(time.offset)}"
-
 /**
  * The selected time in the panel's header, e.g. `Sun 21 Dec · 12:00` (time-selection spec, "Time zone
  * of the selected time"; design D2 of polish-ui): the year only when it is not [today]'s, the UTC
@@ -125,7 +122,7 @@ fun formatWholeDay(wholeDay: WholeDay?): String? =
 private fun formatMinutes(minutes: Int): String = "${minutes / MINUTES_PER_HOUR} h ${minutes % MINUTES_PER_HOUR} min"
 
 /** `UTC`, `UTC+1`, `UTC+5:30`, `UTC-2:30`. */
-private fun formatUtcOffset(offset: ZoneOffset): String {
+internal fun formatUtcOffset(offset: ZoneOffset): String {
     val totalSeconds = offset.totalSeconds
     if (totalSeconds == 0) return "UTC"
     val sign = if (totalSeconds > 0) '+' else '-'
@@ -139,7 +136,6 @@ private fun roundHalfUp(
     decimals: Int,
 ): BigDecimal = BigDecimal(value.toString()).setScale(decimals, RoundingMode.HALF_UP)
 
-private val DATE_TIME = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm", Locale.ROOT)
 private val TIME = DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT)
 private val HEADER_DAY = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)
 private val HEADER_DAY_YEAR = DateTimeFormatter.ofPattern("EEE d MMM uuuu", Locale.ENGLISH)
