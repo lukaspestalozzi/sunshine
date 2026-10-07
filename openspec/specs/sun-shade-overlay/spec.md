@@ -253,7 +253,7 @@ In the mode `Sun hours`, the heatmap's own update rules and notice apply instead
 Once the overlay of the selected time is ready, the app SHALL compute in the background the overlay
 of the visible area at every step of the selected day: every `Sun & shade` step of the shade
 resolution (settings "Shade resolution"; 5 minutes with `Normal`) from the start of the day, over
-its actual length. These are the slider's positions while `Sun & shade` is shown (time-selection
+its actual length. These are the time tape's steps while `Sun & shade` is shown (time-selection
 "Choose the time of day"):
 - **Order:** nearest to the selected time first.
 - **CPU:** at most half of the device's processor cores. The overlay of the selected time itself
@@ -284,13 +284,12 @@ its actual length. These are the slider's positions while `Sun & shade` is shown
   app's heap limit. Beyond it, the least recently used days SHALL be dropped, never the day being
   shown. A day with unknown cells SHALL be computed anew when it is selected while the network is
   available, and after a reconnect while it is shown.
-- **Progress:** while the background computation runs, a determinate progress bar in the status
-  card ("Overlay status card") SHALL show the share of the day's slider positions already
-  computed. It SHALL disappear when every position is computed or the computation stops.
+- **Progress:** the time tape's strip (time-selection "Time tape strip") SHALL show which steps of
+  the day are computed; the status card shows no progress bar ("Overlay status card").
 
 #### Scenario: Scrubbing a computed day
 - **WHEN** the overlay is on at Lauterbrunnen, 46.5935° N, 7.9091° E, map zoom 12, on 2025-12-21 at 12:00, and the day's computation has finished
-- **THEN** moving the slider to 14:35 shows the overlay for 14:35 within 100 ms, without `Computing sun and shade …`
+- **THEN** moving the time tape to 14:35 shows the overlay for 14:35 within 100 ms, without `Computing sun and shade …`
 
 #### Scenario: Night positions
 - **WHEN** the day of 2025-12-21 is computed for Interlaken, 46.6863° N, 7.8632° E
@@ -322,7 +321,7 @@ its actual length. These are the slider's positions while `Sun & shade` is shown
 
 #### Scenario: Back to the app
 - **WHEN** the day has been computed and the user leaves the app for a minute and returns
-- **THEN** moving the slider to a time of that day shows its overlay within 100 ms, without `Computing sun and shade …`
+- **THEN** moving the time tape to a time of that day shows its overlay within 100 ms, without `Computing sun and shade …`
 
 #### Scenario: Switching back to a computed day
 - **WHEN** the day of 2025-12-21 has been computed, and the user picks 2025-12-22 and then 2025-12-21 again
@@ -341,16 +340,16 @@ its actual length. These are the slider's positions while `Sun & shade` is shown
 - **THEN** the day used least recently is dropped, and the day being shown is kept
 
 #### Scenario: Progress of the day
-- **WHEN** the overlay is on and 72 of the day's 288 slider positions are computed
-- **THEN** a progress bar in the status card shows 25 %, and once all 288 are computed no bar is shown
+- **WHEN** the overlay is on and 72 of the day's 288 steps are computed
+- **THEN** those 72 steps of the time tape's strip have their colours and the other daytime steps are not computed yet, no progress bar is shown, and once all 288 are computed every step has its colour
 
 #### Scenario: Responsive while computing the day
 - **WHEN** the day is being computed in the background
-- **THEN** the map can be panned and the time slider moved without delay
+- **THEN** the map can be panned and the time tape moved without delay
 
 #### Scenario: Day of Fast
 - **WHEN** the shade resolution is `Fast` and the overlay is on in the mode `Sun & shade` on 2025-12-21 in Europe/Zurich
-- **THEN** the day's overlay is computed at 144 steps, 10 minutes apart, and the progress bar shows 25 % once 36 of them are computed
+- **THEN** the day's overlay is computed at 144 steps, 10 minutes apart, matching the time tape's 144 steps, each of which takes its colour on the strip once computed
 
 ### Requirement: Overlay status card
 While `Sun & shade` or `Sun hours` is selected, a status card SHALL be shown directly below the
@@ -360,22 +359,21 @@ it SHALL hold:
 2. the mode's notice, if any: `Zoom in to see sun and shade` ("Overlay coverage and zoom range"),
    `Computing sun and shade …` ("Overlay updates") or `Computing sun hours …`
    (sun-exposure-heatmap "Heatmap updates");
-3. while the day of the selected mode is computed ("Overlay of the whole day", sun-exposure-heatmap
-   "Heatmap updates"), its progress bar, directly below the notice, or directly below the mode's
-   name when there is no notice;
-4. the mode's legend ("Overlay appearance", sun-exposure-heatmap "Heatmap legend").
+3. the mode's legend ("Overlay appearance", sun-exposure-heatmap "Heatmap legend").
 
-These notices SHALL appear only in the status card. While `Off` is selected, no status card SHALL
+The card SHALL show no progress bar: the progress of the selected mode's day is shown on the time
+tape (time-selection "Time tape strip"; user decision, 2026-10-05). These notices SHALL appear only
+in the status card. While `Off` is selected, no status card SHALL
 be shown. The card SHALL NOT cover the crosshair, the sun information panel or the Settings
 button (settings "Settings button").
 
 #### Scenario: Computing sun hours
-- **WHEN** `Sun hours` is selected and 72 of the day's 288 slider positions are computed
-- **THEN** the card shows, from top to bottom, `Sun hours`, `Computing sun hours …`, a progress bar at 25 %, and the heatmap legend
+- **WHEN** `Sun hours` is selected and 36 of the heatmap day's 144 steps are computed
+- **THEN** the card shows, from top to bottom, `Sun hours`, `Computing sun hours …` and the heatmap legend, without a progress bar
 
 #### Scenario: Day computing without a notice
 - **WHEN** `Sun & shade` is selected, the overlay of the selected time is shown and the rest of the day is computed
-- **THEN** the card shows `Sun & shade`, directly below it the progress bar, and the `Shade` / `Unknown` legend
+- **THEN** the card shows `Sun & shade` and the `Shade` / `Unknown` legend, without a progress bar, while the time tape's strip fills in
 
 #### Scenario: Zoomed out
 - **WHEN** `Sun & shade` is selected and the map zoom is 10.5
