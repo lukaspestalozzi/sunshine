@@ -26,8 +26,11 @@ time and the overlay as they were, apart from what a changed setting changes.
 - **THEN** the map shows Interlaken at zoom 12 with `Sun hours` selected, and the heatmap is not computed again
 
 ### Requirement: Settings page
-The Settings page SHALL show, from top to bottom, these sections and entries, each entry with its
-current value:
+The Settings page SHALL have a top bar with the title `Settings` and a back arrow with the content
+description `Back`, at least 48 × 48 dp to touch; tapping it SHALL return to the map like the system
+back gesture or button (settings "Settings button"; user decision, 2026-10-05). The top bar SHALL
+stay visible while the page scrolls. Below it, the page SHALL show, from top to bottom, these
+sections and entries, each entry with its current value:
 - **Display:** `Coordinates` (`Decimal`, `Degrees, minutes, seconds` or `Swiss grid LV95`;
   map-view "Selected location crosshair"); `Keep screen on` (a switch; "Keep screen on").
 - **Map:** `Start at` (`Last view`, `My location` or `Alps overview`; map-view "Default
@@ -53,17 +56,24 @@ A change of any setting SHALL take effect at once, without restarting the app.
 - **WHEN** the Settings page is shown
 - **THEN** its sections are Display, Map, Calculation, Storage, Debug and About, in this order, and the attributions are below every setting
 
+#### Scenario: Back arrow
+- **WHEN** the map shows Interlaken at zoom 12, the user opens the Settings page, scrolls to the About section and taps the back arrow
+- **THEN** the map shows Interlaken at zoom 12, as with the system back gesture
+
 #### Scenario: Change takes effect at once
 - **WHEN** the user selects `Degrees, minutes, seconds` and goes back to the map
 - **THEN** the coordinates are shown in degrees, minutes and seconds, without restarting the app
 
 ### Requirement: Stored settings
-Every setting, including the values of `Custom resolution` and the four debug switches, and the
-last view (map-view "Default viewport") SHALL be kept in the app's persistent storage, across app
+Every setting, including the values of `Custom resolution` and the four debug switches, the last
+view (map-view "Default viewport"), whether the panel's details are expanded (sun-position "Sun
+information panel") and whether the first-run hint has been dismissed (map-view "First-run hint")
+SHALL be kept in the app's persistent storage, across app
 restarts and updates. They SHALL be read before the map screen is first shown, so that the first
 map shown already follows them. When no value is stored for a setting, its default SHALL be used:
 `Decimal`, `Keep screen on` off, `Last view`, `60 %`, `Normal`, the `Normal` values for `Custom
-resolution`, `512 MiB`, and every debug switch off. When a stored value cannot be read or is not
+resolution`, `512 MiB`, every debug switch off, the details collapsed and the hint not dismissed.
+The details' state and the hint are not shown on the Settings page. When a stored value cannot be read or is not
 one of the setting's allowed values, that setting SHALL use its default, and the Settings page
 SHALL show that default; the other settings SHALL keep their stored values.
 
@@ -121,7 +131,9 @@ time-selection "Choose the time of day".
 - **THEN** the heatmap's cells are at most 4 × 4 dp, about 100 × 213 cells, counted every 10 minutes
 
 ### Requirement: Custom resolution
-The `Custom resolution` entry SHALL open a page with four values, each chosen within its range:
+The `Custom resolution` entry SHALL open a page with a top bar with the title `Custom resolution`
+and a back arrow with the content description `Back`; tapping it SHALL leave the page like the
+system back gesture or button. The page SHALL show four values, each chosen within its range:
 - `Sun & shade cell`: 1 to 8 dp, in whole dp;
 - `Sun & shade step`: 5, 10, 15, 20 or 30 min;
 - `Sun hours cell`: 4 to 32 dp, in whole dp;
@@ -139,6 +151,10 @@ computation at every step of the adjustment.
 #### Scenario: Ranges
 - **WHEN** the user tries to set `Sun & shade cell` below 1 dp or `Sun hours cell` above 32 dp
 - **THEN** the values stop at 1 dp and 32 dp respectively
+
+#### Scenario: Back arrow applies the values
+- **WHEN** the user sets `Sun & shade cell` to 4 dp on the `Custom resolution` page and taps the back arrow
+- **THEN** the Settings page is shown, and the overlay uses 4 dp cells
 
 #### Scenario: Kept across presets
 - **WHEN** the user sets `Sun hours step` to 20 min, selects `Fast`, and then selects `Custom` again

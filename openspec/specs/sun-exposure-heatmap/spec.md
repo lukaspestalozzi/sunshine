@@ -189,7 +189,8 @@ heatmap.
 
 While the heatmap of the visible area and selected date is not built, in `Sun hours` mode:
 - the notice `Computing sun hours …` SHALL be shown in the status card (sun-shade-overlay "Overlay
-  status card"), with the progress of the heatmap's day directly below it;
+  status card"), and the progress of the heatmap's day on the time tape's strip (time-selection
+  "Time tape strip");
 - after a camera move, the previous heatmap SHALL stay on its geographic area until the new one is
   built; newly visible areas stay untinted meanwhile;
 - after a change of the selected date, the previous heatmap SHALL stay until the new one is built.
@@ -200,14 +201,14 @@ again once the day is complete. A built heatmap SHALL be kept with its day in th
 
 #### Scenario: Switching on in heatmap mode
 - **WHEN** the mode is `Sun hours`, the user switches the overlay on, and 36 of the heatmap day's 144 steps are computed
-- **THEN** no heatmap is drawn, the status card shows `Computing sun hours …` and directly below it the progress bar at 25 %
+- **THEN** no heatmap is drawn, the status card shows `Computing sun hours …`, and the time tape's strip has the colours of those 36 steps and is not computed yet elsewhere in the daytime
 
 #### Scenario: Day complete
 - **WHEN** the last step of the heatmap's day has been computed
-- **THEN** the heatmap is built and drawn, and the notice and the progress bar disappear
+- **THEN** the heatmap is built and drawn, the notice disappears, and every step of the time tape's strip has its colour
 
 #### Scenario: Time change
-- **WHEN** the heatmap is shown and the user moves the time slider
+- **WHEN** the heatmap is shown and the user moves the time tape
 - **THEN** the heatmap stays unchanged, without a notice
 
 #### Scenario: Pan
