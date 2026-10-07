@@ -1,257 +1,74 @@
 #!/bin/bash
-# Local verification script - Matches CI Pipeline exactly
+# Local verification: the same checks as CI (.github/workflows/ci.yml), in the same order.
 #
-# CI Pipeline steps (in order):
-#   1. ktlintCheck                          - Code style
-#   2. lintDebug                            - Android lint
-#   3. :core:test :app:testDebugUnitTest    - Unit tests
-#   4. assembleDebug                        - Build APK
+#   1. openspec validate --all --strict   - OpenSpec specs and changes (CI job `specs`)
+#   2. ktlintCheck                        - Code style
+#   3. lintDebug                          - Android lint
+#   4. :core:test :app:testDebugUnitTest  - Unit tests
+#   5. assembleDebug                      - Debug APK
 #
 # Usage:
-#   ./scripts/verify-local.sh              # Full CI simulation (all 4 steps)
-#   ./scripts/verify-local.sh --quick      # Quick check (ktlint only)
-#   ./scripts/verify-local.sh --standalone # Standalone ktlint (no Android SDK needed)
+#   ./scripts/verify-local.sh          # all steps; run before every push
+#   ./scripts/verify-local.sh --quick  # ktlint only
+#
+# Requirements: ANDROID_HOME (or ANDROID_SDK_ROOT) set, Java 17+, and the OpenSpec CLI
+# (`npm install -g @fission-ai/openspec`; the version CI uses is in ci.yml).
 
-set -e
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-TOOLS_DIR="$PROJECT_DIR/.local-tools"
+set -u
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_DIR"
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-log_info() { echo -e "[INFO] $1"; }
-log_pass() { echo -e "${GREEN}[PASS]${NC} $1"; }
-log_fail() { echo -e "${RED}[FAIL]${NC} $1"; }
-log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
-log_step() { echo -e "\n${YELLOW}=== Step $1: $2 ===${NC}"; }
-
-mkdir -p "$TOOLS_DIR"
-
-# CI Pipeline steps (each entry is one Gradle invocation; tasks separated by spaces)
-CI_STEPS=("ktlintCheck" "lintDebug" ":core:test :app:testDebugUnitTest" "assembleDebug")
-CI_DESCRIPTIONS=(
-    "Code style (ktlint)"
-    "Android lint"
-    "Unit tests"
-    "Build APK"
+STEPS=(
+    "openspec validate --all --strict --no-interactive"
+    "./gradlew ktlintCheck"
+    "./gradlew lintDebug"
+    "./gradlew :core:test :app:testDebugUnitTest"
+    "./gradlew assembleDebug"
 )
 
-# Run Gradle tasks given as one space-separated string
-run_gradle_task() {
-    local tasks
-    read -ra tasks <<< "$1"
-    cd "$PROJECT_DIR"
-    if ./gradlew "${tasks[@]}" 2>&1; then
-        return 0
-    else
-        return 1
-    fi
-}
-
-# Download ktlint if not present (for standalone mode)
-setup_ktlint() {
-    local ktlint_version="1.5.0"
-    local ktlint_path="$TOOLS_DIR/ktlint"
-
-    if [ ! -x "$ktlint_path" ]; then
-        log_info "Downloading ktlint $ktlint_version..."
-        curl -sSL "https://github.com/pinterest/ktlint/releases/download/${ktlint_version}/ktlint" -o "$ktlint_path"
-        chmod +x "$ktlint_path"
-    fi
-    echo "$ktlint_path"
-}
-
-# Run standalone ktlint (fallback - may differ from CI)
-run_standalone_ktlint() {
-    log_warn "Using standalone ktlint 1.5.0 (may differ from the Gradle plugin's ktlint)"
-    local ktlint
-    ktlint=$(setup_ktlint)
-
-    cd "$PROJECT_DIR"
-    if "$ktlint" "**/*.kt" "**/*.kts" 2>&1; then
-        return 0
-    else
-        return 1
-    fi
-}
-
-# Check if Gradle can work (Android SDK present)
-can_use_gradle() {
-    if [ -z "$ANDROID_HOME" ] && [ -z "$ANDROID_SDK_ROOT" ]; then
-        return 1
-    fi
-    return 0
-}
-
-# Run full CI pipeline via Gradle
-run_full_ci() {
-    local failed=0
-    local passed=0
-    local step_num=0
-    local total=${#CI_STEPS[@]}
-
-    for i in "${!CI_STEPS[@]}"; do
-        step_num=$((i + 1))
-        local task="${CI_STEPS[$i]}"
-        local desc="${CI_DESCRIPTIONS[$i]}"
-
-        log_step "$step_num/$total" "$desc"
-
-        if run_gradle_task "$task"; then
-            log_pass "$task"
-            ((passed++))
-        else
-            log_fail "$task"
-            ((failed++))
-            # Continue to show all failures, but mark as failed
-        fi
-    done
-
-    echo
-    echo "========================================"
-    echo "Results: $passed passed, $failed failed"
-    echo "========================================"
-
-    if [ $failed -gt 0 ]; then
-        return 1
-    fi
-    return 0
-}
-
-# Run quick checks (ktlint only)
-run_quick_checks() {
-    local use_gradle="$1"
-    local failed=0
-
-    log_step "1/1" "Code style (ktlint)"
-    if $use_gradle; then
-        if run_gradle_task "ktlintCheck"; then
-            log_pass "ktlintCheck"
-        else
-            log_fail "ktlintCheck"
-            ((failed++))
-        fi
-    else
-        if run_standalone_ktlint; then
-            log_pass "ktlint (standalone)"
-        else
-            log_fail "ktlint (standalone)"
-            ((failed++))
-        fi
-    fi
-
-    echo
-    if [ $failed -gt 0 ]; then
-        return 1
-    fi
-    return 0
-}
-
-# Print usage
-print_usage() {
-    echo "Usage: $0 [OPTIONS]"
-    echo ""
-    echo "Runs local verification matching CI pipeline."
-    echo ""
-    echo "Options:"
-    echo "  (no option)    Full CI simulation: all 4 steps via Gradle"
-    echo "  --quick        Quick check: ktlint only (via Gradle)"
-    echo "  --standalone   Standalone ktlint without Android SDK"
-    echo "  --help, -h     Show this help message"
-    echo ""
-    echo "CI Pipeline Steps:"
-    echo "  1. ktlintCheck                        - Code style"
-    echo "  2. lintDebug                          - Android lint"
-    echo "  3. :core:test :app:testDebugUnitTest  - Unit tests"
-    echo "  4. assembleDebug                      - Build APK"
-    echo ""
-    echo "Requirements:"
-    echo "  Full/Quick:   ANDROID_HOME set, Java 17+"
-    echo "  Standalone:   curl"
-    echo ""
-    echo "Examples:"
-    echo "  $0                   # Run full CI (recommended before push)"
-    echo "  $0 --quick           # Fast check during development"
-    echo "  $0 --standalone      # When Android SDK not available"
-}
-
-# Main
-main() {
-    local mode="full"
-
-    case "${1:-}" in
-        --quick) mode="quick" ;;
-        --standalone) mode="standalone" ;;
-        --help|-h)
-            print_usage
-            exit 0
-            ;;
-        "")
-            mode="full"
-            ;;
-        *)
-            echo "Unknown option: $1"
-            print_usage
-            exit 1
-            ;;
-    esac
-
-    echo "========================================"
-    echo "  Local CI Verification"
-    echo "========================================"
-    echo "Project: $PROJECT_DIR"
-    echo "Mode:    $mode"
-
-    if [ "$mode" = "standalone" ]; then
-        echo ""
-        log_warn "Standalone mode: only ktlint"
-        log_warn "ktlint version may differ from CI!"
-        echo ""
-        if ! run_quick_checks false; then
-            log_fail "Some checks failed"
-            exit 1
-        fi
-        log_pass "All standalone checks passed"
+case "${1:-}" in
+    "") ;;
+    --quick) STEPS=("./gradlew ktlintCheck") ;;
+    --help | -h)
+        sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
         exit 0
-    fi
-
-    # Check if we can use Gradle
-    if ! can_use_gradle; then
-        echo ""
-        log_fail "Cannot run Gradle verification:"
-        log_fail "  - ANDROID_HOME or ANDROID_SDK_ROOT must be set"
-        echo ""
-        log_info "Options:"
-        log_info "  1. Set ANDROID_HOME and retry"
-        log_info "  2. Use --standalone for quick checks (may miss CI issues)"
+        ;;
+    *)
+        echo "Unknown option: $1 (see --help)"
         exit 1
-    fi
+        ;;
+esac
 
-    echo ""
+if [ -z "${ANDROID_HOME:-}" ] && [ -z "${ANDROID_SDK_ROOT:-}" ]; then
+    echo -e "${RED}[FAIL]${NC} ANDROID_HOME or ANDROID_SDK_ROOT must be set"
+    exit 1
+fi
+if [ "${#STEPS[@]}" -gt 1 ] && ! command -v openspec > /dev/null; then
+    echo -e "${RED}[FAIL]${NC} openspec not found: npm install -g @fission-ai/openspec"
+    exit 1
+fi
+export OPENSPEC_TELEMETRY=0
 
-    if [ "$mode" = "quick" ]; then
-        log_info "Quick mode: ktlint only"
-        echo ""
-        if ! run_quick_checks true; then
-            log_fail "Some checks failed"
-            exit 1
-        fi
-        log_pass "Quick checks passed"
-        log_warn "Note: lintDebug, tests, and build not verified"
+# Every step runs, so that one run shows all failures.
+failed=0
+for i in "${!STEPS[@]}"; do
+    echo -e "\n${YELLOW}=== Step $((i + 1))/${#STEPS[@]}: ${STEPS[$i]} ===${NC}"
+    if ${STEPS[$i]}; then
+        echo -e "${GREEN}[PASS]${NC} ${STEPS[$i]}"
     else
-        log_info "Full CI simulation: all ${#CI_STEPS[@]} steps"
-        echo ""
-        if ! run_full_ci; then
-            log_fail "CI simulation failed"
-            exit 1
-        fi
-        log_pass "Full CI simulation passed!"
-        log_info "Safe to push - matches CI exactly"
+        echo -e "${RED}[FAIL]${NC} ${STEPS[$i]}"
+        failed=$((failed + 1))
     fi
-}
+done
 
-main "$@"
+echo
+if [ "$failed" -gt 0 ]; then
+    echo -e "${RED}[FAIL]${NC} $failed of ${#STEPS[@]} steps failed"
+    exit 1
+fi
+echo -e "${GREEN}[PASS]${NC} All ${#STEPS[@]} steps passed"
