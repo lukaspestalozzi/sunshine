@@ -44,8 +44,8 @@ Requirements: JDK 17 or newer, and the Android SDK with platform 37 (`ANDROID_HO
 ./scripts/verify-local.sh                       # everything CI checks; run before pushing
 ```
 
-`verify-local.sh` also validates the OpenSpec specs and needs the OpenSpec CLI
-(`npm install -g @fission-ai/openspec`). CI (`.github/workflows/ci.yml`) runs the same checks and
+`verify-local.sh` also validates the OpenSpec specs and needs the OpenSpec CLI in the version
+CI pins in `.github/workflows/ci.yml` (currently `npm install -g @fission-ai/openspec@1.13.2`). CI (`.github/workflows/ci.yml`) runs the same checks and
 uploads the debug APK as the artifact `app-debug-apk`.
 
 ## How it is built
