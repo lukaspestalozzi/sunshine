@@ -25,7 +25,7 @@ See proposal.md for the motivation and the specs for the behaviour. Relevant cur
   `SettingsStore` setters, read once at start.
 - **Tests.** No Compose UI tests: behaviour is tested through pure functions and the view model on
   the JVM (JUnit 6); look and gestures are checked on the device. Material 3 is 1.4.0 (Compose BOM
-  2026.09.00): `TimePicker`, `TimePickerDialog`, `TooltipBox` and `TopAppBar` are available.
+  2026.09.00): `TopAppBar` is available; its `TimePicker` and `TooltipBox` are experimental.
 
 ## Goals / Non-Goals
 
@@ -112,9 +112,10 @@ the strip shows the progress.
 *Alternatives (asked, 2026-10-05):* only the overlay's day (neutral with the overlay off); only the
 tracer (no progress).
 
-### D6. Exact time: Material clock dialog
-Tapping the header's time opens `TimePickerDialog` with a 24-hour `TimePicker` at the selected
-hour and minute. `OK` calls `MapViewModel.onTimeTyped(hour, minute)`, which selects
+### D6. Exact time: the platform's clock dialog
+Tapping the header's time opens the platform's `android.app.TimePickerDialog` in 24-hour mode at the
+selected hour and minute (Material 3's `TimePicker` is still an experimental API in 1.4.0, which
+would need the project's first opt-in; found while applying). `OK` calls `MapViewModel.onTimeTyped(hour, minute)`, which selects
 `ZonedDateTime.of(date, LocalTime.of(hour, minute), zone)`: `ZonedDateTime.of` already moves a gap
 time forward by the gap and takes the earlier offset in an overlap, as the spec asks; `select`
 rounds it while `Sun & shade` is shown.
@@ -124,10 +125,11 @@ rounds it while `Sun & shade` is shown.
 `decode` defaults and `SettingsStore` setters; they are not shown on the Settings page (settings
 "Stored settings"). The map screen reads them from `settings` and writes through the view model.
 
-### D8. Tooltips on the toggle (user decision, 2026-10-06)
-Each `SegmentedButton`'s icon is wrapped in a `TooltipBox` with a `PlainTooltip` of its content
-description; a long press shows it without selecting (the tooltip state consumes the long press,
-the button keeps the tap).
+### D8. No tooltips on the toggle (user decision, 2026-10-07)
+Planned as a `TooltipBox` per icon; while applying, `TooltipBox` turned out to be an experimental
+Material 3 API (1.4.0), like `TimePicker`. *Alternatives (asked):* the project's first opt-in with a
+justification; an own long-press popup with the toggle rebuilt by hand. The user dropped the
+tooltips: the first-run hint and the status card's mode name explain the toggle.
 
 ### D9. First-run hint (user decision, 2026-10-06)
 A `Surface` card in `MapLabels`' bottom-start column, directly above the panel and as wide: so it
@@ -161,8 +163,6 @@ so the values are stored either way. The `headlineSmall` titles go.
 
 - [The tape's feel (fling speed, snapping) is hard to judge on the JVM] → Its geometry is tested;
   the feel is a device check, with the decay's friction as the one tuning knob.
-- [`TooltipBox` around a `SegmentedButton` may swallow taps or show on tap] → Device check; fall
-  back to `onLongClick` on the button with the same tooltip state.
 - [The hint above the panel may be squeezed in short landscape windows] → It scrolls with the
   panel's column; it is shown once and dismissed with one tap.
 - [The strip's day must belong to the crosshair] → Only a day whose area's centre is the rested

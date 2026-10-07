@@ -1,40 +1,5 @@
 ## MODIFIED Requirements
 
-### Requirement: Overlay toggle
-A three-way toggle on the map SHALL select what the overlay shows: `Off`, `Sun & shade` (the
-overlay of the selected time) or `Sun hours` (the heatmap of the selected day, sun-exposure-heatmap
-"Overlay mode"). Its three options SHALL be icons without text, each at least 48 × 48 dp to touch,
-with the content descriptions `Overlay off`, `Sun and shade now` and `Sun hours of the day`; the
-selected option SHALL be highlighted. Long-pressing an option SHALL show its content description
-as a tooltip next to it, without selecting it (user decision, 2026-10-06). The toggle SHALL sit in the map's top-right corner and SHALL
-NOT wrap or extend beyond the screen. `Off` SHALL be selected when the app is launched. While the
-app process is alive, including across screen rotation, the selection SHALL be preserved. While
-`Off` is selected, no overlay computation and no DEM tile request for it SHALL take place.
-
-#### Scenario: Off at launch
-- **WHEN** the app is launched
-- **THEN** `Off` is selected and no overlay is drawn
-
-#### Scenario: Switch on
-- **WHEN** the map zoom is 12 and the user selects `Sun & shade`
-- **THEN** the overlay for the visible area is computed and drawn
-
-#### Scenario: Straight to sun hours
-- **WHEN** `Off` is selected and the user selects `Sun hours`
-- **THEN** the day of the visible area is computed and its heatmap is shown once it is complete
-
-#### Scenario: Screen rotation
-- **WHEN** `Sun hours` is selected and the device is rotated
-- **THEN** `Sun hours` is still selected
-
-#### Scenario: Name on long press
-- **WHEN** `Off` is selected and the user long-presses the `Sun hours` icon
-- **THEN** a tooltip reads `Sun hours of the day`, and `Off` stays selected
-
-#### Scenario: Narrow screen
-- **WHEN** the screen is 360 dp wide, in portrait or landscape
-- **THEN** the toggle shows its three icons in one row, fully on screen
-
 ### Requirement: Overlay status card
 While `Sun & shade` or `Sun hours` is selected, a status card SHALL be shown directly below the
 overlay toggle, exactly as wide as the toggle and aligned with its right edge. From top to bottom

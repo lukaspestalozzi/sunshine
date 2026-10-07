@@ -7,6 +7,8 @@
     <string name="sun_panel_date">Date</string>
     <string name="sun_panel_now">Now</string>
     <string name="sun_panel_time_of_day">Time of day</string>
+    <string name="tape_earlier">Earlier</string>
+    <string name="tape_later">Later</string>
     <string name="sun_panel_azimuth">Azimuth</string>
     <string name="sun_panel_elevation">Elevation</string>
     <string name="sun_panel_civil_dawn">Civil dawn</string>
@@ -24,6 +26,10 @@
     <string name="heatmap_mode_sun_hours">Sun hours</string>
     <string name="heatmap_computing">Computing sun hours …</string>
     <string name="sun_panel_sun_hours">Sun hours</string>
+    <string name="sun_panel_details">Details</string>
+    <string name="sun_panel_show_details">Show details</string>
+    <string name="sun_panel_hide_details">Hide details</string>
+    <string name="sun_panel_time_zone">Time zone</string>
     <string name="overlay_option_off">Overlay off</string>
     <string name="overlay_option_sun_and_shade">Sun and shade now</string>
     <string name="overlay_option_sun_hours">Sun hours of the day</string>
