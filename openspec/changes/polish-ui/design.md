@@ -143,9 +143,11 @@ location follow stops) and `animateCamera(newLatLng(point), 300 ms)`, returning 
 reports a single tap only when it is not part of a double tap, so double-tap zoom stays.
 
 ### D11. Top bars
-`SettingsScreen`, `CustomResolutionScreen` and `OfflineScreen` get a `Scaffold` with a
-`TopAppBar` (title, `navigationIcon` = `IconButton` with a Material Symbols `arrow_back` vector,
-content description `Back`) and an `onBack` parameter; `MainActivity` passes the same action as
+`SettingsScreen`, `CustomResolutionScreen` and `OfflineScreen` get a shared `PageTopBar` above their
+scrolling content: a 64 dp row with an `IconButton` holding a Material Symbols `arrow_back` vector
+(content description `Back`) and the title. Not Material's `TopAppBar`: it is an experimental API
+in 1.4.0, like `TooltipBox` and `TimePicker` (found while applying; the user preferred avoiding
+experimental APIs, D8). Each page gets an `onBack` parameter; `MainActivity` passes the same action as
 its `BackHandler`s; `CustomResolutionScreen`'s arrow calls the function its `BackHandler` calls,
 so the values are stored either way. The `headlineSmall` titles go.
 

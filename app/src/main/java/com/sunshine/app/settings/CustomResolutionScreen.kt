@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sunshine.app.R
+import com.sunshine.app.ui.PageTopBar
 import kotlin.math.roundToInt
 
 /**
@@ -42,34 +43,38 @@ fun CustomResolutionScreen(
     viewModel: SettingsViewModel = viewModel(factory = settingsViewModelFactory),
 ) {
     LaunchedEffect(viewModel) { viewModel.onCustomOpened() }
-    BackHandler {
+    // The back arrow leaves the page like the system back: the values are stored (design D3 of add-settings).
+    val leave = {
         viewModel.onCustomClosed()
         onBack()
     }
+    BackHandler { leave() }
     val draft by viewModel.customDraft.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val values = draft ?: settings.custom
     val edit = viewModel::onCustomEdited
     Surface(modifier.fillMaxSize()) {
-        Column(
-            Modifier
-                .verticalScroll(rememberScrollState())
-                .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(stringResource(R.string.settings_custom_resolution), style = MaterialTheme.typography.headlineSmall)
-            CellEntry(R.string.settings_custom_sun_shade_cell, values.sunShadeCellDp, Resolution.SUN_SHADE_CELLS) {
-                edit(values.copy(sunShadeCellDp = it))
-            }
-            StepEntry(R.string.settings_custom_sun_shade_step, values.sunShadeStepMinutes) {
-                edit(values.copy(sunShadeStepMinutes = it))
-            }
-            CellEntry(R.string.settings_custom_sun_hours_cell, values.sunHoursCellDp, Resolution.SUN_HOURS_CELLS) {
-                edit(values.copy(sunHoursCellDp = it))
-            }
-            StepEntry(R.string.settings_custom_sun_hours_step, values.sunHoursStepMinutes) {
-                edit(values.copy(sunHoursStepMinutes = it))
+        // The top bar stays while the page scrolls (design D11 of polish-ui).
+        Column(Modifier.windowInsetsPadding(WindowInsets.safeDrawing)) {
+            PageTopBar(stringResource(R.string.settings_custom_resolution), leave)
+            Column(
+                Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                CellEntry(R.string.settings_custom_sun_shade_cell, values.sunShadeCellDp, Resolution.SUN_SHADE_CELLS) {
+                    edit(values.copy(sunShadeCellDp = it))
+                }
+                StepEntry(R.string.settings_custom_sun_shade_step, values.sunShadeStepMinutes) {
+                    edit(values.copy(sunShadeStepMinutes = it))
+                }
+                CellEntry(R.string.settings_custom_sun_hours_cell, values.sunHoursCellDp, Resolution.SUN_HOURS_CELLS) {
+                    edit(values.copy(sunHoursCellDp = it))
+                }
+                StepEntry(R.string.settings_custom_sun_hours_step, values.sunHoursStepMinutes) {
+                    edit(values.copy(sunHoursStepMinutes = it))
+                }
             }
         }
     }

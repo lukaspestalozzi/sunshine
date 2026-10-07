@@ -78,6 +78,13 @@ fun MapLibreMap(
                     map.addOnCameraMoveStartedListener { reason ->
                         if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) currentOnCameraGesture()
                     }
+                    // A single tap moves the tapped point under the crosshair, as a drag would (map-view spec,
+                    // "Selected location crosshair"; design D10 of polish-ui). Double taps still zoom.
+                    map.addOnMapClickListener { point ->
+                        currentOnCameraGesture()
+                        map.animateCamera(CameraUpdateFactory.newLatLng(point), TAP_CENTRE_MILLIS)
+                        true
+                    }
                 }
             }
         }
@@ -295,3 +302,5 @@ private const val UPDATE_MILLIS = 1_000L
 
 // A position older than this is drawn grey (user decision, design D2 of add-gps-location).
 private const val STALE_MILLIS = 30_000L
+
+private const val TAP_CENTRE_MILLIS = 300
