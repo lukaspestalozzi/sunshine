@@ -53,14 +53,17 @@ import com.sunshine.app.about.AboutSection
 import com.sunshine.app.map.LOCATION_PERMISSIONS
 import com.sunshine.app.map.LocationAccess
 import com.sunshine.app.map.locationAccess
+import com.sunshine.app.ui.PageTopBar
 import kotlin.math.roundToInt
 
 /**
  * The Settings page (settings spec, "Settings page"; design D10 of add-settings): the sections
- * Display, Map, Calculation, Storage, Debug and About. The system back returns to the map.
+ * Display, Map, Calculation, Storage, Debug and About. The back arrow ([onBack]) and the system back
+ * return to the map.
  */
 @Composable
 fun SettingsScreen(
+    onBack: () -> Unit,
     onCustomResolution: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = viewModel(factory = settingsViewModelFactory),
@@ -83,64 +86,65 @@ fun SettingsScreen(
         if (startAt == StartAt.MY_LOCATION && !locationAllowed) askLocation.launch(LOCATION_PERMISSIONS)
     }
     Surface(modifier.fillMaxSize()) {
-        Column(
-            Modifier
-                .verticalScroll(rememberScrollState())
-                .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineSmall)
+        // The top bar stays while the page scrolls (design D11 of polish-ui).
+        Column(Modifier.windowInsetsPadding(WindowInsets.safeDrawing)) {
+            PageTopBar(stringResource(R.string.settings_title), onBack)
+            Column(
+                Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Section(R.string.settings_display)
+                ChoiceEntry(R.string.settings_coordinates, COORDINATE_LABELS, settings.coordinates, viewModel::onCoordinates)
+                SwitchEntry(R.string.settings_keep_screen_on, settings.keepScreenOn, viewModel::onKeepScreenOn)
 
-            Section(R.string.settings_display)
-            ChoiceEntry(R.string.settings_coordinates, COORDINATE_LABELS, settings.coordinates, viewModel::onCoordinates)
-            SwitchEntry(R.string.settings_keep_screen_on, settings.keepScreenOn, viewModel::onKeepScreenOn)
+                Section(R.string.settings_map)
+                ChoiceEntry(R.string.settings_start_at, START_AT_LABELS, settings.startAt, onStartAt)
+                if (settings.startAt == StartAt.MY_LOCATION && !locationAllowed) {
+                    Text(stringResource(R.string.settings_location_off), style = MaterialTheme.typography.bodySmall)
+                }
+                OpacityEntry(settings.overlayOpacityPercent, viewModel::onOverlayOpacity)
 
-            Section(R.string.settings_map)
-            ChoiceEntry(R.string.settings_start_at, START_AT_LABELS, settings.startAt, onStartAt)
-            if (settings.startAt == StartAt.MY_LOCATION && !locationAllowed) {
-                Text(stringResource(R.string.settings_location_off), style = MaterialTheme.typography.bodySmall)
+                Section(R.string.settings_calculation)
+                ChoiceEntry(R.string.settings_resolution, PRESET_LABELS, settings.preset, viewModel::onPreset)
+                if (settings.preset == Preset.CUSTOM) {
+                    LinkEntry(R.string.settings_custom_resolution, onCustomResolution)
+                }
+
+                Section(R.string.settings_storage)
+                ChoiceEntry(
+                    R.string.settings_browsed_limit,
+                    Settings.BROWSED_LIMITS_MIB.map { it to { stringResource(R.string.settings_mib, it) } },
+                    settings.browsedLimitMib,
+                    viewModel::onBrowsedLimit,
+                )
+                Text(stringResource(R.string.settings_browsed_limit_note), style = MaterialTheme.typography.bodySmall)
+                // No dialog (user decision); disabled while a region is not complete (offline-regions spec,
+                // "Clear browsed tiles").
+                OutlinedButton(onClick = { viewModel.onClearBrowsed { cleared = it } }, enabled = canClear) {
+                    Text(stringResource(R.string.settings_clear_browsed))
+                }
+                when {
+                    !canClear -> Text(stringResource(R.string.settings_clear_unavailable), style = MaterialTheme.typography.bodySmall)
+                    cleared == true -> Text(stringResource(R.string.settings_cleared), style = MaterialTheme.typography.bodySmall)
+                    cleared == false -> Text(stringResource(R.string.settings_clear_failed), style = MaterialTheme.typography.bodySmall)
+                }
+
+                // In every build, each switch off by default (settings spec, "Debug info"; design D6 of polish-overlay).
+                Section(R.string.settings_debug)
+                val debug = settings.debug
+                SwitchEntry(R.string.settings_debug_timings, debug.timings) { on -> viewModel.onDebug { it.copy(timings = on) } }
+                SwitchEntry(R.string.settings_debug_tiles, debug.tiles) { on -> viewModel.onDebug { it.copy(tiles = on) } }
+                SwitchEntry(R.string.settings_debug_day_state, debug.dayState) { on -> viewModel.onDebug { it.copy(dayState = on) } }
+                SwitchEntry(
+                    R.string.settings_debug_agreement,
+                    debug.agreementCheck,
+                ) { on -> viewModel.onDebug { it.copy(agreementCheck = on) } }
+
+                Section(R.string.about_title)
+                AboutSection()
             }
-            OpacityEntry(settings.overlayOpacityPercent, viewModel::onOverlayOpacity)
-
-            Section(R.string.settings_calculation)
-            ChoiceEntry(R.string.settings_resolution, PRESET_LABELS, settings.preset, viewModel::onPreset)
-            if (settings.preset == Preset.CUSTOM) {
-                LinkEntry(R.string.settings_custom_resolution, onCustomResolution)
-            }
-
-            Section(R.string.settings_storage)
-            ChoiceEntry(
-                R.string.settings_browsed_limit,
-                Settings.BROWSED_LIMITS_MIB.map { it to { stringResource(R.string.settings_mib, it) } },
-                settings.browsedLimitMib,
-                viewModel::onBrowsedLimit,
-            )
-            Text(stringResource(R.string.settings_browsed_limit_note), style = MaterialTheme.typography.bodySmall)
-            // No dialog (user decision); disabled while a region is not complete (offline-regions spec,
-            // "Clear browsed tiles").
-            OutlinedButton(onClick = { viewModel.onClearBrowsed { cleared = it } }, enabled = canClear) {
-                Text(stringResource(R.string.settings_clear_browsed))
-            }
-            when {
-                !canClear -> Text(stringResource(R.string.settings_clear_unavailable), style = MaterialTheme.typography.bodySmall)
-                cleared == true -> Text(stringResource(R.string.settings_cleared), style = MaterialTheme.typography.bodySmall)
-                cleared == false -> Text(stringResource(R.string.settings_clear_failed), style = MaterialTheme.typography.bodySmall)
-            }
-
-            // In every build, each switch off by default (settings spec, "Debug info"; design D6 of polish-overlay).
-            Section(R.string.settings_debug)
-            val debug = settings.debug
-            SwitchEntry(R.string.settings_debug_timings, debug.timings) { on -> viewModel.onDebug { it.copy(timings = on) } }
-            SwitchEntry(R.string.settings_debug_tiles, debug.tiles) { on -> viewModel.onDebug { it.copy(tiles = on) } }
-            SwitchEntry(R.string.settings_debug_day_state, debug.dayState) { on -> viewModel.onDebug { it.copy(dayState = on) } }
-            SwitchEntry(
-                R.string.settings_debug_agreement,
-                debug.agreementCheck,
-            ) { on -> viewModel.onDebug { it.copy(agreementCheck = on) } }
-
-            Section(R.string.about_title)
-            AboutSection()
         }
     }
 }

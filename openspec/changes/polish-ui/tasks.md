@@ -26,9 +26,9 @@ Device checks (7.1–7.4) are done by the user at the end, on the debug APK of t
 
 ## 5. Map and pages
 
-- [ ] 5.1 Tap to centre in `MapLibreMap` (design D10; map-view "Selected location crosshair"), calling `onCameraGesture` first. Verify: `./gradlew :app:compileDebugKotlin` passes; the behaviour is device check 7.3.
-- [ ] 5.2 The first-run hint above the panel (design D9; map-view "First-run hint"), its texts in `strings.xml`, the toggle's icons inline, `Got it` storing `hintDismissed`. Verify: `./gradlew :app:testDebugUnitTest` passes; the look is device check 7.3.
-- [ ] 5.3 Top bars with the back arrow on the Settings, Custom resolution and Offline pages (design D11; settings "Settings page", "Custom resolution", offline-regions "Offline button"), the `arrow_back` icon added, `MainActivity` passing `onBack`. Verify: `./gradlew :app:testDebugUnitTest` passes; device check 7.4.
+- [x] 5.1 Tap to centre in `MapLibreMap` (design D10; map-view "Selected location crosshair"), calling `onCameraGesture` first. Verify: `./gradlew :app:compileDebugKotlin` passes; the behaviour is device check 7.3.
+- [x] 5.2 The first-run hint above the panel (design D9; map-view "First-run hint"), its texts in `strings.xml`, the toggle's icons inline, `Got it` storing `hintDismissed`. Verify: `./gradlew :app:testDebugUnitTest` passes; the look is device check 7.3.
+- [x] 5.3 Top bars with the back arrow on the Settings, Custom resolution and Offline pages (design D11; settings "Settings page", "Custom resolution", offline-regions "Offline button"), the `arrow_back` icon added, `MainActivity` passing `onBack`. Verify: `./gradlew :app:testDebugUnitTest` passes; device check 7.4.
 
 ## 6. Docs and the full check
 

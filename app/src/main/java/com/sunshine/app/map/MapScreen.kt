@@ -13,7 +13,9 @@ import android.provider.Settings
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.calculateStartPadding
@@ -174,26 +176,29 @@ fun MapScreen(
                 )
             },
         ) {
-            SunPanel(
-                selectedTime = selectedTime,
-                today = viewModel.today(),
-                sun = sun,
-                elevation = elevation,
-                sunshine = sunshine,
-                sunHours =
-                    formatSunHours(heatmap, camera.center).takeIf {
-                        isOverlayOn && overlayMode == OverlayMode.SUN_HOURS && camera.zoom >= MIN_OVERLAY_ZOOM
-                    },
-                strip = tapeStrip,
-                detailsExpanded = settings.detailsExpanded,
-                onDetailsToggled = viewModel::onDetailsToggled,
-                onDateSelected = viewModel::onDateSelected,
-                onSliderMoved = viewModel::onSliderMoved,
-                sliderStep = sliderStep,
-                onNowClicked = viewModel::onNowClicked,
-                onTimeTyped = viewModel::onTimeTyped,
-                modifier = Modifier.widthIn(max = panelMaxWidth),
-            )
+            // The first-run hint above the panel, as wide (map-view spec, "First-run hint").
+            Column(Modifier.widthIn(max = panelMaxWidth), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (!settings.hintDismissed) FirstRunHint(onDismiss = viewModel::onHintDismissed)
+                SunPanel(
+                    selectedTime = selectedTime,
+                    today = viewModel.today(),
+                    sun = sun,
+                    elevation = elevation,
+                    sunshine = sunshine,
+                    sunHours =
+                        formatSunHours(heatmap, camera.center).takeIf {
+                            isOverlayOn && overlayMode == OverlayMode.SUN_HOURS && camera.zoom >= MIN_OVERLAY_ZOOM
+                        },
+                    strip = tapeStrip,
+                    detailsExpanded = settings.detailsExpanded,
+                    onDetailsToggled = viewModel::onDetailsToggled,
+                    onDateSelected = viewModel::onDateSelected,
+                    onSliderMoved = viewModel::onSliderMoved,
+                    sliderStep = sliderStep,
+                    onNowClicked = viewModel::onNowClicked,
+                    onTimeTyped = viewModel::onTimeTyped,
+                )
+            }
         }
         SnackbarHost(
             snackbarHostState,

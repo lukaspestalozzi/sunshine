@@ -40,17 +40,19 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.sunshine.app.R
 import com.sunshine.app.SunshineApp
+import com.sunshine.app.ui.PageTopBar
 import com.sunshine.core.MapArea
 import java.time.ZoneId
 
 /**
  * The Offline page for the map [area] visible when it was opened (offline-regions spec; design D9
- * of add-offline-regions): the download of that area, the regions, and the storage used. The system
- * back returns to the map.
+ * of add-offline-regions): the download of that area, the regions, and the storage used. The back
+ * arrow ([onBack]) and the system back return to the map.
  */
 @Composable
 fun OfflineScreen(
     area: MapArea,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: OfflineViewModel = viewModel(key = area.toString(), factory = offlineViewModelFactory(area)),
 ) {
@@ -70,29 +72,31 @@ fun OfflineScreen(
         }
     }
     Surface(modifier.fillMaxSize()) {
-        Column(
-            Modifier
-                .verticalScroll(rememberScrollState())
-                .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(stringResource(R.string.offline_title), style = MaterialTheme.typography.headlineSmall)
-            Button(onClick = onDownload, enabled = state.canDownload) { Text(stringResource(R.string.offline_download)) }
-            val notice = if (state.blocked == DownloadBlock.ACROSS_180) R.string.offline_across_180 else R.string.offline_zoom_in
-            Text(state.estimate ?: stringResource(notice), style = MaterialTheme.typography.bodyMedium)
-            Text(stringResource(R.string.offline_regions), style = MaterialTheme.typography.titleMedium)
-            if (state.regions.isEmpty()) {
-                Text(stringResource(R.string.offline_no_regions), style = MaterialTheme.typography.bodyLarge)
+        // The top bar stays while the page scrolls (design D11 of polish-ui).
+        Column(Modifier.windowInsetsPadding(WindowInsets.safeDrawing)) {
+            PageTopBar(stringResource(R.string.offline_title), onBack)
+            Column(
+                Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Button(onClick = onDownload, enabled = state.canDownload) { Text(stringResource(R.string.offline_download)) }
+                val notice = if (state.blocked == DownloadBlock.ACROSS_180) R.string.offline_across_180 else R.string.offline_zoom_in
+                Text(state.estimate ?: stringResource(notice), style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.offline_regions), style = MaterialTheme.typography.titleMedium)
+                if (state.regions.isEmpty()) {
+                    Text(stringResource(R.string.offline_no_regions), style = MaterialTheme.typography.bodyLarge)
+                }
+                for (region in state.regions) {
+                    RegionEntry(region, onDelete = { viewModel.onDeleteRequested(region.id) })
+                }
+                Column {
+                    Text(stringResource(R.string.offline_storage_map, state.mapStorage), style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.offline_storage_elevation, state.demStorage), style = MaterialTheme.typography.bodyLarge)
+                }
+                Text(stringResource(R.string.offline_storage_limit, state.browsedLimit), style = MaterialTheme.typography.bodySmall)
             }
-            for (region in state.regions) {
-                RegionEntry(region, onDelete = { viewModel.onDeleteRequested(region.id) })
-            }
-            Column {
-                Text(stringResource(R.string.offline_storage_map, state.mapStorage), style = MaterialTheme.typography.bodyLarge)
-                Text(stringResource(R.string.offline_storage_elevation, state.demStorage), style = MaterialTheme.typography.bodyLarge)
-            }
-            Text(stringResource(R.string.offline_storage_limit, state.browsedLimit), style = MaterialTheme.typography.bodySmall)
         }
     }
     state.confirmDelete?.let { region ->

@@ -9,6 +9,11 @@
     <string name="sun_panel_time_of_day">Time of day</string>
     <string name="tape_earlier">Earlier</string>
     <string name="tape_later">Later</string>
+    <string name="hint_crosshair">The crosshair marks the place the panel describes. Drag the map, or tap a point to centre it.</string>
+    <string name="hint_modes_shade">shows sun and shade at the selected time,</string>
+    <string name="hint_modes_hours">the hours of sun over the day.</string>
+    <string name="hint_got_it">Got it</string>
+    <string name="back">Back</string>
     <string name="sun_panel_azimuth">Azimuth</string>
     <string name="sun_panel_elevation">Elevation</string>
     <string name="sun_panel_civil_dawn">Civil dawn</string>

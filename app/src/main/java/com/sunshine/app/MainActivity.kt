@@ -42,14 +42,14 @@ class MainActivity : ComponentActivity() {
                         )
                     Screen.SETTINGS -> {
                         BackHandler { screen = Screen.MAP }
-                        SettingsScreen(onCustomResolution = { screen = Screen.CUSTOM_RESOLUTION })
+                        SettingsScreen(onBack = { screen = Screen.MAP }, onCustomResolution = { screen = Screen.CUSTOM_RESOLUTION })
                     }
                     // Its own back handler stores the values before returning (design D3 of add-settings).
                     Screen.CUSTOM_RESOLUTION -> CustomResolutionScreen(onBack = { screen = Screen.SETTINGS })
                     Screen.OFFLINE -> {
                         BackHandler { screen = Screen.MAP }
                         val (latitude, longitude, zoom, width, height) = offlineArea
-                        OfflineScreen(MapArea(GeoPoint(latitude, longitude), zoom, width, height))
+                        OfflineScreen(MapArea(GeoPoint(latitude, longitude), zoom, width, height), onBack = { screen = Screen.MAP })
                     }
                 }
             }
