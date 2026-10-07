@@ -47,7 +47,10 @@ See proposal.md for the motivation and the specs for the behaviour. Relevant cur
 `SunPanel` becomes: header row (the time as a clickable text, `Date`, `Now`), the headline
 (`formatSunshine`, unchanged text, `titleMedium` at 18 sp or more), the `Sun hours` line when
 shown, the tape, and a `Details` row toggling an `AnimatedVisibility` with altitude, the sun values
-(`FlowRow` as today), the whole-day text and the zone ID. The panel keeps its width rules.
+(`FlowRow` as today), the whole-day text and the zone ID. The panel keeps its width rules. The
+header's time and the `Details` row's text take `MaterialTheme.colorScheme.primary`, the colour of
+the `TextButton`s' texts, so that every clickable text of the panel looks alike (user decision,
+2026-10-07, after the first device check).
 
 *Alternatives (asked):* a "now / until" sentence or a countdown as the headline (user chose the
 day's periods); expanded details by default; collapsing the whole panel to a handle (would hide
@@ -108,6 +111,12 @@ built on its compute dispatcher from:
 The view model publishes the shown day of each mode in a `MutableStateFlow<DayOverlay?>` for this.
 `dayProgress` and the status card's progress bar are removed (spec: "Overlay status card");
 the strip shows the progress.
+
+The strip comes with its progress as a whole percentage, `tapeStrip: StateFlow<TapeStrip>` with
+`TapeStrip(states, percent)` (user decision, 2026-10-07: shown always): from a day,
+`computed * 100 / steps.size` at each emission of its `computed`, so `100` only when complete;
+from the horizon, `0` while it is not there for the crosshair and `100` once it is. The panel shows
+it as `25 %` in `labelSmall` at the tape's right, the tape taking the rest of the width.
 
 *Alternatives (asked, 2026-10-05):* only the overlay's day (neutral with the overlay off); only the
 tracer (no progress).

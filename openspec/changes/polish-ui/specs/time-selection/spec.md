@@ -163,17 +163,22 @@ known, so that the strip fills outward from the needle as a day is computed, nea
 selected time first. The strip replaces the progress bar of the overlay's day (sun-shade-overlay
 "Overlay status card").
 
+Right of the tape, the panel SHALL always show the strip's progress as a whole percentage, e.g.
+`25 %` (user decision, 2026-10-07): while the strip comes from a day, the share of that day's steps
+computed, rounded down, so that `100 %` means the whole day; otherwise `0 %` while the crosshair's
+horizon is computed and `100 %` once it is.
+
 #### Scenario: Overlay off in Interlaken
 - **WHEN** the overlay is off, the crosshair is at 46.6863° N, 7.8632° E, the selected date is 2025-12-21 in Europe/Zurich and the horizon is computed
-- **THEN** the steps from 10:10 to 14:50 and from 15:15 to 15:50 are sun, the steps from 08:15 to 10:05, 14:55 to 15:10 and 15:55 to 16:40 are shade, and the steps up to 08:05 and from 16:45 are night (each boundary ±1 step)
+- **THEN** the steps from 10:10 to 14:50 and from 15:15 to 15:50 are sun, the steps from 08:15 to 10:05, 14:55 to 15:10 and 15:55 to 16:40 are shade, and the steps up to 08:05 and from 16:45 are night (each boundary ±1 step), and the progress shows `100 %`
 
 #### Scenario: Horizon not yet computed
 - **WHEN** the overlay is off and the horizon of a new crosshair is being computed
-- **THEN** every daytime step is not computed yet, and the night steps are night
+- **THEN** every daytime step is not computed yet, the night steps are night, and the progress shows `0 %`
 
 #### Scenario: Day partly computed
 - **WHEN** `Sun & shade` is shown at zoom 12 and 72 of the day's 288 steps are computed, nearest to 12:00 first
-- **THEN** the 72 steps around 12:00 under the needle have their colours, and the other daytime steps are not computed yet
+- **THEN** the 72 steps around 12:00 under the needle have their colours, the other daytime steps are not computed yet, and the progress shows `25 %`
 
 #### Scenario: Missing terrain
 - **WHEN** the overlay is off, offline, and the crosshair's horizon is unknown towards the sun between 14:00 and 15:00
