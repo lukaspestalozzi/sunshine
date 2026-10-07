@@ -365,9 +365,9 @@ class MapViewModel(
      * The states of the time tape's steps at the rested crosshair (time-selection spec, "Time tape
      * strip"; design D5 of polish-ui): from the shown mode's day while it belongs to the crosshair,
      * updated at each computed step, else from the crosshair's horizon; not computed while neither
-     * is there. While the camera moves, the states stay.
+     * is there. While the camera moves, the states stay. With them, the progress of their source.
      */
-    val tapeStrip: StateFlow<List<StripState>> =
+    val tapeStrip: StateFlow<TapeStrip> =
         channelFlow {
             var job: Job? = null
             combine(
@@ -382,18 +382,25 @@ class MapViewModel(
                     job = launch { stripOf(input) }
                 }
         }.flowOn(computeDispatcher)
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), initialValue = emptyList())
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), initialValue = TapeStrip(emptyList(), 0))
 
-    private suspend fun ProducerScope<List<StripState>>.stripOf(input: StripInput) {
+    private suspend fun ProducerScope<TapeStrip>.stripOf(input: StripInput) {
         val point = input.point
         val times = TapeScale(input.date, zone, input.step).times()
         val night = nightSteps(point, times)
         val day = input.day?.takeIf { it.area.center == point && it.date == input.date }
         if (day != null) {
-            day.computed.collect { send(tapeStrip(night) { dayState(day, point, it * input.step.toFloat()) }) }
+            day.computed.collect { computed ->
+                send(TapeStrip(tapeStrip(night) { dayState(day, point, it * input.step.toFloat()) }, computed * 100 / day.steps.size))
+            }
         } else {
             val horizon = input.horizon?.takeIf { it.point == point }
-            send(tapeStrip(night) { step -> horizon?.let { tracerState(it.profile, point, times[step]) } })
+            send(
+                TapeStrip(
+                    tapeStrip(night) { step -> horizon?.let { tracerState(it.profile, point, times[step]) } },
+                    if (horizon == null) 0 else 100,
+                ),
+            )
         }
     }
 

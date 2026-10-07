@@ -13,6 +13,15 @@ import kotlin.math.floor
 enum class StripState { NIGHT, SUN, SHADE, UNKNOWN, NOT_COMPUTED }
 
 /**
+ * The strip's [states] and its source's progress in whole [percent] (time-selection spec, "Time tape
+ * strip"; design D5 of polish-ui): a day's computed share, rounded down, or the horizon's 0 or 100.
+ */
+data class TapeStrip(
+    val states: List<StripState>,
+    val percent: Int,
+)
+
+/**
  * The strip's states of the tape's steps: night where [night] says so, whatever the source; else
  * the source's [state] of the step, `null` while it is not computed yet.
  */
