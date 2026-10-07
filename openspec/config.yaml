@@ -12,14 +12,17 @@ context: |
   - Responsive: computations never block the UI thread; overlays cover the whole visible area
     (no silent caps on the number of computed points).
   - This is a from-scratch rewrite. The discarded first implementation (git history before the
-    rewrite) and docs/legacy-design.md are source material only; do not port code from them.
+    rewrite) is source material only; do not port code from it.
     investigations/ holds verified reference values usable as test oracles.
 
   Tech stack (decided)
-  - Kotlin, Jetpack Compose (Material 3), MVVM with StateFlow, Koin DI, Coroutines/Flow.
+  - Kotlin, Jetpack Compose (Material 3), MVVM with StateFlow, Coroutines/Flow. Dependencies are wired
+    by hand: `SunshineApp` holds the object graph and the screens' view model factories take
+    from it; no DI framework (deferred by every change so far, as the graph does not justify one).
   - Map: MapLibre Native Android showing OpenTopoMap raster tiles. osmdroid is archived; do not use.
   - Sun position: commons-suncalc (see investigations/suncalc-library-evaluation.md).
-  - Elevation: Mapterhorn DEM tiles (Terrarium-encoded lossless WebP, 512 px, zoom 12), downloaded
+  - Elevation: Mapterhorn DEM tiles (Terrarium-encoded lossless WebP, 512 px; zoom 12 for the
+    altitude, zooms 10–14 for the horizon and the overlay), downloaded
     and decoded locally (see investigations/dem-source-evaluation.md and change
     add-elevation-data). No per-point online elevation API.
   - Dependency versions: latest stable at implementation time, managed in gradle/libs.versions.toml.
