@@ -127,13 +127,20 @@ class RenderOverlayTest {
                     ),
                 ),
             )
-        repeat(WARM_UP) {
+        repeat(PAIRS_WARM_UP) {
             renderOverlay(single)
             renderOverlay(combined)
         }
 
-        val singleNanos = fastest { renderOverlay(single) }
-        val nanos = fastest { renderOverlay(combined) }
+        // Alternated, so that a busy spell of the machine falls on both, and each after a collection:
+        // every image allocates two 1.5 MB arrays, which made G1 collect about every second render,
+        // with pauses up to 130 ms in a 5 ms render.
+        var singleNanos = Long.MAX_VALUE
+        var nanos = Long.MAX_VALUE
+        repeat(PAIRS_TIMED) {
+            singleNanos = minOf(singleNanos, timedAfterCollection { renderOverlay(single) })
+            nanos = minOf(nanos, timedAfterCollection { renderOverlay(combined) })
+        }
 
         assertTrue(nanos <= 1.5 * singleNanos, "${nanos / 1e6} ms against ${singleNanos / 1e6} ms")
     }
@@ -152,6 +159,13 @@ class RenderOverlayTest {
                 }
             }
         return OverlayImage(raster.width, raster.height, pixels, grid.area.corners())
+    }
+
+    private fun timedAfterCollection(render: () -> Unit): Long {
+        System.gc()
+        val start = System.nanoTime()
+        render()
+        return System.nanoTime() - start
     }
 
     private fun fastest(render: () -> Unit): Long =
@@ -211,6 +225,8 @@ class RenderOverlayTest {
         val METRES_PER_DEGREE = Math.toRadians(1.0) * 6_371_000.0
         const val WARM_UP = 5
         const val RUNS = 5
+        const val PAIRS_WARM_UP = 20
+        const val PAIRS_TIMED = 10
 
         // #455A64 and #9E9E9E, opaque: the overlay layer applies the chosen opacity (design D5 of
         // add-settings; the colours are those of design D10 of add-sun-exposure-heatmap).
