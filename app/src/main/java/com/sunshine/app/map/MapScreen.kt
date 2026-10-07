@@ -58,6 +58,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.sunshine.app.R
 import com.sunshine.app.SunshineApp
 import com.sunshine.app.network.NetworkMonitor
+import com.sunshine.app.offline.MEBIBYTE
 import com.sunshine.app.sunshine.debugLines
 import com.sunshine.app.sunshine.debugLog
 import com.sunshine.core.MapArea
@@ -285,7 +286,6 @@ private val SUN_PANEL_MAX_WIDTH = 360.dp
 // Label padding (8 dp) + half the 32 dp crosshair (16 dp) + a gap (8 dp).
 private val CROSSHAIR_CLEARANCE = 32.dp
 
-private const val MEBIBYTE = 1024L * 1024
 private const val PERCENT = 100f
 
 private val mapViewModelFactory =

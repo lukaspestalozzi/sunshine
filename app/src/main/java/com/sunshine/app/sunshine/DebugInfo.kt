@@ -1,5 +1,6 @@
 package com.sunshine.app.sunshine
 
+import com.sunshine.app.offline.MEBIBYTE
 import com.sunshine.app.settings.DebugSwitches
 import java.util.Locale
 import kotlin.math.roundToLong
@@ -189,4 +190,3 @@ private const val NONE = "–"
 private const val PERCENT = 100
 private const val SECONDS_FROM_MILLIS = 10_000L
 private const val MILLIS_PER_SECOND = 1000.0
-private const val MEBIBYTE = 1024.0 * 1024

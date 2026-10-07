@@ -1,6 +1,7 @@
 package com.sunshine.app.map
 
 import com.sunshine.core.GeoPoint
+import com.sunshine.core.MAP_TILE_DP
 import com.sunshine.core.MapArea
 import kotlin.math.PI
 import kotlin.math.atan
@@ -73,8 +74,6 @@ private fun mercatorY(latitude: Double): Double {
 }
 
 private fun latitude(y: Double) = Math.toDegrees(atan(sinh(PI * (1 - 2 * y))))
-
-private const val MAP_TILE_DP = 512.0
 
 // Uncovered strips thinner than this are rounding, not area.
 private const val EDGE_DP = 1e-6

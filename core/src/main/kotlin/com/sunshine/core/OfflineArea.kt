@@ -114,8 +114,6 @@ fun downloadEstimate(bounds: GeoBounds): DownloadEstimate {
 const val REQUESTS_PER_SECOND = 5.0
 
 private const val SECONDS_PER_MINUTE = 60.0
-private const val MAX_MAP_LATITUDE = 85.0511287798
-private const val MAP_TILE_DP = 512.0
 private const val METRES_PER_DEGREE = 2 * PI * EARTH_RADIUS / 360
 private const val MIN_MAP_TILE_ZOOM = 6
 private const val MAX_MAP_TILE_ZOOM = 17
