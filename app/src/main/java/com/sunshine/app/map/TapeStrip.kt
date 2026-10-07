@@ -1,6 +1,12 @@
 package com.sunshine.app.map
 
+import com.sunshine.core.GeoPoint
+import com.sunshine.core.HorizonProfile
+import com.sunshine.core.SUN_UPPER_LIMB
 import com.sunshine.core.Sunshine
+import com.sunshine.core.sunPosition
+import com.sunshine.core.sunshineAt
+import java.time.ZonedDateTime
 import kotlin.math.floor
 
 /** The state of one step of the time tape's strip (time-selection spec, "Time tape strip"; design D5 of polish-ui). */
@@ -32,3 +38,30 @@ fun sourceStep(
     tapeMinutes: Float,
     sourceStepMinutes: Int,
 ): Int = floor(tapeMinutes / sourceStepMinutes).toInt()
+
+/** For each of [times], whether the sun's upper edge at [point] is at or below the astronomical horizon. */
+fun nightSteps(
+    point: GeoPoint,
+    times: List<ZonedDateTime>,
+): BooleanArray = BooleanArray(times.size) { sunPosition(point, times[it].toInstant()).elevation + SUN_UPPER_LIMB <= 0.0 }
+
+/** The tracer's state at [point] and [time] from its horizon [profile]; unknown without a ground height (`null`). */
+fun tracerState(
+    profile: HorizonProfile?,
+    point: GeoPoint,
+    time: ZonedDateTime,
+): Sunshine = profile?.let { sunshineAt(it, point, time.toInstant()) } ?: Sunshine.UNKNOWN
+
+/**
+ * The state of [day]'s cell at [point] at the tape's step at [tapeMinutes], from the day's step at or
+ * before it; `null` while that step is not computed.
+ */
+fun dayState(
+    day: DayOverlay,
+    point: GeoPoint,
+    tapeMinutes: Float,
+): Sunshine? =
+    day.steps
+        .getOrNull(sourceStep(tapeMinutes, day.stepMinutes))
+        ?.let(day::gridAt)
+        ?.stateAt(point)

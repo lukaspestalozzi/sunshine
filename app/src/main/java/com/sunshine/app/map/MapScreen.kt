@@ -78,7 +78,6 @@ fun MapScreen(
     val computedSunshine by viewModel.sunshine.collectAsStateWithLifecycle()
     val overlay by viewModel.overlay.collectAsStateWithLifecycle()
     val isOverlayOn by viewModel.isOverlayOn.collectAsStateWithLifecycle()
-    val dayProgress by viewModel.dayProgress.collectAsStateWithLifecycle()
     val overlayMode by viewModel.overlayMode.collectAsStateWithLifecycle()
     val heatmap by viewModel.heatmap.collectAsStateWithLifecycle()
     val locationButton by viewModel.locationButton.collectAsStateWithLifecycle()
@@ -168,7 +167,6 @@ fun MapScreen(
                 OverlayControl(
                     option = overlayOption(isOverlayOn, overlayMode),
                     notice = notice(overlayMode, overlay, heatmap, selectedTime),
-                    dayProgress = dayProgress,
                     // The scale runs up to the day length at the map centre (design D3 of add-sun-exposure-heatmap).
                     bands = sun?.day?.dayLength?.let { remember(it) { HeatmapBands(it) } },
                     onOptionSelected = viewModel::onOverlaySelected,

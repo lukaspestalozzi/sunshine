@@ -23,7 +23,29 @@ class SettingsDecodeTest {
         assertEquals(512, settings.browsedLimitMib)
         assertNull(settings.lastView)
         assertEquals(DebugSwitches(timings = false, tiles = false, dayState = false, agreementCheck = false), settings.debug)
+        assertEquals(false, settings.detailsExpanded)
+        assertEquals(false, settings.hintDismissed)
         assertEquals(Settings(), settings)
+    }
+
+    // settings spec, "Stored settings" (design D7 of polish-ui).
+    @Test
+    fun `the panel's details and the hint are read, and an unreadable value is false`() {
+        val stored = decode(preferencesOf(SettingsKeys.DETAILS_EXPANDED to true, SettingsKeys.HINT_DISMISSED to true))
+        val unreadable =
+            decode(
+                preferencesOf(
+                    stringPreferencesKey(SettingsKeys.DETAILS_EXPANDED.name) to "yes",
+                    SettingsKeys.HINT_DISMISSED to true,
+                    SettingsKeys.COORDINATES to "LV95",
+                ),
+            )
+
+        assertEquals(true, stored.detailsExpanded)
+        assertEquals(true, stored.hintDismissed)
+        assertEquals(false, unreadable.detailsExpanded)
+        assertEquals(true, unreadable.hintDismissed)
+        assertEquals(CoordinateFormat.LV95, unreadable.coordinates)
     }
 
     @Test

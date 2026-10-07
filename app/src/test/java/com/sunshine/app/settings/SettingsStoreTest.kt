@@ -66,6 +66,20 @@ class SettingsStoreTest {
         }
 
     @Test
+    fun `the panel's details and the dismissed hint are read back by a new store`() =
+        runBlocking {
+            val store = open()
+            store.setDetailsExpanded(true)
+            store.setHintDismissed()
+            jobs.forEach { it.cancelAndJoin() }
+
+            val reopened = open()
+
+            assertEquals(true, reopened.settings.value.detailsExpanded)
+            assertEquals(true, reopened.settings.value.hintDismissed)
+        }
+
+    @Test
     fun `a change reaches the settings flow`() =
         runBlocking {
             val store = open()
