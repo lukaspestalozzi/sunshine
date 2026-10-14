@@ -37,8 +37,11 @@ data class SearchEntry(
     val extent: Extent?,
 )
 
-/** Why the list holds saved places only (place-search spec, "Search without network or geocoder"). */
-enum class SearchNotice { OFFLINE, UNAVAILABLE }
+/**
+ * Why the list holds saved places only (place-search spec, "Search without network or geocoder"),
+ * or that Photon's answer is awaited (spec "Online search requests"; design D17 of add-place-search).
+ */
+enum class SearchNotice { OFFLINE, UNAVAILABLE, SEARCHING }
 
 /** The list below the search field; [noneFound] shows `No places found`. */
 data class SearchResults(
@@ -124,7 +127,10 @@ class SearchViewModel(
         val key = SearchKey.of(text, crosshair)
         val places =
             store.answer(key, settings.value.reuseSearchesHours * MILLIS_PER_HOUR)
-                ?: requested(key)
+                ?: run {
+                    mutableResults.value = SearchResults(matches, notice = SearchNotice.SEARCHING)
+                    requested(key)
+                }
                 ?: run {
                     mutableResults.value =
                         SearchResults(matches, notice = SearchNotice.UNAVAILABLE, noneFound = matches.isEmpty())

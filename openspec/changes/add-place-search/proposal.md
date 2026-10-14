@@ -25,8 +25,8 @@ post-1.0 candidates; it is a new user request (2026-10-13). This change adds it 
   code, and its distance from the crosshair. Names are the local ones, as on the map. Results of
   the same name within 250 m of each other are merged into one (user decisions).
 - `app`: **saved places.** Every place Photon returns is saved on the device. Saved places that
-  match the text are shown at once while typing; Photon's answer replaces them when it arrives.
-  Without network, or when Photon fails, the saved places are searched instead, nearest first,
+  match the text are shown at once while typing; Photon's answer replaces them when it arrives,
+  and while it is awaited the page shows `Searching…` (user decision, 2026-10-14). Without network, or when Photon fails, the saved places are searched instead, nearest first,
   with a notice. A repeated search (same text, same rounded crosshair) is answered from the saved
   answer without a request for as long as `Reuse searches for` allows: 1 hour, 1 day, 7 days,
   30 days (default) or 365 days (user decisions).

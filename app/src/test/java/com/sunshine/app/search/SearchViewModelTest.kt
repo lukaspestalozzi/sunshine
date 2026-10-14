@@ -132,6 +132,50 @@ class SearchViewModelTest {
         }
 
     @Test
+    fun `while the request runs the saved matches are listed with a searching notice`() =
+        search { viewModel, store ->
+            // Saved by another search, so that no saved answer for "eiger" exists.
+            store.save(SearchKey.of("eig", INTERLAKEN), listOf(EIGER))
+            fetching = {
+                delay(5_000)
+                fixture("eig")
+            }
+
+            viewModel.onTextChanged("eiger")
+            advanceTimeBy(301)
+            assertEquals(
+                listOf("Eiger"),
+                viewModel.titles(),
+            )
+            assertEquals(SearchNotice.SEARCHING, viewModel.results.value.notice)
+
+            advanceTimeBy(5_000)
+
+            // Photon's 10 results, merged to 8 as in the test above.
+            assertEquals(8, viewModel.titles().size)
+            assertEquals(null, viewModel.results.value.notice)
+        }
+
+    @Test
+    fun `typing on during the request clears the searching notice until the next request`() =
+        search { viewModel, _ ->
+            fetching = {
+                delay(5_000)
+                EMPTY_ANSWER
+            }
+            viewModel.onTextChanged("eig")
+            advanceTimeBy(301)
+            assertEquals(SearchNotice.SEARCHING, viewModel.results.value.notice)
+
+            viewModel.onTextChanged("eige")
+            runCurrent()
+            assertEquals(null, viewModel.results.value.notice)
+
+            advanceTimeBy(301)
+            assertEquals(SearchNotice.SEARCHING, viewModel.results.value.notice)
+        }
+
+    @Test
     fun `an empty answer shows no places found`() =
         search { viewModel, store ->
             // Saved by another search, so that no saved answer for "eiger" exists.
@@ -245,7 +289,7 @@ class SearchViewModelTest {
 
             viewModel.onTextChanged("eiger")
             advanceTimeBy(300 + 9_999)
-            assertEquals(null, viewModel.results.value.notice)
+            assertEquals(SearchNotice.SEARCHING, viewModel.results.value.notice)
             advanceTimeBy(2)
 
             assertEquals(SearchResults(notice = SearchNotice.UNAVAILABLE, noneFound = true), viewModel.results.value)

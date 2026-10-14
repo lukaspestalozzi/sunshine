@@ -20,6 +20,7 @@
     <string name="search_clear">Clear</string>
     <string name="search_offline">Offline · showing saved places</string>
     <string name="search_unavailable">Search unavailable · showing saved places</string>
+    <string name="search_searching">Searching…</string>
     <string name="search_none_found">No places found</string>
     <string name="sun_panel_azimuth">Azimuth</string>
     <string name="sun_panel_elevation">Elevation</string>
