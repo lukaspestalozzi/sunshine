@@ -57,6 +57,11 @@ class SettingsStore private constructor(
         edit { it[SettingsKeys.BROWSED_LIMIT_MIB] = mib }
     }
 
+    suspend fun setReuseSearches(hours: Int) {
+        require(hours in Settings.REUSE_SEARCHES_HOURS) { "Reuse period $hours h is not allowed" }
+        edit { it[SettingsKeys.REUSE_SEARCHES_HOURS] = hours }
+    }
+
     suspend fun setLastView(view: LastView) = edit { it.putAll(*SettingsKeys.lastView(view)) }
 
     suspend fun setDetailsExpanded(expanded: Boolean) = edit { it[SettingsKeys.DETAILS_EXPANDED] = expanded }

@@ -3,6 +3,7 @@
     <string name="app_name">Sunshine</string>
     <string name="map_attribution">© OpenStreetMap contributors, SRTM | Map style: © OpenTopoMap (CC-BY-SA)</string>
     <string name="elevation_attribution">Elevation: © Mapterhorn and its sources</string>
+    <string name="search_attribution">Search: Photon by komoot, © OpenStreetMap contributors</string>
     <string name="map_offline_notice">You are offline. Map tiles may be missing.</string>
     <string name="sun_panel_date">Date</string>
     <string name="sun_panel_now">Now</string>
@@ -78,6 +79,13 @@
     <string name="settings_clear_failed">Browsed tiles could not be cleared</string>
     <string name="settings_clear_unavailable">Not available while a region is downloading</string>
     <string name="settings_browsed_limit_note">Lowering the limit removes the least recently used browsed tiles now.</string>
+    <string name="settings_reuse_searches">Reuse searches for</string>
+    <string name="settings_reuse_searches_note">A search repeated within this time is answered without a request.</string>
+    <string name="settings_one_hour">1 hour</string>
+    <string name="settings_one_day">1 day</string>
+    <string name="settings_days">%1$d days</string>
+    <string name="settings_clear_saved">Clear saved places</string>
+    <string name="settings_saved_cleared">Saved places cleared</string>
     <string name="settings_cancel">Cancel</string>
     <string name="settings_debug">Debug</string>
     <string name="settings_debug_timings">Timings</string>
