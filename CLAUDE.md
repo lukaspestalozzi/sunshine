@@ -35,6 +35,7 @@ yet. `README.md` is the human-facing overview.
 | `OfflineArea.kt` | An offline region's bounds, map and DEM tile ranges, download estimate. |
 | `Lv95.kt` | WGS84 ↔ Swiss grid LV95 by swisstopo's approximate formulas: `toLv95`, `null` outside LV95's area of use, and `fromLv95`. |
 | `Coordinates.kt` | `parseCoordinates`: decimal degrees, degrees-minutes-seconds or LV95 typed as search text, `null` when out of range. |
+| `Places.kt` | Search results: name matching without accents, great-circle distance and its text, merging of same-name results within 250 m, the zoom at which a chosen result is shown. |
 
 ### App packages (`app/src/main/java/com/sunshine/app/`)
 
