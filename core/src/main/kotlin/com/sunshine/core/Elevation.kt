@@ -144,4 +144,4 @@ private fun samplesAround(
 }
 
 /** Latitude limit of the square Web-Mercator world. */
-internal const val MAX_MAP_LATITUDE = 85.0511287798
+const val MAX_MAP_LATITUDE = 85.0511287798
