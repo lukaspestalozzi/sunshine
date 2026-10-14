@@ -2,6 +2,7 @@ package com.sunshine.app.map
 
 import com.sunshine.app.settings.CoordinateFormat
 import com.sunshine.core.GeoPoint
+import com.sunshine.core.Lv95
 import com.sunshine.core.toLv95
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -21,10 +22,11 @@ fun formatCoordinates(
     when (format) {
         CoordinateFormat.DECIMAL -> pair(point, ::formatDecimal)
         CoordinateFormat.DMS -> pair(point, ::formatDms)
-        CoordinateFormat.LV95 ->
-            toLv95(point)?.let { "${grouped(it.easting.roundToLong())}, ${grouped(it.northing.roundToLong())}" }
-                ?: pair(point, ::formatDecimal)
+        CoordinateFormat.LV95 -> toLv95(point)?.let(::formatLv95) ?: pair(point, ::formatDecimal)
     }
+
+/** [lv95] in whole metres with apostrophes, e.g. `2'632'479, 1'170'652`, as typed LV95 coordinates are shown. */
+fun formatLv95(lv95: Lv95): String = "${grouped(lv95.easting.roundToLong())}, ${grouped(lv95.northing.roundToLong())}"
 
 private fun pair(
     point: GeoPoint,
