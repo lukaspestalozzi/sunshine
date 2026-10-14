@@ -240,6 +240,33 @@ Alternative considered: kotlinx.serialization (a Gradle plugin and a runtime lib
 `callTimeout`, without retries; a call is enqueued and cancelled when its coroutine is
 cancelled (D4). It returns the body of an HTTP 200 answer, or fails. MapLibre's client keeps its
 tile-tuned dispatcher. The view model receives the fetch as a function, so tests pass a fake.
+Each request's URL, and its HTTP status or failure with its duration, go to the debug log (D17).
+
+### D17. Photon is kept; the wait is shown (user decision, 2026-10-14)
+
+On the phone a search took about 11 s. Measured from the container on 2026-10-14, 18:06–19:14
+UTC: every Photon request took 2.6–9.9 s to the first byte (median about 5 s), whatever the text,
+the location bias or the limit, and a repeated request was not faster; Photon's `/status`, which
+does no search, took 6–8 s; other hosts answered in 0.08–0.3 s through the same proxy, and the TLS
+handshake with Photon took 0.5–0.7 s. Four concurrent requests each took about 8 s, so Photon does
+not queue a client's requests, and requests cancelled while typing do not delay the next one. On
+2026-10-13 the same requests took 1.2–1.7 s; Photon's maintainer gives "well below 1 s" as the
+public server's baseline. The app's own share is the 300 ms pause and at most 50 ms (budget).
+
+Photon is kept. While a request is in progress, the notice line shows `Searching…`
+(`SearchNotice.SEARCHING`, set from the request's start to its end, replaced by the answer, by
+`UNAVAILABLE` or by the next text's state), so the wait is visible and the saved matches stay
+listed. The debug log line of D16 tells on the device whether Photon or the app is slow.
+
+Alternatives considered (user decision, 2026-10-14):
+- *swisstopo's SearchServer first, Photon after:* 0.3–0.7 s, no key, but Switzerland only and
+  weaker matching (`bachalpsee` and `bluemlisalp` returned municipalities and addresses), and two
+  sources to merge, save and attribute.
+- *A geocoder with an API key* (MapTiler, Geoapify, LocationIQ…): fast and worldwide, but an
+  account, a key in the APK and a free-tier quota; not measured.
+- *Nominatim on Enter:* 0.5 s, worldwide, no key, but its policy forbids search while typing, so
+  results would come only after Enter (reverses D1).
+- *A longer or shorter pause:* changes at most 300 ms of the wait.
 
 ### Performance budget
 
@@ -250,7 +277,8 @@ Measured on the device in task 7.3 (debug log timings), on a mid-range phone:
 - coordinates: parse and format ≤ 1 ms;
 - choosing: computing the camera ≤ 1 ms; the map's first frame is at the chosen place.
 
-Network time is not budgeted (Photon took 1.2–1.7 s from the container).
+Network time is not budgeted (Photon took 1.2–1.7 s from the container on 2026-10-13 and
+2.6–9.9 s on 2026-10-14; D17).
 
 Measured on the desktop JVM during apply (task 4.3; 2026-10-14), saved matches for `eig` among
 20 000 places of which 4 000 contain "Eiger": 99 ms after one warm-up, 18–33 ms after three. The
@@ -264,6 +292,9 @@ sort: 10–14 ms after ten warm-ups, of which ~10 ms are the SQL query and readi
   shows saved places with `Search unavailable`; another server needs an app update. The pause,
   the 3-character minimum and the reuse of saved answers keep requests low; the User-Agent names
   the app.
+- [Photon answers in 3–10 s at busy times (D17), and a request over 10 s counts as failed] →
+  `Searching…` shows the wait, the saved matches stay listed, and a reused answer needs no
+  request. The 10 s limit stays; task 7.3 records from the debug log how often it is reached.
 - [The DMS label may already reach under the toggle column at 360 dp today] → the spec's width
   rule covers `Decimal` and `Swiss grid LV95`; task 7.3 measures all three formats and reports a
   DMS overlap rather than widening this change.

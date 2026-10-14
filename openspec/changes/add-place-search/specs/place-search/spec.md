@@ -56,7 +56,10 @@ requested, so that names are the local ones, as on the map (user decision, 2026-
 request SHALL carry the same User-Agent header as the map tile requests (map-view "Tile request
 identification"). Only one request SHALL be in progress: a change of the text SHALL cancel the
 request for the previous text, whose answer SHALL NOT be shown. A request that has not answered
-within 10 s SHALL count as failed ("Search without network or geocoder").
+within 10 s SHALL count as failed ("Search without network or geocoder"). While a request is in
+progress, the page SHALL show the notice `Searching…`; the notice SHALL disappear when the answer
+arrives, when the request fails or when the text changes (user decision, 2026-10-14: Photon took
+3–10 s per request when measured).
 
 #### Scenario: Request
 - **WHEN** the device is online, the crosshair is at 46.6863° N, 7.8632° E, no saved answer exists, and the user types `Eiger ` and pauses
@@ -69,6 +72,10 @@ within 10 s SHALL count as failed ("Search without network or geocoder").
 #### Scenario: Typing on
 - **WHEN** the request for `eig` is in progress and the user types `e` to make `eige`
 - **THEN** the request for `eig` is cancelled, its answer is not shown, and `eige` is requested 300 ms after typing pauses
+
+#### Scenario: Waiting for the answer
+- **WHEN** the device is online, `Eiger` is saved, and the request for `eiger` is in progress
+- **THEN** `Eiger` is listed and the page shows `Searching…`; when Photon's answer arrives, the notice disappears and the answer's entries are listed
 
 ### Requirement: Result entries
 The list SHALL show at most 10 entries, every kind of place included (peaks, huts, lakes,

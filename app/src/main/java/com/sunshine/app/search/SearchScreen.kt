@@ -105,7 +105,12 @@ fun SearchScreen(
                 )
             }
             results.notice?.let { notice ->
-                val message = if (notice == SearchNotice.OFFLINE) R.string.search_offline else R.string.search_unavailable
+                val message =
+                    when (notice) {
+                        SearchNotice.OFFLINE -> R.string.search_offline
+                        SearchNotice.UNAVAILABLE -> R.string.search_unavailable
+                        SearchNotice.SEARCHING -> R.string.search_searching
+                    }
                 Notice(stringResource(message))
             }
             if (results.noneFound) Notice(stringResource(R.string.search_none_found))

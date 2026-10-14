@@ -4,6 +4,7 @@ import java.io.IOException
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
+import kotlin.time.TimeSource
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.Call
 import okhttp3.Callback
@@ -16,7 +17,8 @@ import okhttp3.Response
 
 /**
  * Requests to komoot's public Photon geocoder (design D16 of add-place-search): identified by
- * [userAgent], at most 10 s each, never retried, cancelled with the calling coroutine.
+ * [userAgent], at most 10 s each, never retried, cancelled with the calling coroutine. Each
+ * request's URL, and its HTTP status or failure with its duration, go to [log].
  */
 class PhotonClient(
     userAgent: Interceptor,
@@ -34,6 +36,7 @@ class PhotonClient(
     suspend fun fetch(key: SearchKey): String? {
         val url = photonUrl(key)
         log("Search request $url")
+        val started = TimeSource.Monotonic.markNow()
         return suspendCancellableCoroutine { continuation ->
             val call = client.newCall(Request.Builder().url(url).build())
             continuation.invokeOnCancellation { call.cancel() }
@@ -43,6 +46,7 @@ class PhotonClient(
                         call: Call,
                         e: IOException,
                     ) {
+                        log("Search request failed after ${started.elapsedNow().inWholeMilliseconds} ms: ${e.message}")
                         continuation.resume(null)
                     }
 
@@ -56,6 +60,9 @@ class PhotonClient(
                             } catch (_: IOException) {
                                 null // the body failed to arrive
                             }
+                        // Photon's time, for the device checks (design D17 of add-place-search).
+                        val milliseconds = started.elapsedNow().inWholeMilliseconds
+                        log("Search answer HTTP ${response.code} in $milliseconds ms, ${body?.length ?: 0} characters")
                         continuation.resume(body)
                     }
                 },
