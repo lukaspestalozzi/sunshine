@@ -78,7 +78,7 @@ class PlaceStoreTest {
                     place("N$i", name, "peak", GeoPoint(45.5 + (i % 100) * 0.02, 6.0 + (i / 100) * 0.04))
                 }
             store.save(SearchKey.of("synthetic", INTERLAKEN), places)
-            store.matches("eig", INTERLAKEN, limit = 10) // warm-up
+            repeat(10) { store.matches("eig", INTERLAKEN, limit = 10) } // the JIT warms up; one run measured 99 ms
 
             val times = (1..5).map { measureTimeMillis { assertEquals(10, store.matches("eig", INTERLAKEN, limit = 10).size) } }
 

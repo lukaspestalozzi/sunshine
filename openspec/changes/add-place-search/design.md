@@ -249,6 +249,12 @@ Measured on the device in task 7.3 (debug log timings), on a mid-range phone:
 
 Network time is not budgeted (Photon took 1.2–1.7 s from the container).
 
+Measured on the desktop JVM during apply (task 4.3; 2026-10-14), saved matches for `eig` among
+20 000 places of which 4 000 contain "Eiger": 99 ms after one warm-up, 18–33 ms after three. The
+word rule then runs on the stored `matchText` by an allocation-free scan (`matchesNormalized`)
+instead of normalizing and splitting every name, and each distance is computed once before the
+sort: 10–14 ms after ten warm-ups, of which ~10 ms are the SQL query and reading the 4 000 rows.
+
 ## Risks / Trade-offs
 
 - [komoot throttles, changes terms or switches the public server off] → requests fail and search
