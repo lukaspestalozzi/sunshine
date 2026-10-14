@@ -121,9 +121,10 @@ class SearchViewModelTest {
 
             advanceTimeBy(301)
 
-            // Photon's order; the service road (19 m) and the locality Eigergletscher (142 m) merged.
+            // Merged in Photon's order (the service road 19 m and the locality Eigergletscher 142 m from
+            // a kept entry), then nearest first: Eigerstrasse 1.5 km … Eigergletscher glacier 16.21 km, Eiger 16.25 km.
             val expected =
-                listOf("Eiger", "Eigergletscher", "Eigergletscher", "Eigerstrasse", "Eiget", "Eiger Mushroom", "Eiger Nordwand", "Eigen")
+                listOf("Eigerstrasse", "Eiget", "Eigen", "Eigergletscher", "Eiger Mushroom", "Eiger Nordwand", "Eigergletscher", "Eiger")
             assertEquals(
                 expected,
                 viewModel.titles(),

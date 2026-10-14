@@ -148,9 +148,10 @@ places whose name matches it: every word of the text begins a word of the name, 
 accents, where words are separated by anything other than letters and digits. They SHALL be sorted
 by distance from the crosshair, nearest first, merged ("Merged duplicates"), at most 10. When the
 online answer for the current text arrives, or its saved answer is reused, the list SHALL show that
-answer's entries instead, in Photon's order, merged, at most 10 (user decision, 2026-10-13:
-Photon's answer replaces the saved matches). When that answer has no entries, the page SHALL show
-`No places found`. When the field is empty, the list SHALL be empty.
+answer's entries instead: merged going through them in Photon's order ("Merged duplicates"), at
+most 10, then sorted by distance from the crosshair, nearest first (user decisions, 2026-10-13:
+Photon's answer replaces the saved matches; 2026-10-14: nearest first). When that answer has no
+entries, the page SHALL show `No places found`. When the field is empty, the list SHALL be empty.
 
 #### Scenario: Words in any part of the name
 - **WHEN** `Grosser Mythen` and `Restaurant Grosser Mythen` are saved and the user types `gross myth`
@@ -162,7 +163,11 @@ Photon's answer replaces the saved matches). When that answer has no entries, th
 
 #### Scenario: Answer replaces the saved matches
 - **WHEN** the device is online, `Eiger` and `Eigerstrasse` are saved, and the user types `eiger`
-- **THEN** both saved places are listed at once, and when Photon's answer arrives the list shows Photon's entries in Photon's order instead
+- **THEN** both saved places are listed at once, and when Photon's answer arrives the list shows Photon's entries instead, nearest first
+
+#### Scenario: Nearest first
+- **WHEN** the crosshair is in Bern and Photon answers `eiger` with the peak `Eiger` (59 km) first and `Eigerstrasse` (1.3 km) last
+- **THEN** `Eigerstrasse` is listed first and the peak `Eiger` last
 
 ### Requirement: Reuse of saved answers
 When a saved answer exists for the normalized text and the rounded crosshair ("Online search

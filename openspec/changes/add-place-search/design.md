@@ -142,6 +142,15 @@ The list shows the saved matches after every text change; when the answer for th
 arrives (online or reused), its entries replace them. Alternative considered: saved matches on
 top with Photon's other results appended below.
 
+The answer's entries are merged in Photon's order (D9), so that the duplicate kept is Photon's
+first, and then sorted by distance from the crosshair, nearest first, like the saved matches
+(user decision, 2026-10-14, after seeing `eiger` searched from Bern in Photon's order). Measured
+for `eiger` from Bern (46.9° N, 7.4° E): Photon ranks the peak (58 km) first, then nearby
+namesakes; nearest first lists it last. Alternatives considered: Photon's order; exact name
+first, then nearest (the peak 4th); Photon's `location_bias_scale`, where 0.5 gave the same order
+as the default 0.2, 0.0 dropped the peak from the 10 results, and 1.0 returned Eigers up to
+10 500 km away.
+
 ### D9. Merging: same name within 250 m (user decision, 2026-10-13)
 
 `core/Places.kt`: `merge(entries)` walks the entries in order and drops one when a kept entry has
