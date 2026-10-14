@@ -137,7 +137,11 @@ class SearchViewModel(
                     return
                 }
         val shown = TimeSource.Monotonic.markNow()
-        val entries = merge(places, LIMIT, name = { it.title }, point = { it.point }).map { it.toEntry(crosshair) }
+        // Merged in Photon's order, so that the duplicate kept is Photon's first; then nearest first (design D8).
+        val entries =
+            merge(places, LIMIT, name = { it.title }, point = { it.point })
+                .sortedBy { distanceMetres(crosshair, it.point) }
+                .map { it.toEntry(crosshair) }
         mutableResults.value = SearchResults(entries, noneFound = entries.isEmpty())
         log("Answer for '$text' listed in ${shown.elapsedNow().inWholeMilliseconds} ms")
     }
