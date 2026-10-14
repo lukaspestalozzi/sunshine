@@ -27,6 +27,9 @@ import com.sunshine.app.offline.RegionRow
 import com.sunshine.app.offline.RegionState
 import com.sunshine.app.offline.StorageUse
 import com.sunshine.app.offline.downloadWork
+import com.sunshine.app.search.PhotonClient
+import com.sunshine.app.search.PlaceStore
+import com.sunshine.app.search.PlacesDatabase
 import com.sunshine.app.settings.SettingsStore
 import com.sunshine.app.sunshine.DebugInfo
 import com.sunshine.app.sunshine.MemoryTiles
@@ -215,6 +218,12 @@ class SunshineApp : Application() {
     val overlayRepository: OverlayRepository by lazy {
         OverlayRepository(tile = tileCache::tile, loads = demTiles::loads, log = ::debugLog, debug = debugInfo, memoryTiles = memoryTiles)
     }
+
+    /** Saved places and saved answers of the search (design D5 of add-place-search). */
+    val placeStore: PlaceStore by lazy { PlaceStore(PlacesDatabase.create(this).dao()) }
+
+    /** Photon's public geocoder (design D16 of add-place-search). */
+    val photonClient: PhotonClient by lazy { PhotonClient(userAgent(), ::debugLog) }
 
     override fun onCreate() {
         super.onCreate()
