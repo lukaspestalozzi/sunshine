@@ -863,6 +863,15 @@ class MapViewModel(
         pendingStartCentre = false
     }
 
+    /**
+     * The user chose a search result: the map is shown at [camera], already set when the map screen
+     * returns, and does not move to a later first position (design D14 of add-place-search).
+     */
+    fun onCameraChosen(camera: CameraState) {
+        pendingStartCentre = false
+        onCameraMoved(camera)
+    }
+
     private fun applyLocationStep(step: LocationStep) {
         mutableLocationButton.value = step.state
         step.actions.forEach { locationActionChannel.trySend(it) }

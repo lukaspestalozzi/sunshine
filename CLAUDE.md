@@ -33,7 +33,9 @@ yet. `README.md` is the human-facing overview.
 | `Sunshine.kt` | Sunshine at an instant, sun periods of a day. |
 | `SunShade.kt` | `MapArea` and `MAP_TILE_DP`; the sun/shade grid of the visible area by a convex-hull sweep, no I/O; cells of the shade resolution, with `Normal` 2 dp for the overlay and 8 dp for the heatmap. `StepGrid`, the grid of one step that every user reads, is a `ShadeGrid` or a `CombinedGrid` of an earlier day's grid and the grids of the parts a pan uncovered, each with the sun of its own area's centre. |
 | `OfflineArea.kt` | An offline region's bounds, map and DEM tile ranges, download estimate. |
-| `Lv95.kt` | WGS84 → Swiss grid LV95 by swisstopo's approximate formulas, `null` outside LV95's area of use. |
+| `Lv95.kt` | WGS84 ↔ Swiss grid LV95 by swisstopo's approximate formulas: `toLv95`, `null` outside LV95's area of use, and `fromLv95`. |
+| `Coordinates.kt` | `parseCoordinates`: decimal degrees, degrees-minutes-seconds or LV95 typed as search text, `null` when out of range. |
+| `Places.kt` | Search results: name matching without accents, great-circle distance and its text, merging of same-name results within 250 m, the zoom at which a chosen result is shown. |
 
 ### App packages (`app/src/main/java/com/sunshine/app/`)
 
@@ -45,6 +47,7 @@ yet. `README.md` is the human-facing overview.
 | `network/` | `NetworkMonitor`, `UserAgentInterceptor`, and `RateLimiter`, which paces region downloads. |
 | `sunshine/` | `SunshineRepository` (horizon profiles) and `OverlayRepository` (sun-shade grids). The debug box: `DebugInfo` collects timings, tiles by source, day state and the agreement check in every build, and `debugLines` formats them; the box is drawn in `MapLabels` while a switch of the Settings page's `Debug` section is on. |
 | `map/` | The map screen; see "Map screen" below. |
+| `search/` | Place search (add-place-search): `PhotonClient` and `parsePhotonAnswer` (`Place`) for komoot's public Photon geocoder, `SearchKey` (normalized text, crosshair in tenths of a degree), `PlaceStore` with saved places and saved answers in `PlacesDatabase` (`places.db`). |
 | `settings/` | `Settings` with its defaults and `decode`, which replaces each unreadable or disallowed value by its default. `Resolution` and `Preset`, the cell sizes and steps of both overlay modes. `SettingsStore`, a Preferences DataStore read once with `runBlocking` in `SunshineApp.onCreate`. The Settings page `SettingsScreen`/`SettingsViewModel`, opened from the gear button in `MapLabels`, and its sub-page `CustomResolutionScreen`, which stores its values when it is left. |
 | `about/` | `AboutEntries.kt`: the About section with the attributions, the last section of the Settings page. The map itself shows no attributions. |
 | `ui/` | `PageTopBar.kt`: the pages' top bar with the back arrow. Material 3's `TopAppBar`, `TooltipBox` and `TimePicker` are experimental and not used. |
@@ -63,7 +66,7 @@ yet. `README.md` is the human-facing overview.
 | `DayCache.kt`, `Uncovered.kt` | Computed days by area, date, cell size and step, least recently used dropped. `reusable` picks the earlier day a new day reuses after a camera move: same date, cell size and step, same zoom or up to one level out, the largest covered share and at least a quarter. A day with such a base computes, at each daytime step the base has, only the rectangles `uncovered` and combines them with the base's grid (`Reused <p> %` in the debug box). |
 | `SunHours.kt`, `HeatmapBands.kt` | The `Sun hours` heatmap: a complete day's sun and unknown steps counted per cell (8 dp with `Normal`) and drawn at one pixel per dp, in 30-minute colour bands. |
 | `LocationButton.kt` | The location button's states idle / waiting / ready as pure functions. |
-| `FirstRunHint.kt`, `SunLine.kt`, `MapOverlay.kt` | The first-run hint; the line toward the sun; the crosshair, and the labels, buttons and debug box over the map (`MapLabels`). |
+| `FirstRunHint.kt`, `SunLine.kt`, `MapOverlay.kt` | The first-run hint; the line toward the sun; the crosshair, and the labels, buttons and debug box over the map (`MapLabels`); tapping the coordinates opens the search page (`search/SearchScreen.kt`, `Screen.SEARCH` in `MainActivity`). |
 | `TimeSelection.kt`, `SunFormat.kt`, `CoordinateFormat.kt` | Time steps of a day, and the panel's and crosshair's text formats. |
 
 ## Workflow: no code without an approved change

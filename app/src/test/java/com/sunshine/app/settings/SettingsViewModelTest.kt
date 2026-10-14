@@ -37,11 +37,14 @@ class SettingsViewModelTest {
     // (a DataStore write resuming late failed a later test, 2026-10-04).
     private val viewModels = ViewModelStore()
 
-    private fun viewModel(clearBrowsed: suspend () -> Boolean = { true }): SettingsViewModel =
+    private fun viewModel(
+        clearBrowsed: suspend () -> Boolean = { true },
+        clearSaved: suspend () -> Unit = {},
+    ): SettingsViewModel =
         ViewModelProvider.create(
             viewModels,
-            viewModelFactory { initializer { SettingsViewModel(store, clearBrowsed = clearBrowsed) } },
-        )[SettingsViewModel::class.java.name + clearBrowsed.hashCode(), SettingsViewModel::class]
+            viewModelFactory { initializer { SettingsViewModel(store, clearBrowsed = clearBrowsed, clearSaved = clearSaved) } },
+        )[SettingsViewModel::class.java.name + clearBrowsed.hashCode() + clearSaved.hashCode(), SettingsViewModel::class]
 
     private val store by lazy { SettingsStore.open(File(directory, "settings.preferences_pb"), CoroutineScope(Dispatchers.IO + job)) }
 
@@ -85,6 +88,25 @@ class SettingsViewModelTest {
 
             assertEquals(Resolution(3, 10, 8, 10), store.settings.first { it.custom != Resolution.NORMAL }.custom)
             assertNull(viewModel.customDraft.value)
+        }
+
+    // place-search spec, "Clear saved places".
+    @Test
+    fun `clearing saved places clears them before reporting`() {
+        val events = mutableListOf<String>()
+
+        viewModel(clearSaved = { events += "cleared" }).onClearSaved { events += "reported" }
+
+        assertEquals(listOf("cleared", "reported"), events)
+    }
+
+    // settings spec, "Settings page" (design D6 of add-place-search).
+    @Test
+    fun `a reuse period is stored`() =
+        runBlocking {
+            viewModel().onReuseSearches(168)
+
+            assertEquals(168, store.settings.first { it.reuseSearchesHours == 168 }.reuseSearchesHours)
         }
 
     @Test

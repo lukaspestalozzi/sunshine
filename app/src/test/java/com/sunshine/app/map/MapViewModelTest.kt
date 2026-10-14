@@ -183,6 +183,22 @@ class MapViewModelTest {
             assertEquals(emptyList<LocationAction>(), actions)
         }
 
+    // design D14 of add-place-search: a chosen search result counts as the user moving the map.
+    @Test
+    fun `My location does not centre after a search result was chosen`() =
+        runTest {
+            val viewModel = newViewModel(settings = Settings(startAt = StartAt.MY_LOCATION))
+            val actions = mutableListOf<LocationAction>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.locationActions.collect { actions += it } }
+            val eiger = CameraState(GeoPoint(46.57763, 8.00547), zoom = 13.0)
+
+            viewModel.onCameraChosen(eiger)
+            viewModel.onLocationStale(false)
+
+            assertEquals(emptyList<LocationAction>(), actions)
+            assertEquals(eiger, viewModel.camera.value)
+        }
+
     @Test
     fun `Last view never centres on a position`() =
         runTest {

@@ -28,6 +28,25 @@ class SettingsDecodeTest {
         assertEquals(Settings(), settings)
     }
 
+    // settings spec, "Stored settings" (design D6 of add-place-search).
+    @Test
+    fun `searches are reused for 30 days by default`() {
+        assertEquals(720, decode(preferencesOf()).reuseSearchesHours)
+    }
+
+    @Test
+    fun `a stored reuse period is read`() {
+        assertEquals(168, decode(preferencesOf(SettingsKeys.REUSE_SEARCHES_HOURS to 168)).reuseSearchesHours)
+    }
+
+    @Test
+    fun `a reuse period not allowed is the default and the others keep their values`() {
+        val settings = decode(preferencesOf(SettingsKeys.REUSE_SEARCHES_HOURS to 75, SettingsKeys.BROWSED_LIMIT_MIB to 1024))
+
+        assertEquals(720, settings.reuseSearchesHours)
+        assertEquals(1024, settings.browsedLimitMib)
+    }
+
     // settings spec, "Stored settings" (design D7 of polish-ui).
     @Test
     fun `the panel's details and the hint are read, and an unreadable value is false`() {

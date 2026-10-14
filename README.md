@@ -74,10 +74,12 @@ The project is developed spec-first with [OpenSpec](https://github.com/Fission-A
 - Elevation: © [Mapterhorn and its sources](https://mapterhorn.com/attribution/). In the Alps
   these are the national terrain models (swisstopo, BEV, Bavaria, IGN, ARSO, Italian regions and
   provinces), with Copernicus GLO-30 elsewhere.
+- Search: [Photon](https://photon.komoot.io/) by komoot, on © OpenStreetMap contributors' data.
+  Places found are saved on the device, so that they can be found again offline.
 - Icons: Material Symbols (Apache License 2.0).
 
-The app identifies itself to the tile servers with its own User-Agent. Region downloads are
-limited to 5 requests per second per server.
+The app identifies itself to the tile servers and to Photon with its own User-Agent. Region
+downloads are limited to 5 requests per second per server.
 
 ## Licence
 

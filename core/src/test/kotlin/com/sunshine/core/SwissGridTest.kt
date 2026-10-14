@@ -29,6 +29,23 @@ class SwissGridTest {
         assertEquals(1_170_652.02, lv95.northing, 0.01)
     }
 
+    @Test
+    fun `swisstopo's worked example back to WGS84`() {
+        val point = fromLv95(Lv95(2_700_000.0, 1_100_000.0))
+
+        // The reference 46°02′38.87″ N, 8°43′49.79″ E, met to 0.42 m and 0.16 m (design D11 of add-place-search).
+        assertEquals(46.04413, point.latitude, 0.00002)
+        assertEquals(8.73050, point.longitude, 0.00002)
+    }
+
+    @Test
+    fun `Interlaken back to WGS84`() {
+        val point = fromLv95(Lv95(2_632_479.0, 1_170_652.0))
+
+        assertEquals(46.6863, point.latitude, 0.00002)
+        assertEquals(7.8632, point.longitude, 0.00002)
+    }
+
     @ParameterizedTest(name = "{0}, {1}")
     @CsvSource("45.81, 8.0", "47.81, 8.0", "46.8, 5.95", "46.8, 10.5")
     fun `defined on the edges of the area of use`(

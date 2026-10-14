@@ -32,6 +32,32 @@ fun toLv95(point: GeoPoint): Lv95? {
     return Lv95(easting, northing)
 }
 
+/**
+ * [lv95] in WGS84 by swisstopo's approximate formulas for LV95 → WGS84 (December 2016), within
+ * about 1 m in Switzerland (design D11 of add-place-search). Not limited to the area of use; the
+ * caller checks it.
+ */
+fun fromLv95(lv95: Lv95): GeoPoint {
+    // Differences to Bern in units of 1000 km.
+    val y = (lv95.easting - 2_600_000.0) / 1_000_000.0
+    val x = (lv95.northing - 1_200_000.0) / 1_000_000.0
+    // In units of 10000 arcseconds.
+    val lambda =
+        2.6779094 +
+            4.728982 * y +
+            0.791484 * y * x +
+            0.1306 * y * x * x -
+            0.0436 * y * y * y
+    val phi =
+        16.9023892 +
+            3.238272 * x -
+            0.270978 * y * y -
+            0.002528 * x * x -
+            0.0447 * y * y * x -
+            0.0140 * x * x * x
+    return GeoPoint(phi * UNIT_SECONDS / SECONDS_PER_DEGREE, lambda * UNIT_SECONDS / SECONDS_PER_DEGREE)
+}
+
 // LV95's area of use (EPSG:2056: Switzerland and Liechtenstein).
 private const val SOUTH = 45.81
 private const val NORTH = 47.81

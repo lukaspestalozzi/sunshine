@@ -28,6 +28,7 @@ fun aboutEntries(versionName: String): List<AboutEntry> =
         AboutEntry(R.string.about_version, argument = versionName),
         AboutEntry(R.string.map_attribution, url = OSM_COPYRIGHT_URL),
         AboutEntry(R.string.elevation_attribution, url = MapterhornTiles.ATTRIBUTION_URL),
+        AboutEntry(R.string.search_attribution, url = PHOTON_URL),
         AboutEntry(R.string.about_icons),
     )
 
@@ -49,3 +50,4 @@ fun AboutSection(modifier: Modifier = Modifier) {
 }
 
 private const val OSM_COPYRIGHT_URL = "https://www.openstreetmap.org/copyright"
+private const val PHOTON_URL = "https://photon.komoot.io/"

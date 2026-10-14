@@ -49,6 +49,8 @@ dependencies {
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.sqlite.bundled)
+    // A real org.json for JVM tests: android.jar's copy throws there (design D15 of add-place-search).
+    testImplementation(libs.org.json)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 
