@@ -218,6 +218,11 @@ Offline page's, for the crosshair and the map size. `search/SearchScreen.kt` and
 the page is composed. Alternative considered: a field and list dropping down over the map (more
 layout code around the toggle, the panel and the insets).
 
+The page opens the view model (`onOpened`: the field empty, the map area) whenever it is not open
+(`isOpened`). After a rotation it still is and keeps the text; `onClosed` closes it; a view model
+created anew after the process was recreated is not, so it is opened again (found in review,
+2026-10-14: a saveable flag on the page had skipped that opening, and nothing was searched).
+
 ### D14. Choosing: the camera is set before the map is shown (user decisions, 2026-10-13)
 
 `core/Places.kt`: `fitZoom(center, extent, widthDp, heightDp)` is the largest zoom at which the
@@ -288,6 +293,11 @@ Measured on the device in task 7.3 (debug log timings), on a mid-range phone:
 
 Network time is not budgeted (Photon took 1.2–1.7 s from the container on 2026-10-13 and
 2.6–9.9 s on 2026-10-14; D17).
+
+The view model's search runs on `Dispatchers.Default`, injected so that tests pass their test
+dispatcher (found in review, 2026-10-14: it ran on the main dispatcher). The debug log gives the
+saved matches in one line and an answer in two: `parsed and saved in`, from the answer's arrival,
+and `listed in`; their sum is the answer's budget.
 
 Measured on the desktop JVM during apply (task 4.3; 2026-10-14), saved matches for `eig` among
 20 000 places of which 4 000 contain "Eiger": 99 ms after one warm-up, 18–33 ms after three. The

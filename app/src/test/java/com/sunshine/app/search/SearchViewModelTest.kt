@@ -389,6 +389,16 @@ class SearchViewModelTest {
             assertEquals("", viewModel.text.value)
         }
 
+    @Test
+    fun `closing forgets the map area, so that the next opening sets it again`() =
+        search { viewModel, _ ->
+            assertEquals(true, viewModel.isOpened)
+
+            viewModel.onClosed()
+
+            assertEquals(false, viewModel.isOpened)
+        }
+
     /** Runs [test] with a view model opened at Interlaken, zoom 12, on a 400 × 800 dp map. */
     private fun search(test: suspend TestScope.(SearchViewModel, PlaceStore) -> Unit) =
         runTest {
@@ -403,6 +413,7 @@ class SearchViewModelTest {
                     },
                     isOnline = online,
                     settings = settings,
+                    dispatcher = UnconfinedTestDispatcher(testScheduler),
                 )
             viewModel.onOpened(MapArea(INTERLAKEN, zoom = 12.0, widthDp = 400.0, heightDp = 800.0))
             try {

@@ -17,6 +17,8 @@ import com.sunshine.core.formatDistance
 import com.sunshine.core.merge
 import com.sunshine.core.parseCoordinates
 import kotlin.time.TimeSource
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,6 +63,8 @@ class SearchViewModel(
     isOnline: Flow<Boolean>,
     private val settings: StateFlow<Settings>,
     private val log: (String) -> Unit = {},
+    /** Where the search runs: off the main thread (design of add-place-search, "Performance budget"). */
+    dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
     private val mutableText = MutableStateFlow("")
 
@@ -73,8 +77,14 @@ class SearchViewModel(
     // The map when the page was opened: its centre is the crosshair.
     private val area = MutableStateFlow<MapArea?>(null)
 
+    /**
+     * Whether the page is open with its map area. A view model created anew, after the process was
+     * recreated, or one whose page was closed, is not, so the page opens it again.
+     */
+    val isOpened: Boolean get() = area.value != null
+
     init {
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcher) {
             combine(mutableText, isOnline, area.filterNotNull()) { text, online, area -> Triple(text, online, area.center) }
                 .collectLatest { (text, online, crosshair) -> search(text, online, crosshair) }
         }
@@ -96,6 +106,7 @@ class SearchViewModel(
      */
     fun onClosed() {
         mutableText.value = ""
+        area.value = null
     }
 
     /** Where the map goes when [entry] is chosen (place-search spec, "Choosing a result"). */
@@ -149,8 +160,11 @@ class SearchViewModel(
     /** Photon's places for [key], saved; `null` when the request failed or its answer could not be read. */
     private suspend fun requested(key: SearchKey): List<Place>? {
         val body = withTimeoutOrNull(TIMEOUT_MILLIS) { fetch(key) } ?: return null
+        // From the answer's arrival; with the "listed in" line below, the budget's parse, save and list.
+        val arrived = TimeSource.Monotonic.markNow()
         val places = runCatching { parsePhotonAnswer(body) }.getOrNull() ?: return null
         store.save(key, places)
+        log("Answer for '${key.text}' parsed and saved in ${arrived.elapsedNow().inWholeMilliseconds} ms")
         return places
     }
 
