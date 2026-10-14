@@ -33,7 +33,8 @@ yet. `README.md` is the human-facing overview.
 | `Sunshine.kt` | Sunshine at an instant, sun periods of a day. |
 | `SunShade.kt` | `MapArea` and `MAP_TILE_DP`; the sun/shade grid of the visible area by a convex-hull sweep, no I/O; cells of the shade resolution, with `Normal` 2 dp for the overlay and 8 dp for the heatmap. `StepGrid`, the grid of one step that every user reads, is a `ShadeGrid` or a `CombinedGrid` of an earlier day's grid and the grids of the parts a pan uncovered, each with the sun of its own area's centre. |
 | `OfflineArea.kt` | An offline region's bounds, map and DEM tile ranges, download estimate. |
-| `Lv95.kt` | WGS84 → Swiss grid LV95 by swisstopo's approximate formulas, `null` outside LV95's area of use. |
+| `Lv95.kt` | WGS84 ↔ Swiss grid LV95 by swisstopo's approximate formulas: `toLv95`, `null` outside LV95's area of use, and `fromLv95`. |
+| `Coordinates.kt` | `parseCoordinates`: decimal degrees, degrees-minutes-seconds or LV95 typed as search text, `null` when out of range. |
 
 ### App packages (`app/src/main/java/com/sunshine/app/`)
 
