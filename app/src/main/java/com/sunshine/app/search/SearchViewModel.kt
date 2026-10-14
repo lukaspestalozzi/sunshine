@@ -87,6 +87,14 @@ class SearchViewModel(
         mutableText.value = text
     }
 
+    /**
+     * The page closed. The view model outlives it, so the field is emptied: a stale text would
+     * otherwise be searched again when the connection changes (place-search spec, "Choosing a result").
+     */
+    fun onClosed() {
+        mutableText.value = ""
+    }
+
     /** Where the map goes when [entry] is chosen (place-search spec, "Choosing a result"). */
     fun cameraFor(entry: SearchEntry): CameraState {
         val area = checkNotNull(area.value) { "The search page was not opened" }

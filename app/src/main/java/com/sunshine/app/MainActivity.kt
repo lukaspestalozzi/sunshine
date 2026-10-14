@@ -10,15 +10,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sunshine.app.map.MapScreen
+import com.sunshine.app.map.MapViewModel
+import com.sunshine.app.map.mapViewModelFactory
 import com.sunshine.app.offline.OfflineScreen
+import com.sunshine.app.search.SearchScreen
 import com.sunshine.app.settings.CustomResolutionScreen
 import com.sunshine.app.settings.SettingsScreen
 import com.sunshine.core.GeoPoint
 import com.sunshine.core.MapArea
 
-/** The app's screens, switched without a navigation library (design D8 of add-sun-exposure-heatmap, D9 of add-offline-regions, D10 of add-settings). */
-private enum class Screen { MAP, SETTINGS, CUSTOM_RESOLUTION, OFFLINE }
+/**
+ * The app's screens, switched without a navigation library (design D8 of add-sun-exposure-heatmap, D9 of
+ * add-offline-regions, D10 of add-settings, D13 of add-place-search).
+ */
+private enum class Screen { MAP, SETTINGS, CUSTOM_RESOLUTION, OFFLINE, SEARCH }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -27,17 +34,26 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 // The map's view model belongs to the activity, so the map is as it was on return.
+                val mapViewModel: MapViewModel = viewModel(factory = mapViewModelFactory)
                 var screen by rememberSaveable { mutableStateOf(Screen.MAP) }
                 // The area visible when the Offline page was opened: centre, zoom, width and height in dp.
                 var offlineArea by rememberSaveable { mutableStateOf(arrayListOf<Double>()) }
+                // The area visible when the search page was opened, the same way.
+                var searchArea by rememberSaveable { mutableStateOf(arrayListOf<Double>()) }
                 when (screen) {
                     Screen.MAP ->
                         MapScreen(
+                            viewModel = mapViewModel,
                             onSettingsClicked = { screen = Screen.SETTINGS },
                             onOfflineClicked = { area ->
                                 offlineArea =
                                     arrayListOf(area.center.latitude, area.center.longitude, area.zoom, area.widthDp, area.heightDp)
                                 screen = Screen.OFFLINE
+                            },
+                            onSearchClicked = { area ->
+                                searchArea =
+                                    arrayListOf(area.center.latitude, area.center.longitude, area.zoom, area.widthDp, area.heightDp)
+                                screen = Screen.SEARCH
                             },
                         )
                     Screen.SETTINGS -> {
@@ -50,6 +66,19 @@ class MainActivity : ComponentActivity() {
                         BackHandler { screen = Screen.MAP }
                         val (latitude, longitude, zoom, width, height) = offlineArea
                         OfflineScreen(MapArea(GeoPoint(latitude, longitude), zoom, width, height), onBack = { screen = Screen.MAP })
+                    }
+                    // Its own back handler empties the field before returning (design D13 of add-place-search).
+                    Screen.SEARCH -> {
+                        val (latitude, longitude, zoom, width, height) = searchArea
+                        SearchScreen(
+                            MapArea(GeoPoint(latitude, longitude), zoom, width, height),
+                            onBack = { screen = Screen.MAP },
+                            onChosen = { camera ->
+                                // Before the map is shown, so that it is created at the chosen place (design D14).
+                                mapViewModel.onCameraChosen(camera)
+                                screen = Screen.MAP
+                            },
+                        )
                     }
                 }
             }
