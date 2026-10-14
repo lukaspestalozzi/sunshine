@@ -23,10 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -62,8 +59,6 @@ fun SearchScreen(
 ) {
     val text by viewModel.text.collectAsStateWithLifecycle()
     val results by viewModel.results.collectAsStateWithLifecycle()
-    // Once per opening of the page, not again after a rotation: the field starts empty.
-    var opened by rememberSaveable { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     // Its own back handler empties the field before returning, as a choice does.
@@ -73,10 +68,9 @@ fun SearchScreen(
     }
     BackHandler(onBack = close)
     LaunchedEffect(Unit) {
-        if (!opened) {
-            viewModel.onOpened(area)
-            opened = true
-        }
+        // Once per opening, the field empty: after a rotation the view model is still open and keeps
+        // the text; after the process was recreated it is new and is opened again.
+        if (!viewModel.isOpened) viewModel.onOpened(area)
         focus.requestFocus()
         keyboard?.show()
     }
