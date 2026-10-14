@@ -39,6 +39,8 @@ data class Settings(
     val preset: Preset = Preset.NORMAL,
     val custom: Resolution = Resolution.NORMAL,
     val browsedLimitMib: Int = 512,
+    /** How long a saved search answer is reused, in hours (place-search spec, "Reuse of saved answers"). */
+    val reuseSearchesHours: Int = 720,
     val lastView: LastView? = null,
     val debug: DebugSwitches = DebugSwitches(),
     /** Whether the panel's details are expanded (sun-position spec, "Sun information panel"); not on the Settings page. */
@@ -52,6 +54,9 @@ data class Settings(
     companion object {
         val OPACITIES = 20..90 step 10
         val BROWSED_LIMITS_MIB = listOf(128, 256, 512, 1024, 2048)
+
+        /** 1 hour, 1 day, 7 days, 30 days and 365 days (design D6 of add-place-search). */
+        val REUSE_SEARCHES_HOURS = listOf(1, 24, 168, 720, 8760)
     }
 }
 
@@ -67,6 +72,7 @@ object SettingsKeys {
     val CUSTOM_SUN_HOURS_CELL = intPreferencesKey("custom_sun_hours_cell_dp")
     val CUSTOM_SUN_HOURS_STEP = intPreferencesKey("custom_sun_hours_step_minutes")
     val BROWSED_LIMIT_MIB = intPreferencesKey("browsed_limit_mib")
+    val REUSE_SEARCHES_HOURS = intPreferencesKey("reuse_searches_hours")
     val LAST_LATITUDE = doublePreferencesKey("last_view_latitude")
     val LAST_LONGITUDE = doublePreferencesKey("last_view_longitude")
     val LAST_ZOOM = doublePreferencesKey("last_view_zoom")
@@ -114,6 +120,9 @@ fun decode(preferences: Preferences): Settings {
         browsedLimitMib =
             preferences.read(SettingsKeys.BROWSED_LIMIT_MIB)?.takeIf { it in Settings.BROWSED_LIMITS_MIB }
                 ?: defaults.browsedLimitMib,
+        reuseSearchesHours =
+            preferences.read(SettingsKeys.REUSE_SEARCHES_HOURS)?.takeIf { it in Settings.REUSE_SEARCHES_HOURS }
+                ?: defaults.reuseSearchesHours,
         lastView = preferences.lastView(),
         debug =
             DebugSwitches(

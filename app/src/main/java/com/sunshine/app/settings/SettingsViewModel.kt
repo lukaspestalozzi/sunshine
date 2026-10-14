@@ -18,6 +18,8 @@ class SettingsViewModel(
     regionNotComplete: Flow<Boolean> = flowOf(false),
     /** Clears the browsed tiles; `false` when some could not be removed. */
     private val clearBrowsed: suspend () -> Boolean = { true },
+    /** Removes the saved places and answers of the search (place-search spec, "Clear saved places"). */
+    private val clearSaved: suspend () -> Unit = {},
 ) : ViewModel() {
     val settings: StateFlow<Settings> = store.settings
 
@@ -39,6 +41,8 @@ class SettingsViewModel(
     fun onPreset(preset: Preset) = write { store.setPreset(preset) }
 
     fun onBrowsedLimit(mib: Int) = write { store.setBrowsedLimit(mib) }
+
+    fun onReuseSearches(hours: Int) = write { store.setReuseSearches(hours) }
 
     fun onDebug(change: (DebugSwitches) -> DebugSwitches) = write { store.setDebug(change) }
 
@@ -68,6 +72,13 @@ class SettingsViewModel(
 
     /** Clears the browsed tiles, then calls [done] with whether all of them were removed. */
     fun onClearBrowsed(done: (Boolean) -> Unit) = write { done(clearBrowsed()) }
+
+    /** Clears the saved places and answers, then calls [done]. */
+    fun onClearSaved(done: () -> Unit) =
+        write {
+            clearSaved()
+            done()
+        }
 
     private fun write(change: suspend () -> Unit) {
         viewModelScope.launch { change() }

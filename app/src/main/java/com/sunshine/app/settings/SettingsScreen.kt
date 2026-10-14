@@ -72,6 +72,8 @@ fun SettingsScreen(
     val canClear by viewModel.canClear.collectAsStateWithLifecycle()
     // Whether the last clear removed every browsed tile; `null` before any clear on this page.
     var cleared by remember { mutableStateOf<Boolean?>(null) }
+    // Whether the saved places were cleared on this page.
+    var savedCleared by remember { mutableStateOf(false) }
     val context = LocalContext.current
     // Read again on every resume: the user may have changed it in the system settings meanwhile.
     var locationAllowed by remember { mutableStateOf(context.locationAccess() != LocationAccess.NONE) }
@@ -130,6 +132,13 @@ fun SettingsScreen(
                     cleared == true -> Text(stringResource(R.string.settings_cleared), style = MaterialTheme.typography.bodySmall)
                     cleared == false -> Text(stringResource(R.string.settings_clear_failed), style = MaterialTheme.typography.bodySmall)
                 }
+                ChoiceEntry(R.string.settings_reuse_searches, REUSE_LABELS, settings.reuseSearchesHours, viewModel::onReuseSearches)
+                Text(stringResource(R.string.settings_reuse_searches_note), style = MaterialTheme.typography.bodySmall)
+                // No dialog, as for the browsed tiles (place-search spec, "Clear saved places").
+                OutlinedButton(onClick = { viewModel.onClearSaved { savedCleared = true } }) {
+                    Text(stringResource(R.string.settings_clear_saved))
+                }
+                if (savedCleared) Text(stringResource(R.string.settings_saved_cleared), style = MaterialTheme.typography.bodySmall)
 
                 // In every build, each switch off by default (settings spec, "Debug info"; design D6 of polish-overlay).
                 Section(R.string.settings_debug)
@@ -279,6 +288,20 @@ private val COORDINATE_LABELS: List<Pair<CoordinateFormat, @Composable () -> Str
         CoordinateFormat.LV95 to { stringResource(R.string.settings_coordinates_lv95) },
     )
 
+// 1 hour, 1 day, then whole days (design D6 of add-place-search).
+private val REUSE_LABELS: List<Pair<Int, @Composable () -> String>> =
+    Settings.REUSE_SEARCHES_HOURS.map { hours ->
+        hours to {
+            when (hours) {
+                1 -> stringResource(R.string.settings_one_hour)
+                HOURS_PER_DAY -> stringResource(R.string.settings_one_day)
+                else -> stringResource(R.string.settings_days, hours / HOURS_PER_DAY)
+            }
+        }
+    }
+
+private const val HOURS_PER_DAY = 24
+
 private val START_AT_LABELS: List<Pair<StartAt, @Composable () -> String>> =
     listOf(
         StartAt.LAST_VIEW to { stringResource(R.string.settings_start_last_view) },
@@ -302,6 +325,7 @@ internal val settingsViewModelFactory =
                 store = application.settingsStore,
                 regionNotComplete = application.regionNotComplete,
                 clearBrowsed = application::clearBrowsedTiles,
+                clearSaved = application.placeStore::clear,
             )
         }
     }
