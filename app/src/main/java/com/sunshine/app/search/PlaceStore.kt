@@ -3,7 +3,7 @@ package com.sunshine.app.search
 import com.sunshine.core.Extent
 import com.sunshine.core.GeoPoint
 import com.sunshine.core.distanceMetres
-import com.sunshine.core.matchesName
+import com.sunshine.core.matchesNormalized
 import com.sunshine.core.merge
 import com.sunshine.core.normalizeName
 import com.sunshine.core.words
@@ -45,13 +45,17 @@ class PlaceStore(
         crosshair: GeoPoint,
         limit: Int,
     ): List<Place> {
-        val longest = words(text).maxByOrNull { it.length } ?: return emptyList()
+        val textWords = words(text)
+        val longest = textWords.maxByOrNull { it.length } ?: return emptyList()
+        // Names are normalized once when saved, and each distance is computed once (design D7).
         val matching =
             dao
                 .candidates(longest)
-                .filter { matchesName(text, it.title) }
+                .filter { matchesNormalized(textWords, it.matchText) }
                 .map { it.toPlace() }
-                .sortedBy { distanceMetres(crosshair, it.point) }
+                .map { it to distanceMetres(crosshair, it.point) }
+                .sortedBy { it.second }
+                .map { it.first }
         return merge(matching, limit, name = { it.title }, point = { it.point })
     }
 

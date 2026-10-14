@@ -29,10 +29,32 @@ fun normalizeName(name: String): String =
 fun matchesName(
     text: String,
     name: String,
+): Boolean = matchesNormalized(words(text), normalizeName(name))
+
+/**
+ * [matchesName] for [textWords] already split by [words] and a [normalizedName] already passed through
+ * [normalizeName], so that a long list of saved names is not normalized again for every search.
+ */
+fun matchesNormalized(
+    textWords: List<String>,
+    normalizedName: String,
 ): Boolean {
-    val textWords = words(text)
-    val nameWords = words(name)
-    return textWords.isNotEmpty() && textWords.all { word -> nameWords.any { it.startsWith(word) } }
+    if (textWords.isEmpty()) return false
+    return textWords.all { startsAWord(normalizedName, it) }
+}
+
+/** Whether [word] occurs in [name] at its start or after a character that is neither letter nor digit. */
+private fun startsAWord(
+    name: String,
+    word: String,
+): Boolean {
+    // A scan without allocations: this runs for every candidate of a search (design D7 of add-place-search).
+    var index = name.indexOf(word)
+    while (index >= 0) {
+        if (index == 0 || !name[index - 1].isLetterOrDigit()) return true
+        index = name.indexOf(word, index + 1)
+    }
+    return false
 }
 
 /** The normalized words of [text]. */
