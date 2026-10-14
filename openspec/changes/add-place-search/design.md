@@ -199,7 +199,10 @@ third row on the left below the coordinates; a button in the coordinates row (do
 
 ### D13. Search is a page (user decision, 2026-10-13)
 
-`Screen.SEARCH` in `MainActivity`, with `BackHandler`, `PageTopBar`'s pattern (back arrow, then
+`Screen.SEARCH` in `MainActivity`; the page has its own `BackHandler`, as `CustomResolutionScreen`
+does, because the field is emptied (`onClosed`) before returning: the activity-scoped view model
+outlives the page and would otherwise search a stale text again when the connection changes
+(found during apply). `PageTopBar`'s pattern (back arrow, then
 an `OutlinedTextField` in the bar's place of the title), and the visible `MapArea` passed like the
 Offline page's, for the crosshair and the map size. `search/SearchScreen.kt` and
 `search/SearchViewModel.kt` (factory over `SunshineApp`'s graph). The field requests focus when

@@ -66,7 +66,7 @@ yet. `README.md` is the human-facing overview.
 | `DayCache.kt`, `Uncovered.kt` | Computed days by area, date, cell size and step, least recently used dropped. `reusable` picks the earlier day a new day reuses after a camera move: same date, cell size and step, same zoom or up to one level out, the largest covered share and at least a quarter. A day with such a base computes, at each daytime step the base has, only the rectangles `uncovered` and combines them with the base's grid (`Reused <p> %` in the debug box). |
 | `SunHours.kt`, `HeatmapBands.kt` | The `Sun hours` heatmap: a complete day's sun and unknown steps counted per cell (8 dp with `Normal`) and drawn at one pixel per dp, in 30-minute colour bands. |
 | `LocationButton.kt` | The location button's states idle / waiting / ready as pure functions. |
-| `FirstRunHint.kt`, `SunLine.kt`, `MapOverlay.kt` | The first-run hint; the line toward the sun; the crosshair, and the labels, buttons and debug box over the map (`MapLabels`). |
+| `FirstRunHint.kt`, `SunLine.kt`, `MapOverlay.kt` | The first-run hint; the line toward the sun; the crosshair, and the labels, buttons and debug box over the map (`MapLabels`); tapping the coordinates opens the search page (`search/SearchScreen.kt`, `Screen.SEARCH` in `MainActivity`). |
 | `TimeSelection.kt`, `SunFormat.kt`, `CoordinateFormat.kt` | Time steps of a day, and the panel's and crosshair's text formats. |
 
 ## Workflow: no code without an approved change

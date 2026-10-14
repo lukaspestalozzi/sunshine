@@ -329,6 +329,21 @@ class SearchViewModelTest {
             assertEquals(CameraState(GeoPoint(46.57763, 8.00547), zoom = 13.0), camera)
         }
 
+    @Test
+    fun `a closed page does not search when the network returns`() =
+        search { viewModel, _ ->
+            online.value = false
+            viewModel.onTextChanged("eiger")
+            runCurrent()
+
+            viewModel.onClosed()
+            online.value = true
+            advanceTimeBy(1_000)
+
+            assertEquals(emptyList<SearchKey>(), requests)
+            assertEquals("", viewModel.text.value)
+        }
+
     /** Runs [test] with a view model opened at Interlaken, zoom 12, on a 400 × 800 dp map. */
     private fun search(test: suspend TestScope.(SearchViewModel, PlaceStore) -> Unit) =
         runTest {

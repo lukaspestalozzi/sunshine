@@ -71,6 +71,7 @@ import kotlinx.coroutines.launch
 fun MapScreen(
     onSettingsClicked: () -> Unit,
     onOfflineClicked: (MapArea) -> Unit,
+    onSearchClicked: (MapArea) -> Unit,
     viewModel: MapViewModel = viewModel(factory = mapViewModelFactory),
 ) {
     val camera by viewModel.camera.collectAsStateWithLifecycle()
@@ -164,6 +165,10 @@ fun MapScreen(
             },
             locationButton = locationButton,
             onLocationClicked = { viewModel.onLocationTapped(context.locationAccess(), context.isLocationOn()) },
+            // The crosshair and the map size, for the bias, the distances and the zoom (design D13 of add-place-search).
+            onSearchClicked = {
+                onSearchClicked(MapArea(camera.center, camera.zoom, maxWidth.value.toDouble(), maxHeight.value.toDouble()))
+            },
             debugLines = if (settings.debug.any) debugLines(debugValues, settings.debug) else emptyList(),
             // Left of the crosshair, as the panel in landscape (settings spec, "Debug info").
             debugMaxWidth = widthLeftOfCrosshair(maxWidth, startInset),
@@ -288,7 +293,7 @@ private val CROSSHAIR_CLEARANCE = 32.dp
 
 private const val PERCENT = 100f
 
-private val mapViewModelFactory =
+internal val mapViewModelFactory =
     viewModelFactory {
         initializer {
             val application = checkNotNull(this[APPLICATION_KEY]) { "MapViewModel needs the Application" }

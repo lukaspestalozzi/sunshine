@@ -15,6 +15,12 @@
     <string name="hint_modes_hours">the hours of sun over the day.</string>
     <string name="hint_got_it">Got it</string>
     <string name="back">Back</string>
+    <string name="search_places">Search places</string>
+    <string name="search_placeholder">Search places or coordinates</string>
+    <string name="search_clear">Clear</string>
+    <string name="search_offline">Offline · showing saved places</string>
+    <string name="search_unavailable">Search unavailable · showing saved places</string>
+    <string name="search_none_found">No places found</string>
     <string name="sun_panel_azimuth">Azimuth</string>
     <string name="sun_panel_elevation">Elevation</string>
     <string name="sun_panel_civil_dawn">Civil dawn</string>
