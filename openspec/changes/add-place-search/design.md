@@ -165,7 +165,7 @@ The distance (`core/Places.kt`, `formatDistance`) is formatted with `Locale.ROOT
 
 ### D11. Coordinates as search text in `core` (user decision, 2026-10-13)
 
-`core/Coordinates.kt`: `parseCoordinates(text): TypedCoordinates?` with the point and the typed
+`core/Coordinates.kt`: `parseCoordinates(text): Coordinates?` with the point and the typed
 kind (decimal, DMS, LV95) and, for LV95, the typed easting and northing, which the entry shows
 instead of a round trip (LV95 → WGS84 → LV95 moves Interlaken's northing by −0.57 m, which would
 display `1'170'651` for a typed `1'170'652`). `Lv95.kt` gets `fromLv95(Lv95): GeoPoint` by
